@@ -3,7 +3,8 @@ package io.github.javiernarvaezz.shura.core.innertube
 /**
  * Identity of the anonymous `WEB_REMIX` (YouTube Music web) client used for catalog requests.
  *
- * [clientVersion] must track a version YouTube Music currently accepts.
+ * [clientVersion] must track a version YouTube Music currently accepts. The [hl] and [gl] defaults are
+ * placeholders for the Phase 1 spike; they will come from the device language and region.
  */
 data class InnerTubeConfig(
     val clientVersion: String = DEFAULT_CLIENT_VERSION,
