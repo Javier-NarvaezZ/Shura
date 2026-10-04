@@ -1,6 +1,6 @@
 # ADR 0001: Stream resolution via InnerTubeX behind `StreamResolver`
 
-- **Status:** Proposed (revised). The first live gate passed only partially. The follow-up investigation and the revised recommendation are below, pending approval.
+- **Status:** Accepted on 2026-10-04: the revised recommendation plus "Implementation requirements".
 - **Date:** 2026-10-04
 - **Scope:** `:core:stream`, `:core:innertube`, build configuration
 
@@ -279,6 +279,85 @@ Both apps work today, which makes them the best available evidence. This is read
 2. **Immediately after**, implement the Android `PoTokenMinter` and re-run the live gate on the phone with the explicit track.
 3. Decide SABR afterwards, depending on what still fails.
 4. Desktop PoToken in Phase 5, starting with WebView2.
+
+## Implementation requirements (accepted 2026-10-04)
+
+These are binding for `:core:stream` and its platform code.
+
+### R1. InnerTubeX failure state and resolver recovery
+
+- **Problem:** InnerTubeX keeps some failure state process-wide, and it outlives an extractor instance (see the side observations above). A bad run can therefore block later resolutions in the same process for a while.
+- **Android:** the resolver runs in the `:resolver` process. Recovery escalates in this order:
+  1. per-video client exclusion with a short TTL, as the library does;
+  2. recreate the extraction bundle (new `HttpClient`, `InnerTube`, cipher service and extractor) after N consecutive failures;
+  3. **restart the `:resolver` process** (unbind and stop the service, then rebind). This is the only step guaranteed to clear library-global state.
+- **Required test** when the separate process is implemented: force failures until a resolution fails fast without network, restart `:resolver`, and check that the next resolution makes network requests and succeeds.
+- **Desktop** has no separate process yet (Phase 5). There, steps 1 and 2 apply, and the residual risk is documented.
+
+### R2. Hardened PoToken `WebView` (Android)
+
+**Settings:**
+- `allowFileAccess = false` and `allowContentAccess = false`.
+- `allowFileAccessFromFileURLs = false` and `allowUniversalAccessFromFileURLs = false`.
+- No geolocation, no multiple windows.
+- `mediaPlaybackRequiresUserGesture = true`.
+- Safe Browsing left on.
+
+**Page:**
+- The page is loaded from an in-memory string with `loadDataWithBaseURL("https://www.youtube.com", …)`, never from `file://`.
+- The page, bgutils-js and the glue code ship as **assets inside the APK**: nothing is fetched to bootstrap the page itself.
+
+**Network allowlist:**
+- It is enforced in `WebViewClient.shouldInterceptRequest` and `shouldOverrideUrlLoading`. Anything else is blocked and logged by host only.
+- Allowed:
+  - `jnn-pa.googleapis.com` for the BotGuard `Create`/`GenerateIT` calls (bgutils-js v4.0.3 constants);
+  - `www.youtube.com` for its alternative `api/jnn` endpoint;
+  - the host of the BotGuard interpreter script, **only if** the challenge returns a script URL instead of inline script.
+- **Not verified:** which host that interpreter URL uses. It is expected to be `www.google.com`, and it will be confirmed in the Android gate before being added to the allowlist.
+
+**JavaScript bridge:**
+- Exactly one `@JavascriptInterface` object with one method that receives `(requestId, token | error code)`.
+- It never receives cookies, URLs or other data.
+- The bridge does not expose any app object.
+
+**Storage and cookies:**
+- bgutils-js itself uses **no** cookies, `localStorage`, `sessionStorage` or IndexedDB (checked in its v4.0.3 source).
+- The BotGuard program it runs is opaque Google code. Orchard enables DOM storage for it; **whether BotGuard needs DOM storage or cookies is not verified**.
+- Start strict:
+  - third-party cookies off;
+  - `CookieManager` accepting no cookies for this `WebView`;
+  - DOM storage enabled, because Orchard needs it, but **non-persistent**: `WebStorage.deleteAllData()`, `CookieManager.removeAllCookies()` and `clearCache(true)` run on teardown and on every `WebView` recreation.
+- Relax only what the Android gate proves necessary, and record it here.
+
+**Process isolation:**
+- The `WebView` lives in the `:resolver` process, with its own data directory (`WebView.setDataDirectorySuffix`).
+- Its cookies and storage are therefore isolated from any `WebView` the app might use elsewhere.
+
+### R3. Remote cipher configs are permanently disabled
+
+- Shura never constructs a `RemotePlayerConfigStore` and never implements a `PlayerConfigRepository` with `enabled = true`.
+- Nothing from `MetrolistGroup/faraday` (no license) or `ZemerTeam/zemer-cipher` is fetched, bundled or copied.
+- `raw.githubusercontent.com`, `github.com` and `cdn.jsdelivr.net` are never on the allowlist.
+- A unit test in `:core:stream` fails the build if the InnerTubeX wiring receives a non-null `RemotePlayerConfigStore`.
+
+### R4. Visible errors, never silent failures
+
+- `StreamResolver` returns typed failures, for example:
+  - `TokenUnavailable`
+  - `NoPlayableStream`
+  - `AgeRestricted`
+  - `Unavailable`
+  - `Network`
+  - `ResolverCrashed`
+- The player maps any of them to a clear UI state: "Couldn't play this track" with a **Retry** action. Playback never stalls or skips silently.
+- Every failure is logged with a sanitized cause: error type, InnerTubeX reason, the attempted client profiles and outcomes, the HTTP status, and hosts only.
+- Logs never include URLs, query strings, cookies, visitor data or tokens.
+
+### R5. Dependency records
+
+- When bgutils-js is added, record it in `docs/dependencies.md` with its exact version (v4.0.3 at the time of writing; confirm at implementation time) and license (MIT).
+- Record also where it comes from and how it is bundled (a pinned asset, with its SHA-256 in the dependency record).
+- InnerTubeX and every other new dependency get the same treatment, and they are added only after explicit approval.
 
 ## Consequences
 
