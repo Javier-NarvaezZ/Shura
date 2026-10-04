@@ -359,6 +359,12 @@ These are binding for `:core:stream` and its platform code.
 - Record also where it comes from and how it is bundled (a pinned asset, with its SHA-256 in the dependency record).
 - InnerTubeX and every other new dependency get the same treatment, and they are added only after explicit approval.
 
+### R6. Ktor version alignment with InnerTubeX
+
+- `:core:innertube` adopts Ktor 3.6.0, while InnerTubeX v0.7.4 is built against Ktor 3.5.2. When InnerTubeX is added, Gradle resolves both to 3.6.0.
+- If that upgrade breaks InnerTubeX at compile time, in tests or in the live gate, the fix is to **align Shura's Ktor to the version InnerTubeX supports** (or upgrade InnerTubeX to a release built against the newer Ktor).
+- The library is never patched, forked or shimmed to tolerate a Ktor version it was not built for.
+
 ## Consequences
 
 - Shura depends on a young, single-maintainer GPL-3.0 library for its riskiest part. This is mitigated by:
