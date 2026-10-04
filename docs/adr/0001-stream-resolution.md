@@ -1,6 +1,6 @@
 # ADR 0001: Stream resolution via InnerTubeX behind `StreamResolver`
 
-- **Status:** On hold. The live gate passed only partially (see "Validation gate results"), so the decision is being revisited.
+- **Status:** Proposed (revised). The first live gate passed only partially. The follow-up investigation and the revised recommendation are below, pending approval.
 - **Date:** 2026-10-04
 - **Scope:** `:core:stream`, `:core:innertube`, build configuration
 
@@ -81,7 +81,8 @@ From reading the InnerTubeX v0.7.4 source:
 **Decision:** construct InnerTubeX without a `RemotePlayerConfigStore`. Cipher solving then uses only the bundled yt-dlp EJS solver and the regex parser.
 
 As defense in depth, the Ktor `HttpClient` given to InnerTubeX gets a **host allowlist**:
-- `*.youtube.com` and `*.googlevideo.com` for resolution and media. The live gate observed only `music.youtube.com`, `www.youtube.com` (`/watch`, `/embed`, `/youtubei/v1/player`, `/s/player/…`) and `rr*---sn-*.googlevideo.com` (`/videoplayback`);
+- `*.youtube.com` and `*.googlevideo.com` for resolution and media. The InnerTubeX runs only contacted `music.youtube.com`, `www.youtube.com` (`/watch`, `/embed`, `/youtubei/v1/player`, `/s/player/…`) and `rr*---sn-*.googlevideo.com` (`/videoplayback`);
+- `youtubei.googleapis.com` (`/youtubei/v1/visitor_id`, `/reel`, `/player`). NewPipeExtractor needs it, but InnerTubeX does not;
 - anything else fails before a connection is opened, and only the host is logged, never the URL.
 
 Artwork is loaded by a different HTTP client (Coil), so it does not go through this allowlist. If Shura later adds an app-wide allowlist, it must also include the artwork hosts seen in search and player responses on 2026-10-04: `i.ytimg.com` (video thumbnails), `lh3.googleusercontent.com` (album and track art), and `yt3.ggpht.com` and `yt3.googleusercontent.com` (artist and channel images).
@@ -166,6 +167,118 @@ If this fails, the spike stops and the decision is revisited (PoToken minting, p
 5. No requests to GitHub or jsDelivr, and no blocked hosts.
 
 **Outcome:** the gate **passes for ordinary tracks and fails for explicit ones**, and the passing path depends on one fragile client. Per this ADR, the spike stops here and the approach is revisited before more code is written.
+
+## Follow-up investigation (2026-10-04)
+
+### How the reference apps resolve streams today
+
+Both apps work today, which makes them the best available evidence. This is read from their source code (Metrolist `f758c86`, Orchard `e6cf95b`); no code was copied.
+
+**Metrolist (Android only)**
+- InnerTubeX v0.7.0, with **direct transport only**: it sets `allowHls = false` and `allowSabr = false` and rejects any SABR result.
+- **PoToken:** a `TokenProvider` declared as `WEB_BOTGUARD` with `usesWebView = true`. A hidden Android `WebView` runs BotGuard and mints a player token per `videoId` and a streaming token bound to the visitor data. Android only.
+- **Remote cipher configs enabled.** Metrolist points them at the zemer-cipher table. InnerTubeX v0.7.4 would no longer accept that URL: it only accepts `MetrolistGroup/faraday`.
+- **Explicit tracks:** it passes the catalog's `isExplicit` to `ContentHints` and has no other special path. It sends login cookies when the user is signed in, but does not require a session.
+- **Client order:** InnerTubeX's scored catalog, plus per-video client exclusion after a 403/410 for 5 min.
+
+**Orchard, Android**
+- **Primary resolver:** NewPipeExtractor v0.26.4, with **no PoToken provider configured**. When the user is signed in, the session cookie rides along on YouTube hosts.
+- **Fallback:** a guest InnerTube client catalog (`ANDROID_VR`, `VISIONOS`, `WEB_REMIX` with PoToken, …) with per-track client bans.
+- **PoToken:** minted with bgutils-js (MIT) in a hidden `WebView`.
+- **Explicit tracks:** Orchard states that the catalog's "explicit" flag is only a lyrics advisory and must not change stream selection.
+- **Real age gates:** they need a **signed-in session** (itag 18 direct, then HLS).
+
+**Orchard, desktop (Electron)**
+- youtubei.js for streams.
+- **PoToken:** BotGuard in Node with bgutils-js plus a jsdom DOM shim.
+- A local proxy serves the audio.
+
+### Diagnosis of the explicit-track 403 (one resolution each)
+
+| Variant | Client / profile | Transport | Result |
+|---|---|---|---|
+| Direct only, no remote configs (gate run) | WEB_EMBEDDED_PLAYER | Direct | 403 on the first range |
+| **SABR allowed**, no remote configs | VISIONOS_SABR (no PoToken) | SABR | **OK**: 4,318,756 bytes in 694 ms, decodes to 243.7 s |
+| **Remote configs enabled** (Faraday table fetched), direct only | WEB_EMBEDDED_PLAYER | Direct | **Still 403** |
+
+**Conclusions:**
+- **The cipher is not the cause.** The 403 is identical with the remote solver configs.
+- **The session is not the cause either.** The track plays without a session over SABR, and also over NewPipe's direct URL (below). It is not a real age gate.
+- **The cause is InnerTubeX's client policy combined with the missing PoToken.** Without a token, the only automatic direct client that is not blocked is `VISIONOS_0_1`, and InnerTubeX allows it for "normal audio only". For explicit tracks the remaining direct candidate (`WEB_EMBEDDED_PLAYER`) yields a URL that googlevideo rejects. **Most likely** it needs a streaming (GVS) PoToken, but this is not verified, because no token was minted.
+
+**Side observations:**
+- InnerTubeX keeps some failure state **process-wide**. A fresh extractor in the same JVM failed in 5 ms with no network request right after a previous run. A per-process resolver (see "Crash isolation") also contains this.
+- The Faraday repository (`MetrolistGroup/faraday`) declares **no license**. That is one more reason never to fetch its configs in Shura.
+
+### NewPipeExtractor gate (v0.26.5, same conditions, no PoToken provider)
+
+| Track | Client (from the URL's `c=` parameter) | Transport | Expected bytes | Received bytes | Decode | Resolve time | Hosts |
+|---|---|---|---|---|---|---|---|
+| Tití Me Preguntó (ATV, explicit) | VISIONOS | Direct (progressive), itag 251 opus | 4,318,756 | 4,318,756 (206×5) | OK, 243.7 s | 2,545 ms | `youtubei.googleapis.com`, `www.youtube.com`, googlevideo |
+| La Camisa Negra (ATV) | VISIONOS | Direct, itag 251 | 3,565,616 | 3,565,616 (206×4) | OK, 216.7 s | 1,787 ms | same |
+| Hips Don't Lie (ATV) | VISIONOS | Direct, itag 251 | 3,219,692 | **0 (403)** | — | 2,067 ms | same |
+
+**Findings:**
+- **NewPipeExtractor also depends on `VISIONOS` without a PoToken.** It plays the explicit track over direct transport, so InnerTubeX's "normal audio only" rule is a library policy, not a YouTube limit observed here.
+- **One of the three URLs was rejected**, and the cause was not determined. NewPipe does not expose the client's required request headers per stream, and the test used a desktop Firefox User-Agent. Orchard notes that the URL must be fetched with the identity of the client that produced it. **Not verified.**
+- **Neither library downloaded `player.js`** in these runs, so the cipher was not exercised by either.
+- Resolution takes about 1.8–2.5 s per track (more requests: `visitor_id`, `reel`, `player`, `next`), compared with about 0.2–0.3 s for InnerTubeX once warm.
+
+### Comparison
+
+| | InnerTubeX v0.7.4 | NewPipeExtractor v0.26.5 | Metrolist / Orchard approach |
+|---|---|---|---|
+| Ordinary tracks today, no PoToken | ✅ direct, via `VISIONOS_0_1` only | ✅ direct, via `VISIONOS` only (2/3, one 403 not explained) | — (both mint tokens) |
+| Explicit tracks today, no PoToken | ❌ direct (403) · ✅ **SABR** (`VISIONOS_SABR`) | ✅ direct (1/1) | Metrolist: direct + PoToken · Orchard: NewPipe, then PoToken clients |
+| Needs a PoToken for a robust path | Yes: every non-legacy client was skipped for lack of one | Not shown; it uses the same single legacy client | **Yes: both apps mint one** |
+| Needs a session | No (only for real age gates and uploads) | No | Orchard: only for real age gates and uploads |
+| Cipher exercised | No (resolved without deciphering) | No | Yes, in production (remote configs or EJS in a WebView) |
+| Platforms | KMP: Android + JVM desktop (Windows QuickJS bundled) | JVM (Android + desktop), not `commonMain` | Metrolist: Android only · Orchard: separate Android and Electron code |
+| Transports | Direct, HLS, SABR (experimental API) | Direct, DASH/HLS manifests | Direct (Metrolist rejects SABR) |
+| PoToken minting | Host-provided (`TokenProvider`) | Host-provided (`PoTokenProvider`) | Android: BotGuard in a hidden `WebView` · desktop: bgutils-js + jsdom in Node |
+| License | GPL-3.0 | GPL-3.0 | GPL-3.0 / AGPL-3.0 (reference only) |
+
+### Revised recommendation
+
+1. **Keep InnerTubeX as the primary `StreamResolver` and NewPipeExtractor as plan B.**
+   - Without a PoToken, both libraries hit the same wall (one legacy client), so switching would not remove the risk.
+   - InnerTubeX remains KMP, resolves faster, and is the only one of the two with a working no-token route for explicit tracks today (SABR).
+2. **Make PoToken minting a first-class part of `:core:stream`.** Both production apps do it, and it is the only thing that makes the non-legacy direct clients eligible again. InnerTubeX already defines the `TokenProvider` contract, so Shura only supplies the minter per platform.
+3. **SABR is a fallback, not the main path.**
+   - It works today without a token, but its InnerTubeX API is marked `@ExperimentalSabrApi`, and Metrolist (by the same authors) does not use it in production.
+   - Using it from Media3 needs a custom `DataSource` that streams from `SabrAudioStream` and restarts at the seek position.
+   - It is deferred until the PoToken path is measured.
+
+**PoToken on Android (proposed design, to be validated with the same live gate):**
+- A small `PoTokenMinter` in `androidMain` of `:core:stream`, implementing InnerTubeX's `TokenProvider`.
+- It hosts a hidden `WebView` loaded with a local HTML page with base URL `https://www.youtube.com`. Inside it, bgutils-js (MIT, bundled as a local asset, not fetched remotely) runs BotGuard:
+  1. fetch the challenge (`jnn/v1/Create`);
+  2. run the BotGuard program;
+  3. get the integrity token (`jnn/v1/GenerateIT`);
+  4. mint a **streaming token** bound to the visitor data, once per session;
+  5. mint a **player token** per `videoId`.
+- **Rules:**
+  - tokens are cached in memory with their expiry;
+  - a token is invalidated when a URL carrying it is rejected;
+  - a hard timeout (about 8 s) applies, after which it proceeds without a token;
+  - the `WebView` is recreated if it crashes;
+  - tokens are never logged.
+- It lives in the same `:resolver` process as the rest of the resolver (see "Crash isolation").
+- **The JS that runs is BotGuard's own challenge program, downloaded from Google.** It is remote code, like `player.js`, and inherent to the mechanism. It runs inside the system `WebView` sandbox.
+- **Acceptance:** the explicit ATV track and the ordinary tracks play over **direct transport with a non-legacy client** (e.g. `WEB_REMIX`), and the downloaded length matches.
+
+**PoToken on desktop (Windows); none of these is evaluated yet, to be decided in Phase 5:**
+1. **System WebView2** (Edge/Chromium runtime, preinstalled on Windows 10/11), driven through a native bridge. This is the closest analogue to the Android `WebView` and adds no browser to the download. It needs JNI/JNA interop and Windows-only code, and cannot be tested locally.
+2. **Embedded Chromium** (JCEF, e.g. through a Compose Desktop wrapper). Cross-platform and proven, but it adds a large download (Chromium) to the installer.
+3. **BotGuard in a JS engine with a DOM shim**, the way Orchard desktop uses Node + jsdom. On the JVM there is no jsdom equivalent, so this would mean bundling Node or writing a shim. BotGuard may detect a fake DOM. Highest uncertainty.
+4. **No token on desktop:** legacy direct client plus SABR for the rest. Simplest, but it inherits the single-client fragility.
+5. **External token service:** rejected. It sends user traffic to a third party and conflicts with the no-remote-code rule.
+
+**Suggested order:**
+1. Finish the spike with InnerTubeX direct without a token, which plays ordinary tracks, to get search → resolve → play working end to end on the phone.
+2. **Immediately after**, implement the Android `PoTokenMinter` and re-run the live gate on the phone with the explicit track.
+3. Decide SABR afterwards, depending on what still fails.
+4. Desktop PoToken in Phase 5, starting with WebView2.
 
 ## Consequences
 
