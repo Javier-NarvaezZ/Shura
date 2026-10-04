@@ -6,6 +6,8 @@ dependencies {
     compileOnly(libs.android.gradlePlugin)
     compileOnly(libs.kotlin.gradlePlugin)
     compileOnly(libs.compose.compiler.gradlePlugin)
+    compileOnly(libs.detekt.gradlePlugin)
+    compileOnly(libs.ktlint.gradlePlugin)
 }
 
 gradlePlugin {
@@ -17,6 +19,10 @@ gradlePlugin {
         register("kmpCompose") {
             id = "shura.kmp.compose"
             implementationClass = "KmpComposeConventionPlugin"
+        }
+        register("quality") {
+            id = "shura.quality"
+            implementationClass = "QualityConventionPlugin"
         }
     }
 }

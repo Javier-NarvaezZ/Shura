@@ -13,6 +13,7 @@ class KmpLibraryConventionPlugin : Plugin<Project> {
         with(target) {
             pluginManager.apply("org.jetbrains.kotlin.multiplatform")
             pluginManager.apply("com.android.kotlin.multiplatform.library")
+            pluginManager.apply("shura.quality")
 
             val jvmTarget = JvmTarget.fromTarget(libs.version("jvmTarget"))
 
