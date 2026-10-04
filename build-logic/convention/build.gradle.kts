@@ -14,5 +14,9 @@ gradlePlugin {
             id = "shura.kmp.library"
             implementationClass = "KmpLibraryConventionPlugin"
         }
+        register("kmpCompose") {
+            id = "shura.kmp.compose"
+            implementationClass = "KmpComposeConventionPlugin"
+        }
     }
 }

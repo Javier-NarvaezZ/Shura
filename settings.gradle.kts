@@ -17,6 +17,8 @@ dependencyResolutionManagement {
 
 rootProject.name = "shura"
 
+enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
+
 include(
     ":core:model",
     ":core:innertube",
@@ -24,4 +26,11 @@ include(
     ":core:data",
     ":core:player",
     ":core:auth",
+    ":core:ui",
+    ":feature:home",
+    ":feature:search",
+    ":feature:player",
+    ":feature:library",
+    ":feature:lyrics",
+    ":feature:settings",
 )
