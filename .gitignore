@@ -1,0 +1,48 @@
+# Gradle / Kotlin
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+.kotlin/
+
+# Android
+local.properties
+*.apk
+*.aab
+*.jks
+*.keystore
+captures/
+.cxx/
+
+# IDEs
+.idea/
+*.iml
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+
+# Secretos y sesiones (NUNCA al repo)
+.env
+.env.*
+*.pem
+cookies*
+*.cookies
+secrets/
+keystore.properties
+
+# Claude Code (configuración personal)
+.claude/settings.local.json
+
+# Sistema
+.DS_Store
+Thumbs.db
+
+# Salidas de Graphify
+graphify-out/
+
+# Archivos de trabajo con IA (solo locales)
+CLAUDE.md
+CLAUDE.local.md
+.claude/
+PLAN.md
+docs/PROMPTS.md
+docs/STATUS.md
