@@ -18,3 +18,16 @@ Anota aquí cada dependencia nueva con su licencia y por qué se agregó.
 | Ktor client mock (`io.ktor:ktor-client-mock`) | 3.6.0 | Apache-2.0 | Test only: `MockEngine` with recorded fixtures |
 | kotlinx-coroutines-test | 1.11.0 | Apache-2.0 | Test only: `runTest` |
 
+## Dependency verification
+
+`gradle/verification-metadata.xml` holds SHA-256 checksums for every resolved artifact (plugins, `build-logic`, Android and desktop builds, including the Windows-only Compose Desktop natives used by CI). A dependency whose checksum does not match fails the build.
+
+Regenerate it after adding or upgrading a dependency, review the diff, and commit it with the change:
+
+```
+./gradlew --write-verification-metadata sha256 \
+    -I gradle/verification-windows-natives.init.gradle \
+    build detekt ktlintCheck :app-android:assembleDebug :app-desktop:assemble :app-desktop:resolveWindowsNatives
+```
+
+The init script adds a temporary configuration that resolves the windows-x64 Compose Desktop variant, which a Linux run would otherwise skip.
