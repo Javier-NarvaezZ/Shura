@@ -20,6 +20,7 @@ rootProject.name = "shura"
 enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
 
 include(
+    ":app-android",
     ":core:model",
     ":core:innertube",
     ":core:stream",
