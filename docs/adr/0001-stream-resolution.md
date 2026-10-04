@@ -1,6 +1,6 @@
 # ADR 0001: Stream resolution via InnerTubeX behind `StreamResolver`
 
-- **Status:** Accepted (pending the live gate in "Validation gate")
+- **Status:** On hold. The live gate passed only partially (see "Validation gate results"), so the decision is being revisited.
 - **Date:** 2026-10-04
 - **Scope:** `:core:stream`, `:core:innertube`, build configuration
 
@@ -81,12 +81,24 @@ From reading the InnerTubeX v0.7.4 source:
 **Decision:** construct InnerTubeX without a `RemotePlayerConfigStore`. Cipher solving then uses only the bundled yt-dlp EJS solver and the regex parser.
 
 As defense in depth, the Ktor `HttpClient` given to InnerTubeX gets a **host allowlist**:
-- YouTube hosts (`*.youtube.com`) and media hosts (`*.googlevideo.com`), finalized from the hosts observed in the live gate;
+- `*.youtube.com` and `*.googlevideo.com` for resolution and media. The live gate observed only `music.youtube.com`, `www.youtube.com` (`/watch`, `/embed`, `/youtubei/v1/player`, `/s/player/…`) and `rr*---sn-*.googlevideo.com` (`/videoplayback`);
 - anything else fails before a connection is opened, and only the host is logged, never the URL.
 
-**Remaining remote code, and it is unavoidable:** YouTube's own `player.js` is downloaded from `www.youtube.com` and evaluated in QuickJS to solve the `sig`/`n` challenges. Every working extractor does this (NewPipeExtractor evaluates it in Rhino). It runs in an embedded JS engine with no file or network bindings.
+Artwork is loaded by a different HTTP client (Coil), so it does not go through this allowlist. If Shura later adds an app-wide allowlist, it must also include the artwork hosts seen in search and player responses on 2026-10-04: `i.ytimg.com` (video thumbnails), `lh3.googleusercontent.com` (album and track art), and `yt3.ggpht.com` and `yt3.googleusercontent.com` (artist and channel images).
 
-The live gate below verifies empirically that no request reaches GitHub or jsDelivr.
+**Remaining remote code, and it is unavoidable:** YouTube's own `player.js` is downloaded from `www.youtube.com` and evaluated in QuickJS to solve the `sig`/`n` challenges. Every working extractor does this (NewPipeExtractor evaluates it in Rhino).
+
+**Live check:** across 8 resolutions with every request routed through a host guard, no request was attempted to GitHub, jsDelivr or any host outside the allowlist.
+
+### QuickJS sandbox
+
+The context that evaluates `player.js` has no network, file or host API access. This was verified in three ways:
+
+1. **Native build.** quickjs-kt 1.0.14 compiles only the QuickJS core (`quickjs.c`, `libregexp`, `libunicode`, `cutils`, `dtoa`) plus its JNI bridge. It does **not** compile `quickjs-libc`, which is what provides the `std`/`os` modules (files, processes, timers). The shipped `libquickjs.so` (linux_x64) exports no `js_std*`/`js_os*`/`js_init_module*` symbols and imports none of `fopen`, `open`, `popen`, `system`, `socket`, `connect`, `exec*` or `dlopen`.
+2. **InnerTubeX setup.** `QuickJsEngine` creates the runtime with an evaluation timeout and a memory limit, and registers **no** host functions or bindings: there are no `define`/`function`/`asyncFunction` calls anywhere in the library. Its YouTube globals setup only adds inert stub objects (`XMLHttpRequest`, `location`, `document`, `navigator`, `self`, `window`, and a minimal `Intl` polyfill) that cannot call back into the host.
+3. **Runtime probe.** In a default quickjs-kt 1.0.14 context, `std`, `os`, `fetch`, `require`, `XMLHttpRequest`, `print`, `console`, `scriptArgs`, `setTimeout` and `WebAssembly` are all `undefined`.
+
+**Residual risk:** a memory-safety bug in QuickJS itself (as in issue #23). That is a crash risk, and it is covered by the process isolation below.
 
 ## Crash isolation (mitigation for issue #23, not implemented yet)
 
@@ -119,6 +131,41 @@ A disposable JVM program, kept outside the repository, runs on Linux. For a hand
 4. record which client was used and the list of hosts contacted, with no GitHub or jsDelivr host in that list.
 
 If this fails, the spike stops and the decision is revisited (PoToken minting, plan B, or both) before any more code is written.
+
+## Validation gate results (2026-10-04, Linux, one residential IP)
+
+**Setup:**
+- InnerTubeX v0.7.4 with no `TokenProvider` and no `RemotePlayerConfigStore`.
+- `AudioQuality.HIGH`, `allowHls = false`, `allowSabr = false` (direct only, the transport Media3 plays natively).
+- Requests were sequential: 8 s between tracks and 400 ms between 1 MiB range chunks.
+- Two runs, 8 tracks in total. The first run's picker took the top search result, which was a live version or a video (OMV/UGC). The second run preferred album audio (ATV).
+
+| Track (type) | Client / profile | Transport | Expected bytes | Received bytes | Decode | Resolve time |
+|---|---|---|---|---|---|---|
+| Hips Don't Lie, Anniversary (OMV) | VISIONOS_0_1 (no PoToken) | Direct, opus | 3,691,220 | 3,691,220 (206×4) | OK, 216.2 s | 1,208 ms |
+| La Camisa Negra, live MTV (OMV) | VISIONOS_0_1 | Direct, opus | 3,710,791 | 3,710,791 (206×4) | OK, 230.5 s | 263 ms |
+| Tití Me Preguntó, live Super Bowl (UGC) | VISIONOS_0_1 | Direct, opus | 1,371,892 | 1,371,892 (206×2) | OK, 79.6 s | 281 ms |
+| Bohemian Rhapsody, Live Aid (UGC) | VISIONOS_0_1 | Direct, opus | 2,643,857 | 2,643,857 (206×3) | OK, 164.6 s | 274 ms |
+| Provenza, Tiësto remix live (UGC) | VISIONOS_0_1 | Direct, opus | 5,421,902 | 5,421,902 (206×6) | OK, 350.0 s | 275 ms |
+| **Tití Me Preguntó (ATV, explicit)** | WEB_EMBEDDED_PLAYER (no PoToken) | Direct, opus | 4,318,756 | **0 (403 on first chunk)** | — | 5,459 ms |
+| La Camisa Negra (ATV) | VISIONOS_0_1 | Direct, opus | 3,565,616 | 3,565,616 (206×4) | OK, 216.7 s | 223 ms |
+| Hips Don't Lie (ATV) | VISIONOS_0_1 | Direct, AAC | 3,568,011 | 3,568,011 (206×4) | OK, 220.4 s | 215 ms |
+
+**Hosts contacted:** `music.youtube.com`, `www.youtube.com` and `rr*---sn-*.googlevideo.com` only.
+
+**Findings:**
+
+1. **Every successful track came from a single client, `VISIONOS_0_1`.** Every other automatic profile was skipped at selection with "GVS PO-token provider unavailable" (and `WEB_CREATOR` also with "login required"). Playback without a PoToken therefore depends on one legacy client. InnerTubeX v0.7.2 already removed it from automatic selection once ("rejected legacy visionOS"), and v0.7.3 allowed it back for ordinary audio only.
+2. **Explicit tracks fail with direct transport and no PoToken.** InnerTubeX limits `VISIONOS_0_1` to "normal audio only".
+   - For the explicit ATV track, it found playable responses only for **SABR** profiles (`VISIONOS_SABR`, `WEB_REMIX_SABR`), which this run disallowed.
+   - It then fell back to `WEB_EMBEDDED_PLAYER`. That path downloaded `player.js`, so the cipher ran, but googlevideo answered **403** on the first range.
+   - **Not determined:** whether that 403 comes from a wrong `n` solution (no remote configs, EJS only) or from the missing streaming PoToken.
+   - This matters for the target audience: a large share of urban and Latin catalog is marked explicit.
+3. **The cipher path was not exercised by any successful resolution.** `VISIONOS_0_1` returns plain URLs, so the "EJS-only, no remote configs" setup is still unvalidated for clients that need deciphering.
+4. Resolution is fast once warm (about 215–280 ms per track; about 1.2 s cold; 5.5 s for the failing explicit track).
+5. No requests to GitHub or jsDelivr, and no blocked hosts.
+
+**Outcome:** the gate **passes for ordinary tracks and fails for explicit ones**, and the passing path depends on one fragile client. Per this ADR, the spike stops here and the approach is revisited before more code is written.
 
 ## Consequences
 
