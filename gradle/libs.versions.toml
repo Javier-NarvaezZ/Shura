@@ -7,6 +7,9 @@ androidx-activity = "1.13.0"
 detekt = "2.0.0-alpha.6"
 ktlint-gradle = "14.2.0"
 ktlint = "1.8.0"
+ktor = "3.6.0"
+kotlinx-serialization = "1.11.0"
+kotlinx-coroutines = "1.11.0"
 android-minSdk = "26"
 android-compileSdk = "37"
 android-targetSdk = "37"
@@ -19,6 +22,10 @@ compose-ui = { module = "org.jetbrains.compose.ui:ui", version.ref = "compose-mu
 compose-material3 = { module = "org.jetbrains.compose.material3:material3", version.ref = "compose-material3" }
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "androidx-activity" }
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
+ktor-client-core = { module = "io.ktor:ktor-client-core", version.ref = "ktor" }
+ktor-client-mock = { module = "io.ktor:ktor-client-mock", version.ref = "ktor" }
+kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinx-serialization" }
+kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "kotlinx-coroutines" }
 
 # Gradle plugins used by build-logic convention plugins
 android-gradlePlugin = { module = "com.android.tools.build:gradle", version.ref = "agp" }
