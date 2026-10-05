@@ -51,6 +51,8 @@ private val STAGE_MESSAGES =
         "stream selected",
         "prewarm completed",
         "player config prewarm failed",
+        "fetchFreshVisitorData success",
+        "fetchFreshVisitorData failed",
     )
 
 private val SAFE_DETAIL_KEYS =

@@ -33,6 +33,7 @@ internal fun interface Extraction {
 class InnerTubeXStreamResolver internal constructor(
     private val extraction: Extraction,
     private val prewarmAction: suspend () -> Unit = {},
+    private val warmUpAction: suspend () -> Unit = {},
 ) : StreamResolver {
     /**
      * The caller owns [httpClient]'s engine; requests are restricted to the app host policy.
@@ -51,13 +52,19 @@ class InnerTubeXStreamResolver internal constructor(
         preprocessedPlayerStore: PreprocessedPlayerStore? = null,
     ) : this(InnerTubeXWiring(httpClient, poTokenMinter, excludedProfiles, trace, preprocessedPlayerStore))
 
-    private constructor(wiring: InnerTubeXWiring) : this(wiring.extraction, wiring.prewarm)
+    private constructor(wiring: InnerTubeXWiring) : this(wiring.extraction, wiring.prewarm, wiring.warmUp)
 
     /**
      * Warms InnerTubeX up (watch config, player script and solvers) without resolving a track. Costs data and CPU;
      * callers decide when (ADR 0001, startup measurements).
      */
     suspend fun prewarm() = prewarmAction()
+
+    /**
+     * Cheap warm-up for a likely playback: fetches the session's visitor data (~1.5 KB) when it has none, so the
+     * first resolution can skip the watch page. Never throws except for cancellation.
+     */
+    suspend fun warmUp() = warmUpAction()
 
     override suspend fun resolve(
         videoId: VideoId,
@@ -132,6 +139,7 @@ private class InnerTubeXWiring(
 ) {
     val extraction: Extraction
     val prewarm: suspend () -> Unit
+    val warmUp: suspend () -> Unit
 
     private val storeMutex = Mutex()
     private var storeInstalled = preprocessedPlayerStore == null
@@ -167,16 +175,43 @@ private class InnerTubeXWiring(
                 }
             }
         }
+        // Without visitor data InnerTubeX fetches the whole watch page (~300 KB) only to obtain it before trying the
+        // config-free clients; the service-worker endpoint returns it in ~1.5 KB.
+        warmUp = {
+            ensureVisitorData(
+                current = { innerTube.sessionSnapshot().visitorData },
+                fetch = { innerTube.fetchFreshVisitorData(innerTube.sessionSnapshot()) },
+            )
+        }
         val hints = ContentHints().withStreamCapabilities(allowHls = false, allowSabr = false)
         extraction =
             Extraction { videoId, quality ->
                 installStore()
+                warmUp()
                 extractor.extract(videoId, hints, excludedClients = excludedProfiles, audioQuality = quality)
             }
         prewarm = {
             installStore()
             extractor.prewarm()
         }
+    }
+}
+
+/** Calls [fetch] when [current] has no visitor data. A failed fetch is ignored: extraction then works as before. */
+internal suspend fun ensureVisitorData(
+    current: () -> String?,
+    fetch: suspend () -> Unit,
+) {
+    if (!current().isNullOrBlank()) return
+    try {
+        fetch()
+    } catch (e: CancellationException) {
+        throw e
+    } catch (
+        // Best effort on purpose: without visitor data InnerTubeX falls back to the watch page as before.
+        @Suppress("TooGenericExceptionCaught", "SwallowedException") e: Exception,
+    ) {
+        return
     }
 }
 
