@@ -12,8 +12,8 @@ import io.github.javiernarvaezz.shura.core.stream.ResolvedStream
 import io.github.javiernarvaezz.shura.core.stream.Trace
 
 /**
- * Splits one logical read into bounded `Range` requests of [ResolvedStream.rangeChunkSizeBytes] when the
- * stream requires it; googlevideo throttles or cuts open-ended ranges. Other streams pass straight through.
+ * Splits every logical read of a resolved stream into bounded `Range` requests sized by [RangeChunks]: googlevideo
+ * throttles or cuts open-ended ranges whatever the client profile. Specs without a [ResolvedStream] pass through.
  */
 @OptIn(UnstableApi::class)
 internal class BoundedRangeDataSource(
@@ -30,7 +30,8 @@ internal class BoundedRangeDataSource(
     private val timer = RangeTimer(trace)
 
     private var spec: DataSpec? = null
-    private var chunkSize = 0L
+    private var streamLimit: Long? = null
+    private var chunkIndex = 0
     private var position = 0L
     private var endExclusive: Long? = null
 
@@ -40,16 +41,17 @@ internal class BoundedRangeDataSource(
 
     override fun open(dataSpec: DataSpec): Long {
         val stream = dataSpec.customData as? ResolvedStream
-        chunkSize = stream?.takeIf { it.requiresBoundedRange }?.rangeChunkSizeBytes ?: 0L
-        if (chunkSize <= 0L) {
+        if (stream == null) {
             spec = null
             timer.opened()
             return upstream.open(dataSpec)
         }
         spec = dataSpec
+        streamLimit = stream.rangeChunkSizeBytes.takeIf { stream.requiresBoundedRange }
+        chunkIndex = 0
         position = dataSpec.position
         val requestedLength = dataSpec.length.takeIf { it != C.LENGTH_UNSET.toLong() }
-        endExclusive = requestedLength?.let { dataSpec.position + it } ?: stream?.contentLength
+        endExclusive = requestedLength?.let { dataSpec.position + it } ?: stream.contentLength
         openChunk()
         if (endExclusive == null) {
             endExclusive = RangeChunks.totalFromContentRange(upstream.responseHeaders["Content-Range"]?.firstOrNull())
@@ -93,7 +95,7 @@ internal class BoundedRangeDataSource(
     private fun openChunk() {
         timer.opened()
         val current = requireNotNull(spec)
-        val chunkEnd = RangeChunks.chunkEnd(position, chunkSize, endExclusive)
+        val chunkEnd = RangeChunks.chunkEnd(position, RangeChunks.chunkSize(chunkIndex++, streamLimit), endExclusive)
         upstream.open(
             current
                 .buildUpon()

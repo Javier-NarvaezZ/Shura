@@ -103,8 +103,28 @@ object StreamUri {
             ?.let { runCatching { VideoId(it) }.getOrNull() }
 }
 
-/** Bounded byte-range planning for googlevideo, which throttles open-ended ranges (ADR 0001). */
+/**
+ * Bounded byte-range planning for googlevideo, which throttles open-ended ranges to ~32 KB/s on every client
+ * profile (measured on device), so every stream is read in bounded ranges (ADR 0001).
+ */
 internal object RangeChunks {
+    /** Small first range after each open (start or seek), so the first bytes arrive in one short request. */
+    const val FIRST_CHUNK_BYTES = 256L * 1024
+
+    const val CHUNK_BYTES = 1024L * 1024
+
+    /**
+     * Size of range number [index] (0-based) since the last open. [streamLimit] is the stream's own maximum
+     * range size when it declares one; it is never exceeded.
+     */
+    fun chunkSize(
+        index: Int,
+        streamLimit: Long?,
+    ): Long {
+        val planned = if (index == 0) FIRST_CHUNK_BYTES else CHUNK_BYTES
+        return streamLimit?.takeIf { it > 0 }?.let { minOf(it, planned) } ?: planned
+    }
+
     /** Exclusive end of the chunk starting at [position]. */
     fun chunkEnd(
         position: Long,

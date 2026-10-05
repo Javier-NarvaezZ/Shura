@@ -31,6 +31,26 @@ class PlayerCommonTest {
     }
 
     @Test
+    fun firstRangeIsSmallAndLaterRangesAreOneMebibyte() {
+        assertEquals(262_144, RangeChunks.chunkSize(index = 0, streamLimit = null))
+        assertEquals(MIB, RangeChunks.chunkSize(index = 1, streamLimit = null))
+        assertEquals(MIB, RangeChunks.chunkSize(index = 7, streamLimit = null))
+    }
+
+    @Test
+    fun streamRangeLimitIsNeverExceeded() {
+        assertEquals(262_144, RangeChunks.chunkSize(index = 0, streamLimit = MIB))
+        assertEquals(MIB, RangeChunks.chunkSize(index = 1, streamLimit = MIB))
+        assertEquals(100_000, RangeChunks.chunkSize(index = 0, streamLimit = 100_000))
+        assertEquals(524_288, RangeChunks.chunkSize(index = 3, streamLimit = 524_288))
+    }
+
+    @Test
+    fun nonPositiveStreamLimitIsIgnored() {
+        assertEquals(MIB, RangeChunks.chunkSize(index = 2, streamLimit = 0))
+    }
+
+    @Test
     fun parsesTotalFromContentRange() {
         assertEquals(3_565_616, RangeChunks.totalFromContentRange("bytes 0-1048575/3565616"))
         assertNull(RangeChunks.totalFromContentRange("bytes 0-1048575/*"))
