@@ -121,9 +121,7 @@ internal object SearchParser {
                     element.forEach(::walk)
                 }
 
-                else -> {
-                    Unit
-                }
+                else -> {}
             }
         }
         walk(root)
@@ -149,9 +147,7 @@ internal object SearchParser {
                     element.forEach(::walk)
                 }
 
-                else -> {
-                    Unit
-                }
+                else -> {}
             }
         }
         walk(root)
