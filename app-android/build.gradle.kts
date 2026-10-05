@@ -45,7 +45,11 @@ kotlin {
 
 dependencies {
     implementation(projects.core.ui)
-    implementation(projects.feature.home)
+    implementation(projects.core.network)
+    implementation(projects.core.innertube)
+    implementation(projects.core.stream)
+    implementation(projects.core.player)
+    implementation(projects.feature.search)
     implementation(libs.compose.runtime)
     implementation(libs.androidx.activity.compose)
 }
