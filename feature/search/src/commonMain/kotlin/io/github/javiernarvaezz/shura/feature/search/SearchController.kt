@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlin.time.Duration
 
 enum class SearchStatus { Idle, Loading, Done, Empty, Failed }
 
@@ -71,6 +72,8 @@ class SearchController(
             else -> Unit
         }
     }
+
+    fun seekBy(offset: Duration) = player.seekBy(offset)
 
     fun retryPlayback() = player.retry()
 }

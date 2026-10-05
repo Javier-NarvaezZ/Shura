@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import okhttp3.Call
+import kotlin.time.Duration
 
 /**
  * Foreground-only Media3 player for the spike (no MediaSession yet; Phase 2).
@@ -70,6 +71,12 @@ class AndroidAudioPlayer(
     override fun pause() = player.pause()
 
     override fun resume() = player.play()
+
+    override fun seekBy(offset: Duration) {
+        val target = player.currentPosition + offset.inWholeMilliseconds
+        val duration = player.duration.takeIf { it > 0 } ?: Long.MAX_VALUE
+        player.seekTo(target.coerceIn(0, duration))
+    }
 
     override fun retry() {
         val song = current ?: return

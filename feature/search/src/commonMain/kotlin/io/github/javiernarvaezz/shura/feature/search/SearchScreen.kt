@@ -30,8 +30,9 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.github.javiernarvaezz.shura.core.model.Song
-import io.github.javiernarvaezz.shura.core.player.PlaybackError
 import io.github.javiernarvaezz.shura.core.player.PlaybackState
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 // Spike UI: hardcoded Spanish strings; resources and branding come in Phase 1B/2.
 @Composable
@@ -60,7 +61,12 @@ fun SearchScreen(controller: SearchController) {
                 HorizontalDivider()
             }
         }
-        NowPlayingBar(playback, onToggle = controller::togglePause, onRetry = controller::retryPlayback)
+        NowPlayingBar(
+            playback,
+            onToggle = controller::togglePause,
+            onSeek = controller::seekBy,
+            onRetry = controller::retryPlayback,
+        )
     }
 }
 
@@ -116,6 +122,7 @@ private fun SongRow(
 private fun NowPlayingBar(
     playback: PlaybackState,
     onToggle: () -> Unit,
+    onSeek: (Duration) -> Unit,
     onRetry: () -> Unit,
 ) {
     val (song, label, action) =
@@ -141,32 +148,35 @@ private fun NowPlayingBar(
             }
 
             is PlaybackState.Failed -> {
-                Triple(playback.song, "No se pudo reproducir (${playback.error.label()})", "Reintentar" to onRetry)
+                Triple(
+                    playback.song,
+                    playbackErrorMessage(playback.error),
+                    "Reintentar" to onRetry,
+                )
             }
         }
+    val canSeek = playback is PlaybackState.Playing || playback is PlaybackState.Paused
     Surface(tonalElevation = 3.dp) {
-        Row(
-            Modifier.fillMaxWidth().padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Column(Modifier.weight(1f)) {
-                Text(song.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(label, style = MaterialTheme.typography.bodySmall)
+        Column(Modifier.fillMaxWidth().padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                Column(Modifier.weight(1f)) {
+                    Text(song.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(label, style = MaterialTheme.typography.bodySmall)
+                }
+                action?.let { (text, onClick) -> TextButton(onClick = onClick) { Text(text) } }
             }
-            action?.let { (text, onClick) -> TextButton(onClick = onClick) { Text(text) } }
+            if (canSeek) {
+                Row {
+                    TextButton(onClick = { onSeek(-SEEK_BACK) }) { Text("−10 s") }
+                    TextButton(onClick = { onSeek(SEEK_FORWARD) }) { Text("+30 s") }
+                }
+            }
         }
     }
 }
 
-private fun PlaybackError.label(): String =
-    when (this) {
-        is PlaybackError.Stream -> failure.name
-        is PlaybackError.Http -> "HTTP $status"
-        PlaybackError.Network -> "red"
-        PlaybackError.Decoding -> "formato"
-        PlaybackError.Unknown -> "desconocido"
-    }
+private val SEEK_BACK = 10.seconds
+private val SEEK_FORWARD = 30.seconds
 
-private fun kotlin.time.Duration.toClock(): String =
+private fun Duration.toClock(): String =
     toComponents { minutes, seconds, _ -> "$minutes:${seconds.toString().padStart(2, '0')}" }

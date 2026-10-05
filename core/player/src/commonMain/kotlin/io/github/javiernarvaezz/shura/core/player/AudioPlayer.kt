@@ -5,6 +5,7 @@ import io.github.javiernarvaezz.shura.core.model.VideoId
 import io.github.javiernarvaezz.shura.core.stream.StreamFailure
 import io.github.javiernarvaezz.shura.core.stream.StreamResolutionException
 import kotlinx.coroutines.flow.StateFlow
+import kotlin.time.Duration
 
 /**
  * Platform-neutral audio player. The UI depends only on this interface, never on Media3 (CLAUDE.md).
@@ -18,6 +19,9 @@ interface AudioPlayer {
     fun pause()
 
     fun resume()
+
+    /** Moves the playback position by [offset] (negative goes back), clamped to the track. */
+    fun seekBy(offset: Duration)
 
     /** Re-resolves the current song's stream and starts it again after a failure. */
     fun retry()

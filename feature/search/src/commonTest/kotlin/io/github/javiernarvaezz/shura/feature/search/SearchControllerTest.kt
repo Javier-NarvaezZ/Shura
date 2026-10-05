@@ -15,6 +15,8 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 class SearchControllerTest {
     private val song = Song(VideoId("7fwUH0oRmkQ"), "La Camisa Negra", listOf(Artist("Juanes")))
@@ -33,6 +35,10 @@ class SearchControllerTest {
 
         override fun resume() {
             calls += "resume"
+        }
+
+        override fun seekBy(offset: Duration) {
+            calls += "seek:${offset.inWholeSeconds}"
         }
 
         override fun retry() {
@@ -149,10 +155,12 @@ class SearchControllerTest {
             controller.togglePause()
             player.state.value = PlaybackState.Paused(song)
             controller.togglePause()
+            controller.seekBy(30.seconds)
+            controller.seekBy((-10).seconds)
             player.state.value = PlaybackState.Failed(song, PlaybackError.Stream(StreamFailure.NoPlayableStream))
             controller.retryPlayback()
 
-            assertEquals(listOf("play:7fwUH0oRmkQ", "pause", "resume", "retry"), player.calls)
+            assertEquals(listOf("play:7fwUH0oRmkQ", "pause", "resume", "seek:30", "seek:-10", "retry"), player.calls)
             assertTrue(controller.playback.value is PlaybackState.Failed)
         }
 }
