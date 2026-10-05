@@ -286,6 +286,30 @@ Both apps work today, which makes them the best available evidence. This is read
 3. Decide SABR afterwards, depending on what still fails.
 4. Desktop PoToken in Phase 5, starting with WebView2.
 
+### Spike results on the device and in `:tools:livecheck` (2026-10-04)
+
+**On the phone** (Android 12, debug build, app wiring):
+- Search, playback, seeking (+30 s ×3 across the first ~1 MiB range and −10 s) and playback to the natural end all work. Confirmed by ear.
+- **The explicit album track plays.** Confirmed by ear.
+- The app log shows host names only: no URLs, tokens or video ids.
+
+**`:tools:livecheck`**, built with `ShuraNetwork` like the app, three album tracks:
+
+| Track | Profile | Transport / format | Expected bytes | Received bytes | Decode |
+|---|---|---|---|---|---|
+| Ordinary 1 | `VISIONOS_0_1__nopo` | direct, opus | 3,565,616 | 3,565,616 (206×4) | OK, 216.7 s |
+| Ordinary 2 | `VISIONOS_0_1__nopo` | direct, AAC | 3,568,011 | 3,568,011 (206×4) | OK, 220.4 s |
+| Explicit (ATV) | `VISIONOS_0_1__nopo` | direct, opus | 4,318,756 | 4,318,756 (206×5) | OK, 243.7 s |
+
+**Why the explicit track now plays:**
+- The app does not pass the catalog's explicit flag to InnerTubeX: it is a lyrics advisory (see "Revised recommendation"), and `StreamResolver` only takes the video id.
+- Without that hint, InnerTubeX does not apply its "normal audio only" restriction to `VISIONOS_0_1`, so explicit tracks also play through it. The earlier direct-only 403 happened only when the explicit hint was passed.
+
+**Consequence:**
+- **Every track Shura plays today depends on the single legacy client `VISIONOS_0_1`.** If YouTube closes it, playback stops entirely.
+- The PoToken minter is therefore the highest-priority work before Phase 2. Its acceptance test forces a non-legacy client.
+- `:tools:livecheck` should be run regularly (e.g. weekly) to detect a client closure early.
+
 ## Implementation requirements (accepted 2026-10-04)
 
 These are binding for `:core:stream` and its platform code.
