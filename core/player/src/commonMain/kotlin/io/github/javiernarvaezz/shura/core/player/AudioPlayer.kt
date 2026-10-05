@@ -11,9 +11,15 @@ import kotlin.time.Duration
  * Platform-neutral audio player. The UI depends only on this interface, never on Media3 (CLAUDE.md).
  * Implementations: Android (Media3) now; desktop in Phase 5.
  */
-interface AudioPlayer {
+interface AudioPlayer :
+    PlaybackControls,
+    QueueControls
+
+/** Transport of the current item. */
+interface PlaybackControls {
     val state: StateFlow<PlaybackState>
 
+    /** Plays [song] alone, replacing the queue. */
     fun play(song: Song)
 
     fun pause()
@@ -29,6 +35,44 @@ interface AudioPlayer {
     fun stop()
 
     fun release()
+}
+
+/** The play queue: order, shuffle and repeat. */
+interface QueueControls {
+    val queue: StateFlow<QueueState>
+
+    /** Replaces the queue with [songs] and plays from [startIndex]. */
+    fun playQueue(
+        songs: List<Song>,
+        startIndex: Int,
+    )
+
+    /** Next item in play order (wraps around with repeat all). */
+    fun next()
+
+    /** Restarts the current item if it has played for more than a few seconds, otherwise goes to the previous one. */
+    fun previous()
+
+    /** Plays the queue item at [index]. */
+    fun skipTo(index: Int)
+
+    /** Shuffle on draws a fresh order with the current item first; off returns to the queue order. */
+    fun setShuffle(enabled: Boolean)
+
+    fun setRepeat(mode: RepeatMode)
+
+    /** Inserts [songs] to play right after the current item, also when shuffled. */
+    fun playNext(songs: List<Song>)
+
+    /** Adds [songs] at the end of the queue (and of the play order). */
+    fun enqueue(songs: List<Song>)
+
+    fun remove(index: Int)
+
+    fun move(
+        from: Int,
+        to: Int,
+    )
 }
 
 sealed interface PlaybackState {

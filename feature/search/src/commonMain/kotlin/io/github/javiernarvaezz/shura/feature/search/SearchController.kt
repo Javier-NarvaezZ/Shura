@@ -3,6 +3,8 @@ package io.github.javiernarvaezz.shura.feature.search
 import io.github.javiernarvaezz.shura.core.model.Song
 import io.github.javiernarvaezz.shura.core.player.AudioPlayer
 import io.github.javiernarvaezz.shura.core.player.PlaybackState
+import io.github.javiernarvaezz.shura.core.player.QueueState
+import io.github.javiernarvaezz.shura.core.player.RepeatMode
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -73,7 +75,33 @@ class SearchController(
             }
     }
 
-    fun play(song: Song) = player.play(song)
+    val queue: StateFlow<QueueState> = player.queue
+
+    /** Plays [song] with the current results as the queue (as YouTube Music does), or alone if not in them. */
+    fun play(song: Song) {
+        val results = mutableState.value.results
+        val index = results.indexOf(song)
+        if (index >= 0) player.playQueue(results, index) else player.play(song)
+    }
+
+    /** Plays [song] right after the current one (or starts it if nothing is queued). */
+    fun playNext(song: Song) = player.playNext(listOf(song))
+
+    fun next() = player.next()
+
+    fun previous() = player.previous()
+
+    fun toggleShuffle() = player.setShuffle(!queue.value.shuffle)
+
+    /** Off → all → one → off. */
+    fun cycleRepeat() =
+        player.setRepeat(
+            when (queue.value.repeat) {
+                RepeatMode.Off -> RepeatMode.All
+                RepeatMode.All -> RepeatMode.One
+                RepeatMode.One -> RepeatMode.Off
+            },
+        )
 
     fun togglePause() {
         when (playback.value) {
