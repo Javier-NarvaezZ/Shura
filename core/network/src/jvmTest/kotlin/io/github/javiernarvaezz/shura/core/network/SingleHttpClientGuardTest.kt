@@ -29,6 +29,10 @@ class SingleHttpClientGuardTest {
             "opens a URL connection" to Regex("""\.(openConnection|openStream)\s*\("""),
         )
 
+    // Builder calls are often split across lines ("ExoPlayer" then ".Builder(context)").
+    private val exoPlayerBuilder = Regex("""\bExoPlayer\s*\.\s*Builder\s*\(""")
+    private val mediaSessionBuilder = Regex("""\b(MediaSession|MediaLibrarySession)\s*\.\s*Builder\s*\(""")
+
     private val forbiddenInBuildFiles =
         Regex("""ktor-client-($ktorEngines)|media3-datasource-(cronet|rtmp)""")
 
@@ -64,8 +68,15 @@ class SingleHttpClientGuardTest {
                 .flatMap { file ->
                     val text = code(file)
                     val found = forbiddenOutsideNetwork.filterValues { it.containsMatchIn(text) }.keys.toMutableList()
-                    if ("ExoPlayer.Builder(" in text && "setMediaSourceFactory(" !in text) {
+                    if (exoPlayerBuilder.containsMatchIn(text) && "setMediaSourceFactory(" !in text) {
                         found += "builds ExoPlayer without an explicit media source factory"
+                    }
+                    // Without these, Media3 loads session and notification artwork with its own HTTP stack.
+                    if (mediaSessionBuilder.containsMatchIn(text) && "setBitmapLoader(" !in text) {
+                        found += "builds a media session without our bitmap loader"
+                    }
+                    if ("DataSourceBitmapLoader" in text && "setDataSourceFactory(" !in text) {
+                        found += "builds a DataSourceBitmapLoader without our data source factory"
                     }
                     found.map { "${file.relativeTo(root)}: $it" }
                 }

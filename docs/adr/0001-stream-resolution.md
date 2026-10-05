@@ -465,7 +465,7 @@ These are binding for `:core:stream` and its platform code.
 - `:core:network` builds the app's single `OkHttpClient`. Its host allowlist runs as both an application and a network interceptor, so it also covers redirect hops.
 - Allowed hosts (`HostPolicy`): `*.youtube.com` and `*.googlevideo.com`, plus these exact hosts:
   - `www.google.com` and `www.gstatic.com` serve the BotGuard interpreter fetched for the PoToken minter; its URL path is validated by InnerTubeX's `requireTrustedAttestationInterpreterUrl`. No other `google.com` or `gstatic.com` host is allowed.
-  - `i.ytimg.com`, `lh3.googleusercontent.com`, `yt3.ggpht.com` and `yt3.googleusercontent.com` serve artwork (Phase 2). The media session loads notification artwork with a `BitmapLoader` built on the single client, never with Media3's default HTTP stack.
+  - `i.ytimg.com`, `lh3.googleusercontent.com`, `yt3.ggpht.com` and `yt3.googleusercontent.com` serve artwork (Phase 2). The media session loads notification artwork with a `BitmapLoader` built on the single client, never with Media3's default HTTP stack. `SingleHttpClientGuardTest` fails if a media session is built without `setBitmapLoader` or a `DataSourceBitmapLoader` without `setDataSourceFactory`. Checked on device on 2026-10-05: the artwork downloaded when the queue is restored (~8 KB) goes through the single client (host counter and request timer), and the app holds no other connection.
 - Every other HTTP consumer uses that client:
   - the Ktor client used by the catalog and InnerTubeX, through the OkHttp engine with that client preconfigured. This also covers InnerTubeX's engine-level clients;
   - Media3, through `OkHttpDataSource` with that client.
