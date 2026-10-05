@@ -15,9 +15,9 @@ internal fun applyDebugLaunchOptions(intent: Intent) = Unit
 
 internal fun debugExcludedStreamProfiles(): Set<String> = emptySet()
 
-// Off until its data, CPU and time cost is measured and approved.
+// Measured on device (ADR 0001, start-up measurements): ~1.5 KB once per process, ~0.4 s off the first play.
 @Suppress("FunctionOnlyReturningConstant")
-internal fun playbackWarmupEnabled(): Boolean = false
+internal fun playbackWarmupEnabled(): Boolean = true
 
 internal fun debugWarmUp(
     warmUp: suspend () -> Unit,
