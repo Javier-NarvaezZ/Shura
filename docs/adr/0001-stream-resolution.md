@@ -310,6 +310,28 @@ Both apps work today, which makes them the best available evidence. This is read
 - The PoToken minter is therefore the highest-priority work before Phase 2. Its acceptance test forces a non-legacy client.
 - `:tools:livecheck` should be run regularly (e.g. weekly) to detect a client closure early.
 
+### PoToken minter results on the device (2026-10-05)
+
+Android 12 phone, debug build. Legacy `VISIONOS` profiles were excluded with the debug launch option, except in the regression run. Sound and seeking confirmed by ear.
+
+| Run | WebView setup | Mint | Profile | Resolution | Result |
+|---|---|---|---|---|---|
+| Ordinary, cold | Android UA, all blocked | ❌ ×3 at `integrity`: `GenerateIT` → `array(4)[null,n,null,s]` (no integrity token) | `WEB_EMBEDDED_PLAYER__nopo` | 25.0 s | Plays (no token) |
+| Ordinary, cold | Android UA, `data:` allowed | ❌ same | `WEB_EMBEDDED_PLAYER__nopo` | 23.9 s | Plays (no token) |
+| Ordinary, cold | Desktop UA, `data:` allowed | ✅ 3.9 s | **`WEB_REMIX__po`** | 24.3 s | Plays; seek +30 s ×3 OK |
+| Ordinary, cold | Desktop UA, all blocked | ❌ ×4 same | `WEB_EMBEDDED_PLAYER__nopo` | 25.9 s | Plays (no token) |
+| **Ordinary, cold (final config)** | **Desktop UA, only `data:` allowed** | ✅ **4.0 s** | **`WEB_REMIX__po`** | 24.6 s | Plays |
+| Ordinary, warm (same process) | final | ✅ **17 ms** (streaming token only) | `WEB_REMIX__po` | 4.0 s | Plays |
+| Explicit, warm | final | ✅ **14 ms** | `WEB_REMIX__po` | 4.3 s | Plays; natural end OK |
+| Regression (legacy allowed) | final | not called | `VISIONOS_0_1__nopo` | 1.4 s | Plays, fast |
+
+**Findings:**
+- **The minter works on the device**, and explicit tracks also play through a non-legacy client with a PoToken. Shura no longer depends only on `VISIONOS_0_1`.
+- **A second non-legacy path without a token:** with legacy clients excluded and no token, `WEB_EMBEDDED_PLAYER__nopo` plays ordinary tracks.
+- **Cold start on the non-legacy path takes about 20 s once per process**, on top of the 4 s mint. Warm resolutions take about 4 s. The likely cause is the first `player.js` download and the cipher solving in QuickJS, which the legacy client does not need. **Not verified:** InnerTubeX's internal timings were not instrumented. Possible fix, pending a decision: call InnerTubeX's `prewarm()` in the background at start-up, which costs data and battery even when nothing is played.
+- **App log during the run:** host names only. No tokens, visitor data, URLs or video ids. The `WebView` attempted only `favicon.ico` and `generate_204`, both blocked.
+- With legacy clients allowed, InnerTubeX still prefers `VISIONOS_0_1` and never calls the minter, so normal playback keeps its current speed. The minter is the fallback that keeps playback alive if that client closes.
+
 ## Implementation requirements (accepted 2026-10-04)
 
 These are binding for `:core:stream` and its platform code.
@@ -333,35 +355,35 @@ These are binding for `:core:stream` and its platform code.
 - `mediaPlaybackRequiresUserGesture = true`.
 - Safe Browsing left on.
 
-**Page:**
-- The page is loaded from an in-memory string with `loadDataWithBaseURL("https://www.youtube.com", …)`, never from `file://`.
-- The page, bgutils-js and the glue code ship as **assets inside the APK**: nothing is fetched to bootstrap the page itself.
+**Page and JavaScript (as implemented, 2026-10-05):**
+- The page is a blank in-memory string loaded with `loadDataWithBaseURL("https://www.youtube.com", …)`, never from `file://`.
+- The bootstrap JavaScript is Shura's own (`BotGuardScripts.kt`), written from bgutils-js's implementation of the protocol and treated as derived from it (see R5). Nothing is fetched to bootstrap the page.
+- The BotGuard interpreter (Google's code) is evaluated in the page. It is downloaded from Kotlin (below), not by the `WebView`.
 
-**Network allowlist:**
-- It is enforced in `WebViewClient.shouldInterceptRequest` and `shouldOverrideUrlLoading`. Anything else is blocked and logged by host only.
-- Allowed:
-  - `jnn-pa.googleapis.com` for the BotGuard `Create`/`GenerateIT` calls (bgutils-js v4.0.3 constants);
-  - `www.youtube.com` for its alternative `api/jnn` endpoint;
-  - the host of the BotGuard interpreter script, **only if** the challenge returns a script URL instead of inline script.
-- **Not verified:** which host that interpreter URL uses. It is expected to be `www.google.com`, and it will be confirmed in the Android gate before being added to the allowlist.
+**No network in the `WebView`:**
+- All HTTP for the attestation is done **from Kotlin through the app's single client** (R7), following InnerTubeX's own live harness: the watch page (`www.youtube.com/watch`, with the visitor id and the `SOCS=CAI` consent cookie), the interpreter (`www.google.com`/`www.gstatic.com`, path validated by InnerTubeX) and `www.youtube.com/api/jnn/v1/GenerateIT`. The `WebView` only computes.
+- `blockNetworkLoads = true`. `shouldInterceptRequest` refuses every request and logs **scheme and host only**; `shouldOverrideUrlLoading` refuses every navigation.
+- **Single exception: the `data:` scheme**, which is in-memory content, not network. BotGuard loads an inline `data:` resource, and with it blocked `GenerateIT` returns no integrity token (measured; approved on 2026-10-05).
+- Requests the `WebView` attempted and that stay blocked: `www.youtube.com/favicon.ico` and `www.youtube.com/generate_204`. Neither is needed.
+
+**User agent:**
+- The `WebView` and the attestation requests use a **desktop Chrome user agent**, the same one InnerTubeX's harness uses. With the Android WebView user agent, `GenerateIT` returns no integrity token for web page attestation (measured; approved on 2026-10-05).
+- InnerTubeX is told the provider is `WEBPAGE_ATTESTATION` (the watch-page challenge flow), not `WEB_BOTGUARD` (the `jnn/v1/Create` flow).
 
 **JavaScript bridge:**
-- Exactly one `@JavascriptInterface` object with one method that receives `(requestId, token | error code)`.
-- It never receives cookies, URLs or other data.
-- The bridge does not expose any app object.
+- Exactly one `@JavascriptInterface` object with one method that receives `(requestId, ok, payload)`. Failures send a short fixed code.
+- It never receives cookies, URLs or other data, and it exposes no app object.
+- `console` output is swallowed, so nothing the page logs reaches logcat.
 
 **Storage and cookies:**
-- bgutils-js itself uses **no** cookies, `localStorage`, `sessionStorage` or IndexedDB (checked in its v4.0.3 source).
-- The BotGuard program it runs is opaque Google code. Orchard enables DOM storage for it; **whether BotGuard needs DOM storage or cookies is not verified**.
-- Start strict:
-  - third-party cookies off;
-  - `CookieManager` accepting no cookies for this `WebView`;
-  - DOM storage enabled, because Orchard needs it, but **non-persistent**: `WebStorage.deleteAllData()`, `CookieManager.removeAllCookies()` and `clearCache(true)` run on teardown and on every `WebView` recreation.
-- Relax only what the Android gate proves necessary, and record it here.
+- `CookieManager` accepts no cookies. DOM storage is enabled but non-persistent: `WebStorage.deleteAllData()`, `CookieManager.removeAllCookies()` and `clearCache(true)` run when the runtime is closed. Each attestation uses a new runtime.
+- Whether BotGuard needs DOM storage is still **not verified**.
+
+**Crashes:**
+- `onRenderProcessGone` fails pending calls and destroys the `WebView` instead of crashing the app. The minter resets and builds a new runtime on the next mint.
 
 **Process isolation:**
-- The `WebView` lives in the `:resolver` process, with its own data directory (`WebView.setDataDirectorySuffix`).
-- Its cookies and storage are therefore isolated from any `WebView` the app might use elsewhere.
+- For now the `WebView` runs in the main process. Moving it, with the resolver, to the `:resolver` process with its own data directory (`WebView.setDataDirectorySuffix`) is part of R1, before Phase 4.
 
 ### R3. Remote cipher configs are permanently disabled
 
@@ -385,9 +407,11 @@ These are binding for `:core:stream` and its platform code.
 
 ### R5. Dependency records
 
-- When bgutils-js is added, record it in `docs/dependencies.md` with its exact version (v4.0.3 at the time of writing; confirm at implementation time) and license (MIT).
-- Record also where it comes from and how it is bundled (a pinned asset, with its SHA-256 in the dependency record).
-- InnerTubeX and every other new dependency get the same treatment, and they are added only after explicit approval.
+- bgutils-js is **not** bundled or fetched. The bootstrap JavaScript was written for Shura from bgutils-js v4.0.3's implementation of the BotGuard protocol, so it is treated as **derived** from it.
+  - The copyright and MIT notice are in the header of `BotGuardScripts.kt`, embedded in the script itself (so it ships with every copy) and in `THIRD_PARTY_NOTICES.md`.
+  - `docs/dependencies.md` records it.
+  - Before a public release, the app must show third-party notices to users (licenses screen).
+- InnerTubeX and every other new dependency are recorded in `docs/dependencies.md` with version, license and origin, and are added only after explicit approval.
 
 ### R6. Ktor version alignment with InnerTubeX
 
@@ -399,6 +423,7 @@ These are binding for `:core:stream` and its platform code.
 
 **The rule:**
 - `:core:network` builds the app's single `OkHttpClient`. Its host allowlist runs as both an application and a network interceptor, so it also covers redirect hops.
+- Allowed hosts (`HostPolicy`): `*.youtube.com` and `*.googlevideo.com`, plus exactly `www.google.com` and `www.gstatic.com`. The last two serve the BotGuard interpreter fetched for the PoToken minter; its URL path is validated by InnerTubeX's `requireTrustedAttestationInterpreterUrl`. No other `google.com` or `gstatic.com` host is allowed.
 - Every other HTTP consumer uses that client:
   - the Ktor client used by the catalog and InnerTubeX, through the OkHttp engine with that client preconfigured. This also covers InnerTubeX's engine-level clients;
   - Media3, through `OkHttpDataSource` with that client.

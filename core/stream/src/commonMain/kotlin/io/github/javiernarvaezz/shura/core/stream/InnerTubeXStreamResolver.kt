@@ -12,6 +12,7 @@ import io.github.javiernarvaezz.shura.core.model.VideoId
 import io.github.javiernarvaezz.shura.core.network.HostAllowlist
 import io.ktor.client.HttpClient
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import com.metrolist.innertubex.extraction.AudioQuality as InnerTubeXAudioQuality
 
@@ -24,16 +25,37 @@ internal fun interface Extraction {
 }
 
 /**
- * [StreamResolver] backed by InnerTubeX (ADR 0001): direct transport only, no PoToken yet, and never any
- * remote solver configuration (R3).
+ * [StreamResolver] backed by InnerTubeX (ADR 0001): direct transport only and never any remote solver
+ * configuration (R3). With a [PoTokenMinter], clients that need a PoToken become eligible (R2).
  */
 class InnerTubeXStreamResolver internal constructor(
     private val extraction: Extraction,
 ) : StreamResolver {
-    /** The caller owns [httpClient]'s engine; requests are restricted to the app host policy. */
-    constructor(httpClient: HttpClient) : this(innerTubeXExtraction(httpClient))
+    /**
+     * The caller owns [httpClient]'s engine; requests are restricted to the app host policy.
+     *
+     * @param excludedProfiles InnerTubeX profile ids never to use. Diagnostics only (e.g. forcing a non-legacy
+     *   client in a device test); production passes none.
+     */
+    constructor(
+        httpClient: HttpClient,
+        poTokenMinter: PoTokenMinter? = null,
+        excludedProfiles: Set<String> = emptySet(),
+    ) : this(innerTubeXExtraction(httpClient, poTokenMinter, excludedProfiles))
 
     override suspend fun resolve(
+        videoId: VideoId,
+        quality: AudioQuality,
+    ): ResolvedStream {
+        val tokenFailures = TokenFailures()
+        return try {
+            withContext(tokenFailures) { resolveDirect(videoId, quality) }
+        } catch (e: StreamResolutionException) {
+            throw e.withTokenFailure(tokenFailures.last)
+        }
+    }
+
+    private suspend fun resolveDirect(
         videoId: VideoId,
         quality: AudioQuality,
     ): ResolvedStream {
@@ -75,7 +97,21 @@ private fun Exception.toResolutionException(): StreamResolutionException =
         }
     }
 
-private fun innerTubeXExtraction(httpClient: HttpClient): Extraction {
+/** A failure that may have been caused by a missing token is reported as [StreamFailure.TokenUnavailable] (R4). */
+private fun StreamResolutionException.withTokenFailure(token: PoTokenUnavailableException?): StreamResolutionException =
+    if (token != null && failure in TOKEN_MASKABLE_FAILURES) {
+        StreamResolutionException(StreamFailure.TokenUnavailable, attempts, "PoToken:${token.stage}", this)
+    } else {
+        this
+    }
+
+private val TOKEN_MASKABLE_FAILURES = setOf(StreamFailure.NoPlayableStream, StreamFailure.Unknown)
+
+private fun innerTubeXExtraction(
+    httpClient: HttpClient,
+    poTokenMinter: PoTokenMinter?,
+    excludedProfiles: Set<String>,
+): Extraction {
     // InnerTubeX sends request bodies as @Serializable objects and expects the caller's client to serialize them.
     // Only this derived client gets that: same engine and OkHttpClient, no extra headers or logging (ADR 0001 R7).
     val client =
@@ -91,9 +127,12 @@ private fun innerTubeXExtraction(httpClient: HttpClient): Extraction {
             configParser = YtConfigParserImpl(client, innerTube, cipherService = cipher),
             cipherService = cipher,
             innerTube = innerTube,
+            tokenProvider = poTokenMinter?.let(::InnerTubeXTokenProvider),
         )
     val hints = ContentHints().withStreamCapabilities(allowHls = false, allowSabr = false)
-    return Extraction { videoId, quality -> extractor.extract(videoId, hints, audioQuality = quality) }
+    return Extraction { videoId, quality ->
+        extractor.extract(videoId, hints, excludedClients = excludedProfiles, audioQuality = quality)
+    }
 }
 
 /**

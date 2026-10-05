@@ -16,6 +16,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        applyDebugLaunchOptions(intent) // Debug builds only; before the graph is first used.
         setContent {
             ShuraTheme {
                 val scope = rememberCoroutineScope()

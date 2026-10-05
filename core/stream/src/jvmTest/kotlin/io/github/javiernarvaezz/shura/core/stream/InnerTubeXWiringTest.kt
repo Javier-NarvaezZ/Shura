@@ -58,4 +58,42 @@ class InnerTubeXWiringTest {
             val disallowed = hosts.filterNot(HostPolicy::isAllowed).distinct()
             assertTrue(disallowed.isEmpty(), "requests to disallowed hosts: $disallowed")
         }
+
+    @Test
+    fun withAMinterInnerTubeXNoLongerSkipsTokenClients() =
+        runBlocking {
+            val hosts = Collections.synchronizedList(mutableListOf<String>())
+            val engine =
+                MockEngine { request ->
+                    hosts += request.url.host
+                    respondError(HttpStatusCode.ServiceUnavailable)
+                }
+            val minter =
+                object : PoTokenMinter {
+                    override suspend fun mint(
+                        videoId: VideoId,
+                        visitorData: String,
+                    ) = PoTokens("player", "streaming", visitorData)
+
+                    override suspend fun invalidate() = Unit
+
+                    override fun close() = Unit
+                }
+            val resolver = InnerTubeXStreamResolver(HttpClient(engine), minter)
+
+            val error =
+                assertFailsWith<StreamResolutionException> {
+                    withTimeout(60_000) { resolver.resolve(VideoId("7fwUH0oRmkQ")) }
+                }
+
+            // Without a minter WEB_REMIX is skipped with "GVS PO-token provider unavailable"; with one it is eligible.
+            val webRemix = error.attempts.filter { it.profile == "WEB_REMIX" }
+            assertTrue(webRemix.isNotEmpty(), "WEB_REMIX was not considered: ${error.attempts}")
+            assertTrue(
+                webRemix.none { "PO-token provider unavailable" in it.outcome },
+                "minter not recognized: $webRemix",
+            )
+            val disallowed = hosts.filterNot(HostPolicy::isAllowed).distinct()
+            assertTrue(disallowed.isEmpty(), "requests to disallowed hosts: $disallowed")
+        }
 }
