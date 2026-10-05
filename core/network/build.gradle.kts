@@ -31,3 +31,16 @@ kotlin {
         }
     }
 }
+
+// SingleHttpClientGuardTest scans sources and build files of every module (ADR 0001 R7). Declare them as
+// inputs so a change anywhere re-runs it instead of reporting a stale UP-TO-DATE result.
+tasks.named<Test>("jvmTest") {
+    inputs
+        .files(
+            fileTree(rootDir) {
+                include("**/src/**/*.kt", "**/*.gradle.kts", "gradle/libs.versions.toml")
+                exclude("**/build/**", ".gradle/**", "build-logic/**/build/**")
+            },
+        ).withPathSensitivity(PathSensitivity.RELATIVE)
+        .withPropertyName("repositorySources")
+}

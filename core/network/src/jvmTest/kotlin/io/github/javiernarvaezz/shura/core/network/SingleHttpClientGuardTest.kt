@@ -32,6 +32,13 @@ class SingleHttpClientGuardTest {
     private val forbiddenInBuildFiles =
         Regex("""ktor-client-($ktorEngines)|media3-datasource-(cronet|rtmp)""")
 
+    /** Drops block and line comments so KDoc mentioning a type is not mistaken for code. */
+    private fun code(file: File): String =
+        file
+            .readText()
+            .replace(Regex("""/\*.*?\*/""", RegexOption.DOT_MATCHES_ALL), " ")
+            .replace(Regex("""(^|\s)//[^\n]*""", RegexOption.MULTILINE), " ")
+
     private fun productionSources(): List<File> =
         root
             .walkTopDown()
@@ -55,7 +62,7 @@ class SingleHttpClientGuardTest {
             productionSources()
                 .filterNot { it.canonicalPath.startsWith(networkMain) }
                 .flatMap { file ->
-                    val text = file.readText()
+                    val text = code(file)
                     val found = forbiddenOutsideNetwork.filterValues { it.containsMatchIn(text) }.keys.toMutableList()
                     if ("ExoPlayer.Builder(" in text && "setMediaSourceFactory(" !in text) {
                         found += "builds ExoPlayer without an explicit media source factory"
@@ -70,7 +77,7 @@ class SingleHttpClientGuardTest {
         val builders =
             productionSources()
                 .filter { it.canonicalPath.startsWith(networkMain) }
-                .filter { forbiddenOutsideNetwork.getValue("creates an OkHttpClient").containsMatchIn(it.readText()) }
+                .filter { forbiddenOutsideNetwork.getValue("creates an OkHttpClient").containsMatchIn(code(it)) }
                 .map { it.name }
         assertTrue(builders == listOf("ShuraNetwork.kt"), "OkHttpClient built outside ShuraNetwork: $builders")
     }
