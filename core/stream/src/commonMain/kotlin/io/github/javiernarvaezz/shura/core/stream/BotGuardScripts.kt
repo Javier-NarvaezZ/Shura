@@ -1,11 +1,34 @@
 package io.github.javiernarvaezz.shura.core.stream
 
+/*
+ * Portions derived from bgutils-js v4.0.3 (https://github.com/LuanRT/BgUtils):
+ *
+ * MIT License
+ *
+ * Copyright (c) 2024 LuanRT
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
+ * documentation files (the "Software"), to deal in the Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and
+ * to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all copies or substantial portions of
+ * the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
+ * THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF
+ * CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
+ */
+
 /**
  * The JavaScript that runs inside the [JsRuntime] to execute BotGuard and mint tokens. It performs no network
  * access: the challenge, the interpreter and the integrity token are fetched from Kotlin.
  *
- * Written for Shura. It follows the BotGuard protocol as implemented by bgutils-js v4.0.3
- * (https://github.com/LuanRT/BgUtils, MIT License, Copyright (c) LuanRT); no code was copied from it.
+ * Written for Shura from bgutils-js's implementation of the BotGuard protocol, so it is treated as derived from it
+ * (MIT, notice above and in THIRD_PARTY_NOTICES.md). The same notice is embedded in [BOOTSTRAP], so it ships with
+ * every copy of the script.
  *
  * Every function receives a request id first and reports exactly once through the bridge object
  * [BRIDGE]`.onResult(id, ok, payload)`. Failures report a short fixed code, never data.
@@ -18,6 +41,21 @@ internal object BotGuardScripts {
 
     val BOOTSTRAP: String =
         """
+        /*
+         * Portions derived from bgutils-js v4.0.3 (https://github.com/LuanRT/BgUtils).
+         * MIT License. Copyright (c) 2024 LuanRT.
+         * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
+         * documentation files (the "Software"), to deal in the Software without restriction, including without
+         * limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the
+         * Software, and to permit persons to whom the Software is furnished to do so, subject to the following
+         * conditions: The above copyright notice and this permission notice shall be included in all copies or
+         * substantial portions of the Software.
+         * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
+         * TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+         * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF
+         * CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+         * DEALINGS IN THE SOFTWARE.
+         */
         (function () {
           'use strict';
           var bridge = globalThis.$BRIDGE;
