@@ -50,5 +50,6 @@ internal fun playbackErrorMessage(error: PlaybackError): String =
         }
     }
 
-private const val OFFLINE = "No hay conexión a internet. Revisa tu conexión e inténtalo de nuevo."
+// The library may report non-network failures as network ones, so this must not claim the device is offline.
+private const val OFFLINE = "No se pudo cargar la canción. Revisa tu conexión e inténtalo de nuevo."
 private const val GENERIC = "Algo salió mal al cargar la canción."

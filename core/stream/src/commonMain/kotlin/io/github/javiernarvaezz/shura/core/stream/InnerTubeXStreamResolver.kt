@@ -12,6 +12,7 @@ import io.github.javiernarvaezz.shura.core.model.VideoId
 import io.github.javiernarvaezz.shura.core.network.HostAllowlist
 import io.ktor.client.HttpClient
 import kotlinx.coroutines.CancellationException
+import kotlinx.serialization.json.Json
 import com.metrolist.innertubex.extraction.AudioQuality as InnerTubeXAudioQuality
 
 /** Seam over InnerTubeX extraction, so mapping can be tested without network. */
@@ -75,7 +76,13 @@ private fun Exception.toResolutionException(): StreamResolutionException =
     }
 
 private fun innerTubeXExtraction(httpClient: HttpClient): Extraction {
-    val client = httpClient.config { install(HostAllowlist) }
+    // InnerTubeX sends request bodies as @Serializable objects and expects the caller's client to serialize them.
+    // Only this derived client gets that: same engine and OkHttpClient, no extra headers or logging (ADR 0001 R7).
+    val client =
+        httpClient.config {
+            install(serializedRequestBodies(InnerTubeXJson))
+            install(HostAllowlist)
+        }
     val innerTube = InnerTube(client)
     // No remote solver configuration store: cipher solving uses only the solvers bundled in the library.
     val cipher = YouTubeCipherService(client)
@@ -88,6 +95,12 @@ private fun innerTubeXExtraction(httpClient: HttpClient): Extraction {
     val hints = ContentHints().withStreamCapabilities(allowHls = false, allowSabr = false)
     return Extraction { videoId, quality -> extractor.extract(videoId, hints, audioQuality = quality) }
 }
+
+/**
+ * The configuration InnerTubeX v0.7.4 uses itself (its live harness and tests): unknown response keys are
+ * ignored, and with `encodeDefaults = false` optional body fields that default to null are omitted.
+ */
+private val InnerTubeXJson = Json { ignoreUnknownKeys = true }
 
 private fun AudioQuality.toInnerTubeX(): InnerTubeXAudioQuality =
     when (this) {

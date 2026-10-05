@@ -22,16 +22,37 @@ class InnerTubeXWiringTest {
     fun offlineFailureIsTypedAndOnlyAllowedHostsAreContacted() =
         runBlocking {
             val hosts = Collections.synchronizedList(mutableListOf<String>())
+            val paths = Collections.synchronizedList(mutableListOf<String>())
+            val playerContentTypes = Collections.synchronizedList(mutableListOf<String?>())
             val engine =
                 MockEngine { request ->
                     hosts += request.url.host
+                    paths += request.url.encodedPath
+                    if (request.url.encodedPath.endsWith("/player")) {
+                        playerContentTypes +=
+                            request.body.contentType
+                                ?.withoutParameters()
+                                ?.toString()
+                    }
                     respondError(HttpStatusCode.ServiceUnavailable)
                 }
             val resolver = InnerTubeXStreamResolver(HttpClient(engine))
 
-            assertFailsWith<StreamResolutionException> {
-                withTimeout(60_000) { resolver.resolve(VideoId("7fwUH0oRmkQ")) }
-            }
+            val error =
+                assertFailsWith<StreamResolutionException> {
+                    withTimeout(60_000) { resolver.resolve(VideoId("7fwUH0oRmkQ")) }
+                }
+
+            // The player request must actually be sent: a client-side failure (e.g. a body InnerTubeX cannot
+            // serialize) never reaches the engine and shows up as "request:<Exception>" attempts.
+            assertTrue(paths.any { it.endsWith("/youtubei/v1/player") }, "no player request reached the engine: $paths")
+            // InnerTubeHttpException is the mocked 503 (server side); anything else failed before reaching the server.
+            assertTrue(playerContentTypes.all { it == "application/json" }, "player bodies: $playerContentTypes")
+            val clientSide =
+                error.attempts.filter {
+                    it.outcome.startsWith("request:") && it.outcome != "request:InnerTubeHttpException"
+                }
+            assertTrue(clientSide.isEmpty(), "client-side request failures: $clientSide")
 
             assertTrue(hosts.isNotEmpty(), "expected the library to attempt requests")
             val disallowed = hosts.filterNot(HostPolicy::isAllowed).distinct()

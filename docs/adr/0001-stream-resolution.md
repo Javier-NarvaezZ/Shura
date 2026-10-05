@@ -397,6 +397,35 @@ These are binding for `:core:stream` and its platform code.
 - The spike uses Media3 1.11.1 for foreground playback only.
 - The final version is decided in Phase 2, together with `MediaSession`. Metrolist pins 1.10.1 because 1.11.1 hid the Android 17 media controls; whether that is still the case is checked then.
 
+**Live checks:**
+- Every live check builds its network with `ShuraNetwork` and the real `InnerTubeXStreamResolver`, exactly like the app.
+- They live in the `:tools:livecheck` module. It is never a dependency of any module, is never part of an app artifact and is **never run by CI**: it only compiles and is linted with the rest of the build.
+- It runs only by hand (`./gradlew :tools:livecheck:run`), with few, spaced requests.
+- It never writes audio or responses into the repository. Audio goes to the system temp directory and is deleted after the decode check.
+- Its output follows the host-counter rule: host names, client profiles and sizes only. No URLs, video ids or tokens.
+- Context: on 2026-10-04 the first on-device test failed because the throwaway gate had configured its own Ktor client differently from the app.
+
+### R8. InnerTubeX request bodies and upgrade checklist
+
+**Request bodies:**
+- InnerTubeX sends its request bodies (e.g. `PlayerBody`) as `@Serializable` objects and expects the caller's client to serialize them. Without that, every player request fails before leaving the device (`request:IllegalStateException`), which the library reports as a network failure.
+- Shura does **not** use Ktor's `ContentNegotiation`: its 3.6.0 serialization module pulls an OpenAPI schema module and a YAML parser (`ktor-openapi-schema`, `kaml`, `snakeyaml-engine-kmp`, `urlencoder-lib`, `kotlinx-datetime`).
+- Instead, `:core:stream` has a small `SerializedRequestBodies` client plugin. It is installed **only** on the client derived for InnerTubeX, with no extra headers or logging.
+  - It encodes `@Serializable` bodies with kotlinx-serialization-json and sets `Content-Type: application/json`.
+  - It leaves strings, byte arrays and explicit `OutgoingContent` to Ktor.
+- **JSON configuration:** `Json { ignoreUnknownKeys = true }`. This is what InnerTubeX v0.7.4 uses in its own live harness and in 21 of its 22 test clients.
+  - `encodeDefaults` stays `false`, so optional body fields that default to `null` (`playlistId`, `playbackContext`, `thirdParty`, `serviceIntegrityDimensions`, `videoCheckOk`) are omitted, as InnerTubeX's own requests do.
+  - Required fields such as `contentCheckOk` and `racyCheckOk` are always sent. `explicitNulls` keeps its default.
+- **The plugin covers requests only.** InnerTubeX v0.7.4 reads every response itself and never calls `body<T>()`.
+- The offline wiring test asserts that real player requests reach the engine with `application/json` and without client-side failures.
+
+**Checklist when upgrading InnerTubeX** (in addition to reading its CHANGELOG):
+1. **R6:** check the Ktor version it is built against and align if needed.
+2. Check whether it now reads responses with `body<T>()` (or otherwise relies on the caller's `ContentNegotiation`). If so, revisit `SerializedRequestBodies`.
+3. Check that its request bodies still serialize correctly with `Json { ignoreUnknownKeys = true }` (new required fields, changed defaults).
+4. Re-run the offline wiring test and `:tools:livecheck` on a few ordinary and explicit tracks.
+5. Regenerate the dependency checksums (`--refresh-dependencies`) and review the transitive diff.
+
 ## Consequences
 
 - Shura depends on a young, single-maintainer GPL-3.0 library for its riskiest part. This is mitigated by:
