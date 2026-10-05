@@ -96,4 +96,30 @@ class InnerTubeXWiringTest {
             val disallowed = hosts.filterNot(HostPolicy::isAllowed).distinct()
             assertTrue(disallowed.isEmpty(), "requests to disallowed hosts: $disallowed")
         }
+
+    @Test
+    fun withAPreprocessedPlayerStoreResolutionAndPrewarmStillComplete() =
+        runBlocking<Unit> {
+            val engine = MockEngine { respondError(HttpStatusCode.ServiceUnavailable) }
+            val store =
+                object : PreprocessedPlayerStore {
+                    override suspend fun read(key: String): String? = null
+
+                    override suspend fun write(
+                        key: String,
+                        value: String?,
+                    ) = Unit
+                }
+            val resolver = InnerTubeXStreamResolver(HttpClient(engine), preprocessedPlayerStore = store)
+
+            withTimeout(60_000) { resolver.prewarm() }
+            // Offline the library never reaches the cipher, so only installation is exercised here; reads and
+            // writes are verified on device.
+            assertFailsWith<StreamResolutionException> {
+                withTimeout(60_000) { resolver.resolve(VideoId("7fwUH0oRmkQ")) }
+            }
+            assertFailsWith<StreamResolutionException> {
+                withTimeout(60_000) { resolver.resolve(VideoId("7fwUH0oRmkQ")) }
+            }
+        }
 }

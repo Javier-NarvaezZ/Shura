@@ -391,6 +391,7 @@ These are binding for `:core:stream` and its platform code.
 - Nothing from `MetrolistGroup/faraday` (no license) or `ZemerTeam/zemer-cipher` is fetched, bundled or copied.
 - `raw.githubusercontent.com`, `github.com` and `cdn.jsdelivr.net` are never on the allowlist.
 - A unit test in `:core:stream` fails the build if the InnerTubeX wiring receives a non-null `RemotePlayerConfigStore`.
+- EJS preprocessed players are not remote configs: InnerTubeX generates them on the device from YouTube's own player script. `FilePreprocessedPlayerStore` keeps up to 3 of them (~3.6 MB each, measured) in the app-private cache (`cacheDir/ejs-players`) so that a cold start does not regenerate them. Measured on device: the cold cipher solve drops from 18.7 s to 3.7–3.8 s, and `player.js` is no longer downloaded.
 
 ### R4. Visible errors, never silent failures
 

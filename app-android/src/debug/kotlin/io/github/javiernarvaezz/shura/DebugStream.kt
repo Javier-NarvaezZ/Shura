@@ -7,8 +7,10 @@ import io.github.javiernarvaezz.shura.core.stream.AudioQuality
 import io.github.javiernarvaezz.shura.core.stream.PoTokenMinter
 import io.github.javiernarvaezz.shura.core.stream.PoTokenUnavailableException
 import io.github.javiernarvaezz.shura.core.stream.PoTokens
+import io.github.javiernarvaezz.shura.core.stream.PreprocessedPlayerStore
 import io.github.javiernarvaezz.shura.core.stream.ResolvedStream
 import io.github.javiernarvaezz.shura.core.stream.StreamResolver
+import io.github.javiernarvaezz.shura.core.stream.Trace
 import kotlin.time.TimeSource
 
 /*
@@ -70,5 +72,38 @@ internal fun debugPoTokenMinter(minter: PoTokenMinter): PoTokenMinter =
                 Log.w(TAG, "PoToken failed stage=${e.stage} cause=${e.causeType} after ${elapsed}ms")
                 throw e
             }
+        }
+    }
+
+/** Reports store hits, misses and sizes; never the key (it derives from the player script URL). */
+internal fun debugPreprocessedPlayerStore(
+    store: PreprocessedPlayerStore,
+    trace: Trace,
+): PreprocessedPlayerStore =
+    object : PreprocessedPlayerStore {
+        override suspend fun read(key: String): String? {
+            val started = TimeSource.Monotonic.markNow()
+            return store.read(key).also {
+                val ms = started.elapsedNow().inWholeMilliseconds.toString()
+                val result = if (it == null) "miss" else "hit"
+                trace.event(
+                    "ejs-store: read",
+                    mapOf(
+                        "result" to result,
+                        "ms" to ms,
+                        "chars" to (it?.length ?: 0).toString(),
+                    ),
+                )
+            }
+        }
+
+        override suspend fun write(
+            key: String,
+            value: String?,
+        ) {
+            val started = TimeSource.Monotonic.markNow()
+            store.write(key, value)
+            val ms = started.elapsedNow().inWholeMilliseconds.toString()
+            trace.event("ejs-store: write", mapOf("chars" to (value?.length ?: -1).toString(), "ms" to ms))
         }
     }

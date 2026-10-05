@@ -12,6 +12,8 @@ import io.github.javiernarvaezz.shura.core.model.VideoId
 import io.github.javiernarvaezz.shura.core.network.HostAllowlist
 import io.ktor.client.HttpClient
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import com.metrolist.innertubex.extraction.AudioQuality as InnerTubeXAudioQuality
@@ -38,13 +40,16 @@ class InnerTubeXStreamResolver internal constructor(
      * @param excludedProfiles InnerTubeX profile ids never to use. Diagnostics only (e.g. forcing a non-legacy
      *   client in a device test); production passes none.
      * @param trace Stage timings for debug builds; release passes [Trace.NONE].
+     * @param preprocessedPlayerStore Keeps EJS preprocessed players across restarts, which turns a cold cipher
+     *   solve of ~19 s into ~3 s on a phone; without it they live in memory only.
      */
     constructor(
         httpClient: HttpClient,
         poTokenMinter: PoTokenMinter? = null,
         excludedProfiles: Set<String> = emptySet(),
         trace: Trace = Trace.NONE,
-    ) : this(InnerTubeXWiring(httpClient, poTokenMinter, excludedProfiles, trace))
+        preprocessedPlayerStore: PreprocessedPlayerStore? = null,
+    ) : this(InnerTubeXWiring(httpClient, poTokenMinter, excludedProfiles, trace, preprocessedPlayerStore))
 
     private constructor(wiring: InnerTubeXWiring) : this(wiring.extraction, wiring.prewarm)
 
@@ -123,9 +128,13 @@ private class InnerTubeXWiring(
     poTokenMinter: PoTokenMinter?,
     excludedProfiles: Set<String>,
     trace: Trace,
+    preprocessedPlayerStore: PreprocessedPlayerStore?,
 ) {
     val extraction: Extraction
     val prewarm: suspend () -> Unit
+
+    private val storeMutex = Mutex()
+    private var storeInstalled = preprocessedPlayerStore == null
 
     init {
         val logger = trace.asInnerTubeLogger()
@@ -147,12 +156,27 @@ private class InnerTubeXWiring(
                 tokenProvider = poTokenMinter?.let(::InnerTubeXTokenProvider),
                 logger = logger,
             )
+        // Installing the store suspends, so it happens once, before the first use of the cipher service.
+        val installStore: suspend () -> Unit = {
+            if (preprocessedPlayerStore != null) {
+                storeMutex.withLock {
+                    if (!storeInstalled) {
+                        cipher.setPreprocessedPlayerCache(preprocessedPlayerStore::read, preprocessedPlayerStore::write)
+                        storeInstalled = true
+                    }
+                }
+            }
+        }
         val hints = ContentHints().withStreamCapabilities(allowHls = false, allowSabr = false)
         extraction =
             Extraction { videoId, quality ->
+                installStore()
                 extractor.extract(videoId, hints, excludedClients = excludedProfiles, audioQuality = quality)
             }
-        prewarm = { extractor.prewarm() }
+        prewarm = {
+            installStore()
+            extractor.prewarm()
+        }
     }
 }
 

@@ -7,8 +7,10 @@ import io.github.javiernarvaezz.shura.core.network.ShuraNetwork
 import io.github.javiernarvaezz.shura.core.player.AndroidAudioPlayer
 import io.github.javiernarvaezz.shura.core.player.AudioPlayer
 import io.github.javiernarvaezz.shura.core.stream.BotGuardPoTokenMinter
+import io.github.javiernarvaezz.shura.core.stream.FilePreprocessedPlayerStore
 import io.github.javiernarvaezz.shura.core.stream.InnerTubeXStreamResolver
 import io.github.javiernarvaezz.shura.core.stream.WebViewJsRuntime
+import java.io.File
 
 class ShuraApp : Application() {
     /** Created on first use from the main thread (ExoPlayer binds to the creating thread's looper). */
@@ -31,7 +33,14 @@ class AppGraph(
         debugPoTokenMinter(BotGuardPoTokenMinter(network.ktor) { WebViewJsRuntime.create(context) })
 
     private val streamResolver =
-        InnerTubeXStreamResolver(network.ktor, poTokenMinter, debugExcludedStreamProfiles(), trace)
+        InnerTubeXStreamResolver(
+            network.ktor,
+            poTokenMinter,
+            debugExcludedStreamProfiles(),
+            trace,
+            // App-private cache: generated on device from YouTube's player script, rebuilt if the system clears it.
+            debugPreprocessedPlayerStore(FilePreprocessedPlayerStore(File(context.cacheDir, "ejs-players")), trace),
+        )
 
     val catalog = InnerTubeClient(network.ktor)
 
