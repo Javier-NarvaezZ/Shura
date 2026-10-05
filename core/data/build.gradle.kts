@@ -43,6 +43,8 @@ sqldelight {
     databases {
         create("ShuraDatabase") {
             packageName.set("io.github.javiernarvaezz.shura.core.data.db")
+            // Each released schema version is kept here (1.db, ...) so migrations can be verified against it.
+            schemaOutputDirectory.set(file("src/commonMain/sqldelight/databases"))
             verifyMigrations.set(true)
         }
     }

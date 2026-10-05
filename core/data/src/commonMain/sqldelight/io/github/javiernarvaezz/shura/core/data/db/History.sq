@@ -1,0 +1,29 @@
+-- Songs listened to for at least 30 seconds (or to the end), newest first; capped by the store.
+CREATE TABLE play_history (
+    id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    video_id TEXT NOT NULL,
+    title TEXT NOT NULL,
+    artist_names TEXT NOT NULL,
+    artist_ids TEXT NOT NULL,
+    album_title TEXT,
+    album_id TEXT,
+    duration_ms INTEGER,
+    thumbnail_url TEXT,
+    explicit INTEGER NOT NULL,
+    played_at INTEGER NOT NULL
+);
+
+CREATE INDEX play_history_played_at ON play_history(played_at);
+
+insertPlay:
+INSERT INTO play_history(video_id, title, artist_names, artist_ids, album_title, album_id, duration_ms, thumbnail_url, explicit, played_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+prune:
+DELETE FROM play_history WHERE id NOT IN (SELECT id FROM play_history ORDER BY played_at DESC, id DESC LIMIT :keep);
+
+recent:
+SELECT * FROM play_history ORDER BY played_at DESC, id DESC LIMIT :limit;
+
+countPlays:
+SELECT count(*) FROM play_history;
