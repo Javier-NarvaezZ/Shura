@@ -42,4 +42,5 @@ include(
     ":feature:library",
     ":feature:lyrics",
     ":feature:settings",
+    ":tools:livecheck",
 )
