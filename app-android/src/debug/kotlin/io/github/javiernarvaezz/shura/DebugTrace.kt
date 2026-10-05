@@ -1,5 +1,6 @@
 package io.github.javiernarvaezz.shura
 
+import android.os.Process
 import android.os.SystemClock
 import android.util.Log
 import io.github.javiernarvaezz.shura.core.stream.InnerTubeXStreamResolver
@@ -108,3 +109,27 @@ internal fun debugMaybePrewarm(
         )
     }
 }
+
+/** Reports the warm-up's duration, response-body bytes and this process's CPU time; never what was fetched. */
+internal fun debugWarmUp(
+    warmUp: suspend () -> Unit,
+    trace: Trace,
+): suspend () -> Unit =
+    {
+        val bytesBefore = totalBodyBytes.get()
+        val cpuBefore = Process.getElapsedCpuTime()
+        val started = SystemClock.elapsedRealtime()
+        trace.event("warmup: start")
+        try {
+            warmUp()
+        } finally {
+            trace.event(
+                "warmup: done",
+                mapOf(
+                    "ms" to (SystemClock.elapsedRealtime() - started).toString(),
+                    "bodyBytes" to (totalBodyBytes.get() - bytesBefore).toString(),
+                    "processCpuMs" to (Process.getElapsedCpuTime() - cpuBefore).toString(),
+                ),
+            )
+        }
+    }

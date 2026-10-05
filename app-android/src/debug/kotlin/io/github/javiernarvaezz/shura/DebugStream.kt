@@ -21,6 +21,7 @@ import kotlin.time.TimeSource
 private const val TAG = "ShuraStream"
 private const val EXTRA_NO_LEGACY = "shura.debug.noLegacyClients"
 private const val EXTRA_PREWARM = "shura.debug.prewarm"
+private const val EXTRA_WARMUP = "shura.debug.warmup"
 
 // Every variant of the legacy VISIONOS manifests, to force a non-legacy (PoToken) client in device tests.
 private val LEGACY_PROFILES =
@@ -32,6 +33,9 @@ private var noLegacyClients = false
 @Volatile
 internal var prewarmRequested = false
 
+@Volatile
+private var warmupEnabled = false
+
 /** `adb shell am start -n <app>/.MainActivity --ez shura.debug.noLegacyClients true` after a force-stop. */
 internal fun applyDebugLaunchOptions(intent: Intent) {
     if (intent.getBooleanExtra(EXTRA_NO_LEGACY, false)) {
@@ -39,7 +43,11 @@ internal fun applyDebugLaunchOptions(intent: Intent) {
         Log.w(TAG, "Legacy VISIONOS clients excluded for this process")
     }
     if (intent.getBooleanExtra(EXTRA_PREWARM, false)) prewarmRequested = true
+    warmupEnabled = intent.getBooleanExtra(EXTRA_WARMUP, false)
 }
+
+/** Debug: off unless launched with `--ez shura.debug.warmup true`, so cold-start measurements stay comparable. */
+internal fun playbackWarmupEnabled(): Boolean = warmupEnabled
 
 internal fun debugExcludedStreamProfiles(): Set<String> = if (noLegacyClients) LEGACY_PROFILES else emptySet()
 

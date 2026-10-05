@@ -15,6 +15,15 @@ internal fun applyDebugLaunchOptions(intent: Intent) = Unit
 
 internal fun debugExcludedStreamProfiles(): Set<String> = emptySet()
 
+// Off until its data, CPU and time cost is measured and approved.
+@Suppress("FunctionOnlyReturningConstant")
+internal fun playbackWarmupEnabled(): Boolean = false
+
+internal fun debugWarmUp(
+    warmUp: suspend () -> Unit,
+    @Suppress("UnusedParameter") trace: Trace,
+): suspend () -> Unit = warmUp
+
 internal fun debugStreamResolver(resolver: StreamResolver): StreamResolver = resolver
 
 internal fun debugPoTokenMinter(minter: PoTokenMinter): PoTokenMinter = minter

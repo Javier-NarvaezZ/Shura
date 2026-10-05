@@ -60,6 +60,32 @@ class SearchControllerTest {
         SearchController(search, player, backgroundScope)
 
     @Test
+    fun typingOrSubmittingAQuerySignalsPlaybackIntent() =
+        runTest {
+            var intents = 0
+            val controller = SearchController({ emptyList() }, player, backgroundScope) { intents++ }
+
+            controller.onQueryChange("   ")
+            assertEquals(0, intents)
+            controller.onQueryChange("j")
+            assertEquals(1, intents)
+            controller.submit()
+            assertEquals(2, intents)
+        }
+
+    @Test
+    fun blankQueryDoesNotSignalPlaybackIntent() =
+        runTest {
+            var intents = 0
+            val controller = SearchController({ emptyList() }, player, backgroundScope) { intents++ }
+
+            controller.onQueryChange("")
+            controller.submit()
+
+            assertEquals(0, intents)
+        }
+
+    @Test
     fun blankQueryDoesNotSearch() =
         runTest {
             var searched = false

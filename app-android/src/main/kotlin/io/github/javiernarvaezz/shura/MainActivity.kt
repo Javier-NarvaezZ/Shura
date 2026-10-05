@@ -20,7 +20,15 @@ class MainActivity : ComponentActivity() {
         setContent {
             ShuraTheme {
                 val scope = rememberCoroutineScope()
-                val controller = remember { SearchController(graph.catalog::searchSongs, graph.player, scope) }
+                val controller =
+                    remember {
+                        SearchController(
+                            graph.catalog::searchSongs,
+                            graph.player,
+                            scope,
+                            graph.playbackWarmup::onPlaybackIntent,
+                        )
+                    }
                 SearchScreen(controller)
             }
         }
