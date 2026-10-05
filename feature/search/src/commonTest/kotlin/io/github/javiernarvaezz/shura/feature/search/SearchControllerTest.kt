@@ -6,6 +6,8 @@ import io.github.javiernarvaezz.shura.core.model.VideoId
 import io.github.javiernarvaezz.shura.core.player.AudioPlayer
 import io.github.javiernarvaezz.shura.core.player.PlaybackError
 import io.github.javiernarvaezz.shura.core.player.PlaybackState
+import io.github.javiernarvaezz.shura.core.player.QueueState
+import io.github.javiernarvaezz.shura.core.player.RepeatMode
 import io.github.javiernarvaezz.shura.core.stream.StreamFailure
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -25,8 +27,56 @@ class SearchControllerTest {
         val calls = mutableListOf<String>()
         override val state = MutableStateFlow<PlaybackState>(PlaybackState.Idle)
 
+        override val queue = MutableStateFlow(QueueState())
+
         override fun play(song: Song) {
             calls += "play:${song.videoId}"
+        }
+
+        override fun playQueue(
+            songs: List<Song>,
+            startIndex: Int,
+        ) {
+            calls += "playQueue:${songs.size}@$startIndex"
+        }
+
+        override fun next() {
+            calls += "next"
+        }
+
+        override fun previous() {
+            calls += "previous"
+        }
+
+        override fun skipTo(index: Int) {
+            calls += "skipTo:$index"
+        }
+
+        override fun setShuffle(enabled: Boolean) {
+            calls += "shuffle:$enabled"
+        }
+
+        override fun setRepeat(mode: RepeatMode) {
+            calls += "repeat:$mode"
+        }
+
+        override fun playNext(songs: List<Song>) {
+            calls += "playNext:${songs.size}"
+        }
+
+        override fun enqueue(songs: List<Song>) {
+            calls += "enqueue:${songs.size}"
+        }
+
+        override fun remove(index: Int) {
+            calls += "remove:$index"
+        }
+
+        override fun move(
+            from: Int,
+            to: Int,
+        ) {
+            calls += "move:$from>$to"
         }
 
         override fun pause() {
@@ -188,5 +238,52 @@ class SearchControllerTest {
 
             assertEquals(listOf("play:7fwUH0oRmkQ", "pause", "resume", "seek:30", "seek:-10", "retry"), player.calls)
             assertTrue(controller.playback.value is PlaybackState.Failed)
+        }
+
+    @Test
+    fun tappingAResultPlaysTheResultsAsAQueueFromThatSong() =
+        runTest {
+            val other = Song(VideoId("dQw4w9WgXcQ"), "Other", listOf(Artist("X")))
+            val third = Song(VideoId("kJQP7kiw5Fk"), "Third", listOf(Artist("Y")))
+            val controller = controller { listOf(other, song, third) }
+            controller.onQueryChange("juanes")
+            controller.submit()
+            runCurrent()
+
+            controller.play(song)
+
+            assertEquals(listOf("playQueue:3@1"), player.calls)
+        }
+
+    @Test
+    fun queueControlsGoToThePlayer() =
+        runTest {
+            val controller = controller { emptyList() }
+
+            controller.playNext(song)
+            controller.next()
+            controller.previous()
+            controller.toggleShuffle()
+            player.queue.value = QueueState(shuffle = true)
+            controller.toggleShuffle()
+            controller.cycleRepeat()
+            player.queue.value = QueueState(repeat = RepeatMode.All)
+            controller.cycleRepeat()
+            player.queue.value = QueueState(repeat = RepeatMode.One)
+            controller.cycleRepeat()
+
+            assertEquals(
+                listOf(
+                    "playNext:1",
+                    "next",
+                    "previous",
+                    "shuffle:true",
+                    "shuffle:false",
+                    "repeat:All",
+                    "repeat:One",
+                    "repeat:Off",
+                ),
+                player.calls,
+            )
         }
 }

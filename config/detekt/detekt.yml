@@ -4,3 +4,8 @@ naming:
   FunctionNaming:
     ignoreAnnotated:
       - 'Composable'
+
+complexity:
+  TooManyFunctions:
+    # Functions required by an interface (e.g. a player implementing AudioPlayer) do not make a class do too much.
+    ignoreOverridden: true

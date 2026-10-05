@@ -31,6 +31,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.github.javiernarvaezz.shura.core.model.Song
 import io.github.javiernarvaezz.shura.core.player.PlaybackState
+import io.github.javiernarvaezz.shura.core.player.QueueState
+import io.github.javiernarvaezz.shura.core.player.RepeatMode
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
@@ -39,6 +41,7 @@ import kotlin.time.Duration.Companion.seconds
 fun SearchScreen(controller: SearchController) {
     val state by controller.state.collectAsState()
     val playback by controller.playback.collectAsState()
+    val queue by controller.queue.collectAsState()
 
     Column(Modifier.fillMaxSize().safeDrawingPadding()) {
         Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -57,15 +60,22 @@ fun SearchScreen(controller: SearchController) {
         SearchStatusLine(state.status, onRetry = controller::submit)
         LazyColumn(Modifier.weight(1f)) {
             items(state.results, key = { it.videoId.value }) { song ->
-                SongRow(song, onClick = { controller.play(song) })
+                SongRow(song, onClick = { controller.play(song) }, onPlayNext = { controller.playNext(song) })
                 HorizontalDivider()
             }
         }
         NowPlayingBar(
             playback,
-            onToggle = controller::togglePause,
-            onSeek = controller::seekBy,
-            onRetry = controller::retryPlayback,
+            queue,
+            NowPlayingActions(
+                toggle = controller::togglePause,
+                seek = controller::seekBy,
+                retry = controller::retryPlayback,
+                previous = controller::previous,
+                next = controller::next,
+                shuffle = controller::toggleShuffle,
+                repeat = controller::cycleRepeat,
+            ),
         )
     }
 }
@@ -102,29 +112,51 @@ private fun SearchStatusLine(
 private fun SongRow(
     song: Song,
     onClick: () -> Unit,
+    onPlayNext: () -> Unit,
 ) {
-    Column(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 10.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(song.title, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            if (song.isExplicit) Text("  E", style = MaterialTheme.typography.labelSmall)
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f).clickable(onClick = onClick).padding(start = 16.dp, top = 10.dp, bottom = 10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    song.title,
+                    style = MaterialTheme.typography.bodyLarge,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (song.isExplicit) Text("  E", style = MaterialTheme.typography.labelSmall)
+            }
+            val details = listOfNotNull(song.artistNames.ifBlank { null }, song.album?.title, song.duration?.toClock())
+            Text(
+                details.joinToString(" • "),
+                style = MaterialTheme.typography.bodySmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
-        val details = listOfNotNull(song.artistNames.ifBlank { null }, song.album?.title, song.duration?.toClock())
-        Text(
-            details.joinToString(" • "),
-            style = MaterialTheme.typography.bodySmall,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
+        // Temporary until the queue actions of the full player screen (Phase 2, E5).
+        TextButton(onClick = onPlayNext) { Text("A continuación") }
     }
 }
+
+private class NowPlayingActions(
+    val toggle: () -> Unit,
+    val seek: (Duration) -> Unit,
+    val retry: () -> Unit,
+    val previous: () -> Unit,
+    val next: () -> Unit,
+    val shuffle: () -> Unit,
+    val repeat: () -> Unit,
+)
 
 @Composable
 private fun NowPlayingBar(
     playback: PlaybackState,
-    onToggle: () -> Unit,
-    onSeek: (Duration) -> Unit,
-    onRetry: () -> Unit,
+    queue: QueueState,
+    actions: NowPlayingActions,
 ) {
+    val onToggle = actions.toggle
+    val onSeek = actions.seek
+    val onRetry = actions.retry
     val (song, label, action) =
         when (playback) {
             PlaybackState.Idle -> {
@@ -171,7 +203,38 @@ private fun NowPlayingBar(
                     TextButton(onClick = { onSeek(SEEK_FORWARD) }) { Text("+30 s") }
                 }
             }
+            if (queue.items.size > 1) QueueControls(queue, actions)
         }
+    }
+}
+
+// Temporary queue controls until the full player screen (Phase 2, E5).
+@Composable
+private fun QueueControls(
+    queue: QueueState,
+    actions: NowPlayingActions,
+) {
+    Row {
+        TextButton(onClick = actions.previous) { Text("Anterior") }
+        TextButton(onClick = actions.next) { Text("Siguiente") }
+        TextButton(onClick = actions.shuffle) { Text(if (queue.shuffle) "Aleatorio: sí" else "Aleatorio: no") }
+        TextButton(onClick = actions.repeat) {
+            Text(
+                when (queue.repeat) {
+                    RepeatMode.Off -> "Repetir: no"
+                    RepeatMode.All -> "Repetir: todo"
+                    RepeatMode.One -> "Repetir: una"
+                },
+            )
+        }
+    }
+    queue.next?.let {
+        Text(
+            "Sigue: ${it.title}",
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            style = MaterialTheme.typography.bodySmall,
+        )
     }
 }
 

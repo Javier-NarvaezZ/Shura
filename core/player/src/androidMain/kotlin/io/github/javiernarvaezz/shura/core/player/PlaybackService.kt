@@ -44,7 +44,8 @@ class PlaybackService : MediaSessionService() {
         trace = dependencies.trace
         trace.event("player: service created")
         specResolver = StreamSpecResolver(dependencies.resolver, dependencies.quality, dependencies.trace)
-        val player = buildShuraExoPlayer(this, dependencies, specResolver)
+        val exo = buildShuraExoPlayer(this, dependencies, specResolver)
+        val player = ShuraPlayer(exo)
         // Artwork through the single OkHttpClient and its host allowlist, never Media3's default HTTP stack (R7).
         val artworkLoader =
             DataSourceBitmapLoader
@@ -58,7 +59,7 @@ class PlaybackService : MediaSessionService() {
                 .setBitmapLoader(artworkLoader)
                 .apply { launchIntent()?.let(::setSessionActivity) }
                 .build()
-                .also { player.addListener(ErrorListener(it, player)) }
+                .also { exo.addListener(ErrorListener(it, exo)) }
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = session
@@ -78,11 +79,13 @@ class PlaybackService : MediaSessionService() {
             PendingIntent.getActivity(this, 0, it, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
         }
 
+    /** Re-resolves the current item and prepares again from where it failed, keeping the whole queue. */
     private fun retry(player: Player) {
-        val item = player.currentMediaItem?.toSessionItem() ?: return
-        videoIdOf(item.mediaId)?.let(specResolver::invalidate)
+        player.currentMediaItem
+            ?.mediaId
+            ?.let(::videoIdOf)
+            ?.let(specResolver::invalidate) ?: return
         session?.setSessionExtras(Bundle.EMPTY)
-        player.setMediaItem(item)
         player.prepare()
         player.play()
     }

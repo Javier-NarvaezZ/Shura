@@ -395,6 +395,11 @@ These are binding for `:core:stream` and its platform code.
 
 **No network in the `WebView`:**
 - All HTTP for the attestation is done **from Kotlin through the app's single client** (R7), following InnerTubeX's own live harness: the watch page (`www.youtube.com/watch`, with the visitor id and the `SOCS=CAI` consent cookie), the interpreter (`www.google.com`/`www.gstatic.com`, path validated by InnerTubeX) and `www.youtube.com/api/jnn/v1/GenerateIT`. The `WebView` only computes.
+- **`GenerateIT` uses two public constants, not secrets.** They are embedded in YouTube's web player and published in bgutils-js v4.0.3 (MIT), so they are identical for every client:
+  - `WEB_API_KEY`, sent as `x-goog-api-key`, is `GOOG_API_KEY` in `src/utils/constants.ts`;
+  - `REQUEST_KEY`, the first element of the request body, is `requestKey` in `examples/index.ts` and `examples/index-innertube.ts`.
+
+  Both live in `BotGuardPoTokenMinter.kt`. GitHub secret scanning flags the API key pattern; the alert was closed as a false positive on 2026-10-05. Shura's own keys, tokens and credentials are never committed (CLAUDE.md, security).
 - `blockNetworkLoads = true`. `shouldInterceptRequest` refuses every request and logs **scheme and host only**; `shouldOverrideUrlLoading` refuses every navigation.
 - **Single exception: the `data:` scheme**, which is in-memory content, not network. BotGuard loads an inline `data:` resource, and with it blocked `GenerateIT` returns no integrity token (measured; approved on 2026-10-05).
 - Requests the `WebView` attempted and that stay blocked: `www.youtube.com/favicon.ico` and `www.youtube.com/generate_204`. Neither is needed.
@@ -445,6 +450,7 @@ These are binding for `:core:stream` and its platform code.
   - The copyright and MIT notice are in the header of `BotGuardScripts.kt`, embedded in the script itself (so it ships with every copy) and in `THIRD_PARTY_NOTICES.md`.
   - `docs/dependencies.md` records it.
   - Before a public release, the app must show third-party notices to users (licenses screen).
+  - The two public `GenerateIT` constants in `BotGuardPoTokenMinter.kt` (`WEB_API_KEY`, `REQUEST_KEY`) come from bgutils-js v4.0.3 as well. They are public values, not secrets (see R2).
 - InnerTubeX and every other new dependency are recorded in `docs/dependencies.md` with version, license and origin, and are added only after explicit approval.
 
 ### R6. Ktor version alignment with InnerTubeX
