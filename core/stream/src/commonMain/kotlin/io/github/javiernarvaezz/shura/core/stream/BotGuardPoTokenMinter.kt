@@ -1,5 +1,7 @@
 package io.github.javiernarvaezz.shura.core.stream
 
+import com.metrolist.innertubex.extraction.potoken.IntegrityTokenData
+import com.metrolist.innertubex.extraction.potoken.PoTokenException
 import com.metrolist.innertubex.extraction.potoken.parseAttestationChallengeData
 import com.metrolist.innertubex.extraction.potoken.parseAttestationInterpreterUrl
 import com.metrolist.innertubex.extraction.potoken.parseIntegrityTokenData
@@ -27,6 +29,11 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
@@ -140,19 +147,7 @@ class BotGuardPoTokenMinter internal constructor(
                     "$challengeData, ${Json.encodeToString(attestation.eventId)}",
                 )
             stage.name = "integrity"
-            val integrity =
-                parseIntegrityTokenData(
-                    fetchText("integrity") {
-                        http.post(GENERATE_IT_URL) {
-                            browserHeaders(runtime.userAgent)
-                            header(HttpHeaders.Accept, "application/json")
-                            header("x-goog-api-key", WEB_API_KEY)
-                            header("x-user-agent", "grpc-web-javascript/0.1")
-                            val body = "[${Json.encodeToString(REQUEST_KEY)},${Json.encodeToString(botguardResponse)}]"
-                            setBody(TextContent(body, ContentType.parse("application/json+protobuf")))
-                        }
-                    },
-                )
+            val integrity = requestIntegrity(runtime.userAgent, botguardResponse)
             stage.name = "minter"
             runtime.call(BotGuardScripts.CREATE_MINTER, integrity.tokenJavaScript)
             stage.name = "player"
@@ -163,6 +158,30 @@ class BotGuardPoTokenMinter internal constructor(
         ) {
             runtime.close()
             throw e
+        }
+    }
+
+    /** Exchanges the BotGuard response for an integrity token (`GenerateIT`). */
+    private suspend fun requestIntegrity(
+        userAgent: String,
+        botguardResponse: String,
+    ): IntegrityTokenData {
+        val response =
+            fetchText("integrity") {
+                http.post(GENERATE_IT_URL) {
+                    browserHeaders(userAgent)
+                    header(HttpHeaders.Accept, "application/json")
+                    header("x-goog-api-key", WEB_API_KEY)
+                    header("x-user-agent", "grpc-web-javascript/0.1")
+                    val body = "[${Json.encodeToString(REQUEST_KEY)},${Json.encodeToString(botguardResponse)}]"
+                    setBody(TextContent(body, ContentType.parse("application/json+protobuf")))
+                }
+            }
+        return try {
+            parseIntegrityTokenData(response)
+        } catch (e: PoTokenException) {
+            // Report only the response's JSON shape (types and sizes), never its values.
+            throw PoTokenUnavailableException("integrity", "${e::class.simpleName} ${jsonShape(response)}")
         }
     }
 
@@ -210,3 +229,43 @@ class BotGuardPoTokenMinter internal constructor(
         const val REQUEST_KEY = "O43z0dpjhgX20SCx4KAo"
     }
 }
+
+/** Describes JSON structure without values, e.g. `array(3)[s,n,s]` or `object{error}`; safe to log. */
+internal fun jsonShape(text: String): String =
+    runCatching {
+        when (val element = Json.parseToJsonElement(text)) {
+            is JsonArray -> "array(${element.size})[${element.joinToString(",") { it.typeCode() }}]"
+            is JsonObject -> "object{${element.keys.joinToString(",")}}"
+            else -> element.typeCode()
+        }
+    }.getOrNull()?.takeUnless { it == UNQUOTED_LITERAL } ?: "non-json(${text.length})"
+
+private const val UNQUOTED_LITERAL = "literal"
+
+private fun JsonElement.typeCode(): String =
+    when (this) {
+        is JsonNull -> {
+            "null"
+        }
+
+        is JsonPrimitive -> {
+            when {
+                isString -> "s"
+
+                content == "true" || content == "false" -> "b"
+
+                content.toDoubleOrNull() != null -> "n"
+
+                // kotlinx accepts some unquoted tokens (e.g. `<html>`); they are not valid JSON values.
+                else -> UNQUOTED_LITERAL
+            }
+        }
+
+        is JsonArray -> {
+            "a"
+        }
+
+        is JsonObject -> {
+            "o"
+        }
+    }

@@ -17,7 +17,8 @@ internal class InnerTubeXTokenProvider(
     private val minter: PoTokenMinter,
 ) : TokenProvider {
     override val capabilities =
-        TokenProviderCapabilities(providers = setOf(PoTokenProviderKind.WEB_BOTGUARD), usesWebView = true)
+        // The minter uses the watch page's BotGuard challenge, i.e. web page attestation.
+        TokenProviderCapabilities(providers = setOf(PoTokenProviderKind.WEBPAGE_ATTESTATION), usesWebView = true)
 
     // Anonymous playback only: the cookie InnerTubeX passes is ignored.
     override suspend fun getPoToken(

@@ -37,10 +37,10 @@ class InnerTubeXTokenProviderTest {
     }
 
     @Test
-    fun declaresWebBotGuardThroughAWebView() {
+    fun declaresWebPageAttestationThroughAWebView() {
         val capabilities = InnerTubeXTokenProvider(FakeMinter()).capabilities
 
-        assertEquals(setOf(PoTokenProviderKind.WEB_BOTGUARD), capabilities.providers)
+        assertEquals(setOf(PoTokenProviderKind.WEBPAGE_ATTESTATION), capabilities.providers)
         assertTrue(capabilities.usesWebView)
     }
 

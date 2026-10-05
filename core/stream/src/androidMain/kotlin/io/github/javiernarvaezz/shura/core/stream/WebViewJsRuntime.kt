@@ -104,6 +104,8 @@ class WebViewJsRuntime private constructor(
         private const val BLANK_PAGE = "<!DOCTYPE html><html><head><meta charset=\"utf-8\"></head><body></body></html>"
         private const val CODE_LIMIT = 32
         private const val HTTP_FORBIDDEN = 403
+        private const val DESKTOP_USER_AGENT =
+            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36"
 
         @SuppressLint("SetJavaScriptEnabled") // Required to run BotGuard; the page has no network and no file access.
         suspend fun create(context: Context): WebViewJsRuntime =
@@ -128,6 +130,10 @@ class WebViewJsRuntime private constructor(
                     mediaPlaybackRequiresUserGesture = true
                     safeBrowsingEnabled = true
                     blockNetworkLoads = true
+                    // The Android WebView user agent gets no integrity token for web page attestation (measured on
+                    // 2026-10-05); a desktop Chrome one, as InnerTubeX's harness uses, does. HTTP for the attestation
+                    // uses this same value (JsRuntime.userAgent).
+                    userAgentString = DESKTOP_USER_AGENT
                 }
                 webView.webViewClient = BlockingClient(bridge, pageReady)
                 webView.webChromeClient = SilentChromeClient()
@@ -146,8 +152,11 @@ class WebViewJsRuntime private constructor(
         override fun shouldInterceptRequest(
             view: WebView,
             request: WebResourceRequest,
-        ): WebResourceResponse {
-            Log.w(TAG, "WebView request blocked host=${request.url.host}")
+        ): WebResourceResponse? {
+            // BotGuard loads an inline data: resource; without it GenerateIT returns no integrity token (measured on
+            // 2026-10-05). data: is in-memory content, not network; every other scheme stays blocked.
+            if (request.url.scheme == "data") return null
+            Log.w(TAG, "WebView request blocked scheme=${request.url.scheme} host=${request.url.host}")
             return WebResourceResponse(
                 "text/plain",
                 "utf-8",

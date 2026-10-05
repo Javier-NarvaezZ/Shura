@@ -300,3 +300,21 @@ class BotGuardPoTokenMinterTest {
             assertFalse(failure.message.orEmpty().contains(visitor))
         }
 }
+
+class JsonShapeTest {
+    @Test
+    fun describesStructureWithoutValues() {
+        assertEquals("array(2)[s,n]", jsonShape("[\"AQID\",43200]"))
+        assertEquals("array(4)[null,n,null,s]", jsonShape("[null,43200,null,\"fallback-token\"]"))
+        assertEquals("object{error}", jsonShape("{\"error\":{\"message\":\"secret detail\"}}"))
+        assertEquals("non-json(6)", jsonShape("<html>"))
+        assertEquals("s", jsonShape("\"text\""))
+    }
+
+    @Test
+    fun neverIncludesValues() {
+        val shape = jsonShape("[\"AQIDBAUGBwgJ\",43200,null,\"fallback-token\"]")
+
+        listOf("AQID", "43200", "fallback").forEach { assertFalse(shape.contains(it), shape) }
+    }
+}
