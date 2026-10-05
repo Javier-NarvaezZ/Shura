@@ -212,6 +212,59 @@ class InnerTubeXStreamResolverTest {
             assertFalse(message.contains("http"))
         }
 
+    @Test
+    fun failedResolutionAfterATokenFailureIsTokenUnavailable() =
+        runTest {
+            val resolver =
+                resolver { _, _ ->
+                    recordTokenFailure(PoTokenUnavailableException("botguard", "timeout"))
+                    null
+                }
+
+            val error = assertFailsWith<StreamResolutionException> { resolver.resolve(videoId) }
+
+            assertEquals(StreamFailure.TokenUnavailable, error.failure)
+            assertEquals("PoToken:botguard", error.causeType)
+        }
+
+    @Test
+    fun tokenFailureDoesNotHideNetworkOrAgeErrors() =
+        runTest {
+            val resolver =
+                resolver { _, _ ->
+                    recordTokenFailure(PoTokenUnavailableException("watch", "HTTP 503"))
+                    throw StreamResolveException(StreamResolveException.Reason.AGE_RESTRICTED, "x")
+                }
+
+            assertEquals(
+                StreamFailure.AgeRestricted,
+                assertFailsWith<StreamResolutionException> {
+                    resolver.resolve(videoId)
+                }.failure,
+            )
+        }
+
+    @Test
+    fun tokenFailureFromAnotherResolutionDoesNotLeak() =
+        runTest {
+            var first = true
+            val resolver =
+                resolver { _, _ ->
+                    if (first) {
+                        first = false
+                        recordTokenFailure(PoTokenUnavailableException("watch", "timeout"))
+                        extracted()
+                    } else {
+                        null
+                    }
+                }
+
+            resolver.resolve(videoId)
+            val error = assertFailsWith<StreamResolutionException> { resolver.resolve(videoId) }
+
+            assertEquals(StreamFailure.NoPlayableStream, error.failure)
+        }
+
     private companion object {
         const val TOKEN_OUTCOME = "selection:GVS PO-token provider unavailable"
         val NO_PLAYABLE = StreamResolveException.Reason.NO_PLAYABLE_STREAM
