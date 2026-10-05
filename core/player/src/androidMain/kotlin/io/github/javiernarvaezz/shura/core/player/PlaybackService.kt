@@ -83,6 +83,7 @@ class PlaybackService : MediaSessionService() {
             release()
         }
         session = null
+        specResolver.close()
         super.onDestroy()
     }
 
