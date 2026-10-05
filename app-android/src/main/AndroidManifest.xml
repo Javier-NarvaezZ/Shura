@@ -5,6 +5,9 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- Metered-network check for the playback warm-up (also merged from Media3; declared so it does not depend on it). -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- Background playback (Phase 2). Media session notifications need no POST_NOTIFICATIONS on 13+. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
 
     <application
         android:name=".ShuraApp"
@@ -23,6 +26,21 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!--
+            Exported without a permission on purpose: system UI, Bluetooth and other media controllers must be able
+            to connect. The session trusts nothing they send: untrusted controllers are read-only and media items are
+            rebuilt from a validated video id (PlaybackService).
+        -->
+        <service
+            android:name="io.github.javiernarvaezz.shura.core.player.PlaybackService"
+            android:exported="true"
+            android:foregroundServiceType="mediaPlayback"
+            tools:ignore="ExportedService">
+            <intent-filter>
+                <action android:name="androidx.media3.session.MediaSessionService" />
+            </intent-filter>
+        </service>
     </application>
 
 </manifest>
