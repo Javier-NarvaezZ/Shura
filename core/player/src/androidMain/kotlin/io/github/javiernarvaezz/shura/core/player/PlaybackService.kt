@@ -1,6 +1,7 @@
 package io.github.javiernarvaezz.shura.core.player
 
 import android.app.PendingIntent
+import android.content.Intent
 import android.os.Bundle
 import android.os.Process
 import android.util.Log
@@ -37,6 +38,7 @@ class PlaybackService : MediaSessionService() {
     private var session: MediaSession? = null
     private lateinit var specResolver: StreamSpecResolver
     private var trace: Trace = Trace.NONE
+    private var persistence: QueuePersistence? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -60,11 +62,22 @@ class PlaybackService : MediaSessionService() {
                 .apply { launchIntent()?.let(::setSessionActivity) }
                 .build()
                 .also { exo.addListener(ErrorListener(it, exo)) }
+        persistence = dependencies.queueStore?.let { QueuePersistence(player, it, trace).also(QueuePersistence::start) }
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = session
 
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        persistence?.saveNow()
+        super.onTaskRemoved(rootIntent)
+    }
+
     override fun onDestroy() {
+        persistence?.run {
+            saveBlocking(LAST_SAVE_TIMEOUT_MS)
+            stop()
+        }
+        persistence = null
         session?.run {
             player.release()
             release()
@@ -161,6 +174,14 @@ class PlaybackService : MediaSessionService() {
             return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
         }
 
+        override fun onPlaybackResumption(
+            mediaSession: MediaSession,
+            controller: MediaSession.ControllerInfo,
+            isForPlayback: Boolean,
+        ): ListenableFuture<MediaSession.MediaItemsWithStartPosition> =
+            persistence?.resumptionItems()
+                ?: Futures.immediateFailedFuture(UnsupportedOperationException("No saved queue"))
+
         private fun rebuilt(items: List<MediaItem>): List<MediaItem>? = items.map { it.toSessionItem() ?: return null }
     }
 
@@ -193,5 +214,8 @@ class PlaybackService : MediaSessionService() {
 
     private companion object {
         const val TAG = "ShuraPlayer"
+
+        // The process may be about to die: wait briefly for the last save, never block the shutdown for long.
+        const val LAST_SAVE_TIMEOUT_MS = 300L
     }
 }

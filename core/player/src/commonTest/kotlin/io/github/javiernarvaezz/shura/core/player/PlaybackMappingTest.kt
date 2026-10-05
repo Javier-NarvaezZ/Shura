@@ -64,6 +64,14 @@ class PlaybackMappingTest {
     }
 
     @Test
+    fun aRestoredQueueThatIsNotPreparedShowsAsPaused() {
+        assertEquals(
+            PlaybackState.Paused(song),
+            playbackStateOf(song, isPlaying = false, phase = PlayerPhase.Idle, error = null, playWhenReady = false),
+        )
+    }
+
+    @Test
     fun noSongMeansIdle() {
         assertEquals(PlaybackState.Idle, playbackStateOf(null, true, PlayerPhase.Ready, PlaybackError.Network))
     }

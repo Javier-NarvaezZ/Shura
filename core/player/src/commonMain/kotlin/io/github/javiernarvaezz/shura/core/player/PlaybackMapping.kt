@@ -40,12 +40,16 @@ object PlaybackErrorCodec {
 /** Platform-neutral player phase, so state mapping does not depend on Media3 constants. */
 enum class PlayerPhase { Idle, Buffering, Ready, Ended }
 
-/** Maps a player snapshot to [PlaybackState]; an error wins over every other signal. */
+/**
+ * Maps a player snapshot to [PlaybackState]; an error wins over every other signal. An idle player that is not
+ * meant to play (a restored queue, not prepared until the user presses play) shows as paused.
+ */
 fun playbackStateOf(
     song: Song?,
     isPlaying: Boolean,
     phase: PlayerPhase,
     error: PlaybackError?,
+    playWhenReady: Boolean = true,
 ): PlaybackState =
     when {
         song == null -> PlaybackState.Idle
@@ -53,6 +57,7 @@ fun playbackStateOf(
         phase == PlayerPhase.Ended -> PlaybackState.Ended(song)
         isPlaying -> PlaybackState.Playing(song)
         phase == PlayerPhase.Ready -> PlaybackState.Paused(song)
+        phase == PlayerPhase.Idle && !playWhenReady -> PlaybackState.Paused(song)
         else -> PlaybackState.Loading(song)
     }
 

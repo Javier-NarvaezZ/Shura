@@ -11,6 +11,8 @@ class PlaybackDependencies(
     val resolver: StreamResolver,
     val quality: AudioQuality = AudioQuality.Auto,
     val trace: Trace = Trace.NONE,
+    /** Saves and restores the queue and records the play history; null keeps the queue in memory only. */
+    val queueStore: QueueStore? = null,
 )
 
 /** Implemented by the `Application`, so the service gets its dependencies without a DI framework. */

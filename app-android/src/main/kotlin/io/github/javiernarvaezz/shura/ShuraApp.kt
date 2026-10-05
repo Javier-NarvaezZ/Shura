@@ -4,6 +4,7 @@ import android.app.Application
 import android.content.Context
 import android.net.ConnectivityManager
 import android.os.PowerManager
+import io.github.javiernarvaezz.shura.core.data.androidQueueStore
 import io.github.javiernarvaezz.shura.core.innertube.InnerTubeClient
 import io.github.javiernarvaezz.shura.core.network.ShuraNetwork
 import io.github.javiernarvaezz.shura.core.player.AndroidAudioPlayer
@@ -62,6 +63,8 @@ class AppGraph(
             callFactory = network.okHttp,
             resolver = debugStreamResolver(streamResolver),
             trace = trace,
+            // App-private database (excluded from backups); opened on first use, off the main thread.
+            queueStore = androidQueueStore(context, Dispatchers.IO),
         )
 
     val player: AudioPlayer = AndroidAudioPlayer(context, trace)
