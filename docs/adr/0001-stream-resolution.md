@@ -399,6 +399,7 @@ These are binding for `:core:stream` and its platform code.
 
 **The rule:**
 - `:core:network` builds the app's single `OkHttpClient`. Its host allowlist runs as both an application and a network interceptor, so it also covers redirect hops.
+- Allowed hosts (`HostPolicy`): `*.youtube.com` and `*.googlevideo.com`, plus exactly `www.google.com` and `www.gstatic.com`. The last two serve the BotGuard interpreter fetched for the PoToken minter; its URL path is validated by InnerTubeX's `requireTrustedAttestationInterpreterUrl`. No other `google.com` or `gstatic.com` host is allowed.
 - Every other HTTP consumer uses that client:
   - the Ktor client used by the catalog and InnerTubeX, through the OkHttp engine with that client preconfigured. This also covers InnerTubeX's engine-level clients;
   - Media3, through `OkHttpDataSource` with that client.

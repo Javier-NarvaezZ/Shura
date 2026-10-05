@@ -36,6 +36,21 @@ class HostPolicyTest {
     }
 
     @Test
+    fun allowsOnlyTheExactBotGuardInterpreterHosts() {
+        assertTrue(HostPolicy.isAllowed("www.google.com"))
+        assertTrue(HostPolicy.isAllowed("www.gstatic.com"))
+        listOf(
+            "google.com",
+            "accounts.google.com",
+            "mail.google.com",
+            "gstatic.com",
+            "fonts.gstatic.com",
+            "evil.www.google.com",
+            "www.google.com.evil.net",
+        ).forEach { assertFalse(HostPolicy.isAllowed(it), it) }
+    }
+
+    @Test
     fun hostMatchingIsCaseInsensitive() {
         assertTrue(HostPolicy.isAllowed("Music.YouTube.com"))
     }
