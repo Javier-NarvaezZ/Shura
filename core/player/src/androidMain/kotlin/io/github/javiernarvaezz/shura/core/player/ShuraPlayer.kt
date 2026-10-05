@@ -69,6 +69,31 @@ internal class ShuraPlayer(
         }
     }
 
+    /**
+     * Loads a saved queue without preparing it (nothing is resolved or downloaded until play), keeping its saved
+     * shuffled order instead of drawing a new one.
+     */
+    fun restore(
+        items: List<MediaItem>,
+        snapshot: QueueSnapshot,
+    ) {
+        exo.setMediaItems(items, snapshot.currentIndex, snapshot.positionMs)
+        restoreModes(snapshot)
+    }
+
+    /** Applies a saved shuffled order, shuffle and repeat to the loaded queue, if it is the same size. */
+    fun restoreModes(snapshot: QueueSnapshot) {
+        if (exo.mediaItemCount != snapshot.items.size) return
+        exo.setShuffleOrder(QueueShuffleOrder(PlayOrder.fromList(snapshot.playOrder)))
+        exo.shuffleModeEnabled = snapshot.shuffle
+        exo.repeatMode =
+            when (snapshot.repeat) {
+                RepeatMode.Off -> REPEAT_MODE_OFF
+                RepeatMode.All -> REPEAT_MODE_ALL
+                RepeatMode.One -> REPEAT_MODE_ONE
+            }
+    }
+
     fun playOrder(): PlayOrder =
         (exo.shuffleOrder as? QueueShuffleOrder)?.playOrder ?: PlayOrder.identity(exo.mediaItemCount)
 

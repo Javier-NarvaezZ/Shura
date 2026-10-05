@@ -182,6 +182,7 @@ class AndroidAudioPlayer(
                 controller.isPlaying,
                 controller.playbackState.toPhase(),
                 error,
+                controller.playWhenReady,
             )
     }
 

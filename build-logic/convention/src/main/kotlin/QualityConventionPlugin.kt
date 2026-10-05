@@ -3,6 +3,7 @@ import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.kotlin.dsl.configure
 import org.jlleitschuh.gradle.ktlint.KtlintExtension
+import org.jlleitschuh.gradle.ktlint.tasks.BaseKtLintCheckTask
 
 /** Static analysis (detekt) and formatting checks (ktlint) shared by every module. */
 class QualityConventionPlugin : Plugin<Project> {
@@ -21,6 +22,14 @@ class QualityConventionPlugin : Plugin<Project> {
 
             extensions.configure<KtlintExtension> {
                 version.set(libs.version("ktlint"))
+            }
+
+            // Generated code (e.g. SQLDelight under build/generated) is not ours to format. Path.startsWith compares
+            // path segments, so this works with Windows and Unix separators alike; everything under src/ is checked.
+            // Applied to the tasks: the extension's filter does not see sources that plugins add to KMP source sets.
+            val buildDirectory = layout.buildDirectory.get().asFile.toPath()
+            tasks.withType(BaseKtLintCheckTask::class.java).configureEach {
+                exclude { it.file.toPath().startsWith(buildDirectory) }
             }
         }
     }

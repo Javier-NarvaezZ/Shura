@@ -1,0 +1,43 @@
+-- The play queue in queue order, plus its single state row. Lists are JSON arrays of strings or integers.
+CREATE TABLE queue_item (
+    position INTEGER NOT NULL PRIMARY KEY,
+    video_id TEXT NOT NULL,
+    title TEXT NOT NULL,
+    artist_names TEXT NOT NULL,
+    artist_ids TEXT NOT NULL,
+    album_title TEXT,
+    album_id TEXT,
+    duration_ms INTEGER,
+    thumbnail_url TEXT,
+    explicit INTEGER NOT NULL
+);
+
+CREATE TABLE queue_state (
+    id INTEGER NOT NULL PRIMARY KEY CHECK (id = 1),
+    current_index INTEGER NOT NULL,
+    position_ms INTEGER NOT NULL,
+    shuffle INTEGER NOT NULL,
+    repeat_mode TEXT NOT NULL,
+    play_order TEXT NOT NULL
+);
+
+insertItem:
+INSERT INTO queue_item VALUES ?;
+
+items:
+SELECT * FROM queue_item ORDER BY position;
+
+countItems:
+SELECT count(*) FROM queue_item;
+
+clearItems:
+DELETE FROM queue_item;
+
+upsertState:
+INSERT OR REPLACE INTO queue_state VALUES (1, ?, ?, ?, ?, ?);
+
+state:
+SELECT * FROM queue_state WHERE id = 1;
+
+clearState:
+DELETE FROM queue_state;
