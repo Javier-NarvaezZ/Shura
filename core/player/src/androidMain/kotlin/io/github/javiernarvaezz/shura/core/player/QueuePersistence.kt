@@ -47,6 +47,10 @@ internal class QueuePersistence(
     private val saves = Mutex()
     private val tracker = PlayTracker { SystemClock.elapsedRealtime() }
     private var trackedSong: Song? = null
+
+    // A queue handed to Media3 for playback resumption: Media3 sets only its items, index and position, so its
+    // shuffled order, shuffle and repeat are applied once those items arrive.
+    private var pendingModes: QueueSnapshot? = null
     private val debouncedSave = Runnable { saveNow() }
     private val tick =
         object : Runnable {
@@ -72,7 +76,12 @@ internal class QueuePersistence(
             if (snapshot == null || items == null) {
                 result.setException(UnsupportedOperationException("Nothing to resume"))
             } else {
-                result.set(MediaSession.MediaItemsWithStartPosition(items, snapshot.currentIndex, snapshot.positionMs))
+                main.post {
+                    pendingModes = snapshot
+                    result.set(
+                        MediaSession.MediaItemsWithStartPosition(items, snapshot.currentIndex, snapshot.positionMs),
+                    )
+                }
             }
         }
         return result
@@ -99,7 +108,10 @@ internal class QueuePersistence(
     override fun onTimelineChanged(
         timeline: Timeline,
         reason: Int,
-    ) = scheduleSave()
+    ) {
+        applyPendingModes()
+        scheduleSave()
+    }
 
     override fun onShuffleModeEnabledChanged(shuffleModeEnabled: Boolean) = scheduleSave()
 
@@ -144,6 +156,14 @@ internal class QueuePersistence(
         }
     }
 
+    private fun applyPendingModes() {
+        val snapshot = pendingModes ?: return
+        if (player.mediaItemCount != snapshot.items.size) return
+        pendingModes = null
+        player.restoreModes(snapshot)
+        trace.event("queue: resumed", mapOf("items" to snapshot.items.size.toString()))
+    }
+
     private fun scheduleSave() {
         main.removeCallbacks(debouncedSave)
         main.postDelayed(debouncedSave, SAVE_DEBOUNCE_MS)
@@ -178,28 +198,28 @@ internal class QueuePersistence(
         trace.event("queue: play recorded")
     }
 
-    private fun QueueSnapshot.sessionItems(): List<MediaItem>? =
-        items.map {
-            it.toMediaItem().toSessionItem()
-                ?: return null
-        }
-
-    private suspend fun <T> guarded(block: suspend () -> T): T? =
-        try {
-            block()
-        } catch (e: CancellationException) {
-            throw e
-        } catch (
-            // Storage must never break playback; only the exception type is logged (no queue contents).
-            @Suppress("TooGenericExceptionCaught") e: Exception,
-        ) {
-            Log.w(TAG, "Queue store failed: ${e::class.simpleName}")
-            null
-        }
-
     private companion object {
-        const val TAG = "ShuraQueue"
         const val SAVE_DEBOUNCE_MS = 500L
         const val POSITION_SAVE_INTERVAL_MS = 10_000L
     }
 }
+
+private const val TAG = "ShuraQueue"
+
+private fun QueueSnapshot.sessionItems(): List<MediaItem>? =
+    items.map {
+        it.toMediaItem().toSessionItem() ?: return null
+    }
+
+private suspend fun <T> guarded(block: suspend () -> T): T? =
+    try {
+        block()
+    } catch (e: CancellationException) {
+        throw e
+    } catch (
+        // Storage must never break playback; only the exception type is logged (no queue contents).
+        @Suppress("TooGenericExceptionCaught") e: Exception,
+    ) {
+        Log.w(TAG, "Queue store failed: ${e::class.simpleName}")
+        null
+    }

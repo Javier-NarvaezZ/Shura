@@ -78,6 +78,12 @@ internal class ShuraPlayer(
         snapshot: QueueSnapshot,
     ) {
         exo.setMediaItems(items, snapshot.currentIndex, snapshot.positionMs)
+        restoreModes(snapshot)
+    }
+
+    /** Applies a saved shuffled order, shuffle and repeat to the loaded queue, if it is the same size. */
+    fun restoreModes(snapshot: QueueSnapshot) {
+        if (exo.mediaItemCount != snapshot.items.size) return
         exo.setShuffleOrder(QueueShuffleOrder(PlayOrder.fromList(snapshot.playOrder)))
         exo.shuffleModeEnabled = snapshot.shuffle
         exo.repeatMode =
