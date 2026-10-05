@@ -23,10 +23,15 @@ class ShuraApp : Application() {
 class AppGraph(
     context: Context,
 ) {
-    private val network = ShuraNetwork(debugNetworkInterceptors())
+    private val trace = debugTrace()
+
+    private val network = ShuraNetwork(debugNetworkInterceptors(), debugEventListenerFactory())
 
     private val poTokenMinter =
         debugPoTokenMinter(BotGuardPoTokenMinter(network.ktor) { WebViewJsRuntime.create(context) })
+
+    private val streamResolver =
+        InnerTubeXStreamResolver(network.ktor, poTokenMinter, debugExcludedStreamProfiles(), trace)
 
     val catalog = InnerTubeClient(network.ktor)
 
@@ -34,9 +39,11 @@ class AppGraph(
         AndroidAudioPlayer(
             context = context,
             callFactory = network.okHttp,
-            resolver =
-                debugStreamResolver(
-                    InnerTubeXStreamResolver(network.ktor, poTokenMinter, debugExcludedStreamProfiles()),
-                ),
+            resolver = debugStreamResolver(streamResolver),
+            trace = trace,
         )
+
+    init {
+        debugMaybePrewarm(streamResolver, trace)
+    }
 }

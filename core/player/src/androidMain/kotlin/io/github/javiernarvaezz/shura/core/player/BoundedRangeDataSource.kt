@@ -8,6 +8,7 @@ import androidx.media3.datasource.DataSource
 import androidx.media3.datasource.DataSpec
 import androidx.media3.datasource.TransferListener
 import io.github.javiernarvaezz.shura.core.stream.ResolvedStream
+import io.github.javiernarvaezz.shura.core.stream.Trace
 
 /**
  * Splits one logical read into bounded `Range` requests of [ResolvedStream.rangeChunkSizeBytes] when the
@@ -16,12 +17,18 @@ import io.github.javiernarvaezz.shura.core.stream.ResolvedStream
 @OptIn(UnstableApi::class)
 internal class BoundedRangeDataSource(
     private val upstream: DataSource,
+    private val trace: Trace = Trace.NONE,
 ) : DataSource {
     class Factory(
         private val upstream: DataSource.Factory,
+        private val trace: Trace = Trace.NONE,
     ) : DataSource.Factory {
-        override fun createDataSource(): DataSource = BoundedRangeDataSource(upstream.createDataSource())
+        override fun createDataSource(): DataSource = BoundedRangeDataSource(upstream.createDataSource(), trace)
     }
+
+    // Debug timing of the current upstream range (bytes, open time); only reported through [trace].
+    private var chunkBytes = 0L
+    private var chunkOpenedAt = 0L
 
     private var spec: DataSpec? = null
     private var chunkSize = 0L
@@ -37,6 +44,7 @@ internal class BoundedRangeDataSource(
         chunkSize = stream?.takeIf { it.requiresBoundedRange }?.rangeChunkSizeBytes ?: 0L
         if (chunkSize <= 0L) {
             spec = null
+            markChunkOpened()
             return upstream.open(dataSpec)
         }
         spec = dataSpec
@@ -70,6 +78,7 @@ internal class BoundedRangeDataSource(
             read = upstream.read(buffer, offset, length)
         }
         if (spec != null && read > 0) position += read
+        recordChunkProgress(read)
         return read
     }
 
@@ -82,7 +91,43 @@ internal class BoundedRangeDataSource(
         upstream.close()
     }
 
+    private fun recordChunkProgress(read: Int) {
+        if (trace === Trace.NONE) return
+        if (read > 0) {
+            if (chunkBytes ==
+                0L
+            ) {
+                trace.event("player: first byte", mapOf("afterOpenMs" to elapsedSinceOpen().toString()))
+            }
+            chunkBytes += read
+        } else if (read == C.RESULT_END_OF_INPUT && chunkBytes > 0) {
+            reportChunk()
+        }
+    }
+
+    private fun reportChunk() {
+        val ms = elapsedSinceOpen().coerceAtLeast(1)
+        trace.event(
+            "player: range done",
+            mapOf(
+                "bytes" to chunkBytes.toString(),
+                "ms" to ms.toString(),
+                "kbPerS" to (chunkBytes * MS_PER_S / BYTES_PER_KB / ms).toString(),
+            ),
+        )
+        chunkBytes = 0
+    }
+
+    private fun elapsedSinceOpen() = android.os.SystemClock.elapsedRealtime() - chunkOpenedAt
+
+    private fun markChunkOpened() {
+        if (chunkBytes > 0) reportChunk()
+        chunkOpenedAt = android.os.SystemClock.elapsedRealtime()
+        chunkBytes = 0
+    }
+
     private fun openChunk() {
+        markChunkOpened()
         val current = requireNotNull(spec)
         val chunkEnd = RangeChunks.chunkEnd(position, chunkSize, endExclusive)
         upstream.open(
@@ -92,5 +137,10 @@ internal class BoundedRangeDataSource(
                 .setLength(chunkEnd - position)
                 .build(),
         )
+    }
+
+    private companion object {
+        const val MS_PER_S = 1000L
+        const val BYTES_PER_KB = 1024L
     }
 }

@@ -10,12 +10,15 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.HttpDataSource
 import androidx.media3.datasource.ResolvingDataSource
 import androidx.media3.datasource.okhttp.OkHttpDataSource
+import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import io.github.javiernarvaezz.shura.core.model.Song
 import io.github.javiernarvaezz.shura.core.stream.AudioQuality
 import io.github.javiernarvaezz.shura.core.stream.StreamResolutionException
 import io.github.javiernarvaezz.shura.core.stream.StreamResolver
+import io.github.javiernarvaezz.shura.core.stream.Trace
+import io.github.javiernarvaezz.shura.core.stream.event
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -34,8 +37,9 @@ class AndroidAudioPlayer(
     callFactory: Call.Factory,
     resolver: StreamResolver,
     quality: AudioQuality = AudioQuality.Auto,
+    private val trace: Trace = Trace.NONE,
 ) : AudioPlayer {
-    private val specResolver = StreamSpecResolver(resolver, quality)
+    private val specResolver = StreamSpecResolver(resolver, quality, trace)
     private val mutableState = MutableStateFlow<PlaybackState>(PlaybackState.Idle)
     private var current: Song? = null
 
@@ -47,14 +51,28 @@ class AndroidAudioPlayer(
             .setMediaSourceFactory(
                 ProgressiveMediaSource.Factory(
                     ResolvingDataSource.Factory(
-                        BoundedRangeDataSource.Factory(OkHttpDataSource.Factory(callFactory)),
+                        BoundedRangeDataSource.Factory(OkHttpDataSource.Factory(callFactory), trace),
                         specResolver,
                     ),
                 ),
             ).build()
-            .apply { addListener(Listener()) }
+            .apply {
+                addListener(Listener())
+                if (trace !== Trace.NONE) addAnalyticsListener(TraceAnalytics(trace))
+            }
+
+    init {
+        trace.event(
+            "player: buffer config",
+            mapOf(
+                "bufferForPlaybackMs" to DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_MS.toString(),
+                "minBufferMs" to DefaultLoadControl.DEFAULT_MIN_BUFFER_MS.toString(),
+            ),
+        )
+    }
 
     override fun play(song: Song) {
+        trace.event("player: play")
         current = song
         mutableState.value = PlaybackState.Loading(song)
         player.setMediaItem(

@@ -18,6 +18,7 @@ import kotlin.time.TimeSource
 
 private const val TAG = "ShuraStream"
 private const val EXTRA_NO_LEGACY = "shura.debug.noLegacyClients"
+private const val EXTRA_PREWARM = "shura.debug.prewarm"
 
 // Every variant of the legacy VISIONOS manifests, to force a non-legacy (PoToken) client in device tests.
 private val LEGACY_PROFILES =
@@ -26,12 +27,16 @@ private val LEGACY_PROFILES =
 @Volatile
 private var noLegacyClients = false
 
+@Volatile
+internal var prewarmRequested = false
+
 /** `adb shell am start -n <app>/.MainActivity --ez shura.debug.noLegacyClients true` after a force-stop. */
 internal fun applyDebugLaunchOptions(intent: Intent) {
     if (intent.getBooleanExtra(EXTRA_NO_LEGACY, false)) {
         noLegacyClients = true
         Log.w(TAG, "Legacy VISIONOS clients excluded for this process")
     }
+    if (intent.getBooleanExtra(EXTRA_PREWARM, false)) prewarmRequested = true
 }
 
 internal fun debugExcludedStreamProfiles(): Set<String> = if (noLegacyClients) LEGACY_PROFILES else emptySet()

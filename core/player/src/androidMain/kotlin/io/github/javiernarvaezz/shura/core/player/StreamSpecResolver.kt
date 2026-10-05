@@ -9,6 +9,8 @@ import io.github.javiernarvaezz.shura.core.stream.AudioQuality
 import io.github.javiernarvaezz.shura.core.stream.ResolvedStream
 import io.github.javiernarvaezz.shura.core.stream.StreamResolutionException
 import io.github.javiernarvaezz.shura.core.stream.StreamResolver
+import io.github.javiernarvaezz.shura.core.stream.Trace
+import io.github.javiernarvaezz.shura.core.stream.event
 import kotlinx.coroutines.runBlocking
 import java.io.IOException
 import java.util.concurrent.ConcurrentHashMap
@@ -28,12 +30,16 @@ internal class StreamResolutionIOException(
 internal class StreamSpecResolver(
     private val resolver: StreamResolver,
     private val quality: AudioQuality,
+    private val trace: Trace = Trace.NONE,
 ) : ResolvingDataSource.Resolver {
     private val cache = ConcurrentHashMap<VideoId, ResolvedStream>()
 
     override fun resolveDataSpec(dataSpec: DataSpec): DataSpec {
         val videoId = StreamUri.parse(dataSpec.uri.toString()) ?: return dataSpec
-        val stream = cache[videoId]?.takeIf { it.isFresh() } ?: resolve(videoId).also { cache[videoId] = it }
+        val cached = cache[videoId]?.takeIf { it.isFresh() }
+        trace.event("player: resolve start", mapOf("cached" to (cached != null).toString()))
+        val stream = cached ?: resolve(videoId).also { cache[videoId] = it }
+        trace.event("player: resolve done", mapOf("profile" to stream.clientProfile))
         return dataSpec
             .buildUpon()
             .setUri(stream.url)

@@ -30,18 +30,29 @@ internal fun interface Extraction {
  */
 class InnerTubeXStreamResolver internal constructor(
     private val extraction: Extraction,
+    private val prewarmAction: suspend () -> Unit = {},
 ) : StreamResolver {
     /**
      * The caller owns [httpClient]'s engine; requests are restricted to the app host policy.
      *
      * @param excludedProfiles InnerTubeX profile ids never to use. Diagnostics only (e.g. forcing a non-legacy
      *   client in a device test); production passes none.
+     * @param trace Stage timings for debug builds; release passes [Trace.NONE].
      */
     constructor(
         httpClient: HttpClient,
         poTokenMinter: PoTokenMinter? = null,
         excludedProfiles: Set<String> = emptySet(),
-    ) : this(innerTubeXExtraction(httpClient, poTokenMinter, excludedProfiles))
+        trace: Trace = Trace.NONE,
+    ) : this(InnerTubeXWiring(httpClient, poTokenMinter, excludedProfiles, trace))
+
+    private constructor(wiring: InnerTubeXWiring) : this(wiring.extraction, wiring.prewarm)
+
+    /**
+     * Warms InnerTubeX up (watch config, player script and solvers) without resolving a track. Costs data and CPU;
+     * callers decide when (ADR 0001, startup measurements).
+     */
+    suspend fun prewarm() = prewarmAction()
 
     override suspend fun resolve(
         videoId: VideoId,
@@ -107,31 +118,41 @@ private fun StreamResolutionException.withTokenFailure(token: PoTokenUnavailable
 
 private val TOKEN_MASKABLE_FAILURES = setOf(StreamFailure.NoPlayableStream, StreamFailure.Unknown)
 
-private fun innerTubeXExtraction(
+private class InnerTubeXWiring(
     httpClient: HttpClient,
     poTokenMinter: PoTokenMinter?,
     excludedProfiles: Set<String>,
-): Extraction {
-    // InnerTubeX sends request bodies as @Serializable objects and expects the caller's client to serialize them.
-    // Only this derived client gets that: same engine and OkHttpClient, no extra headers or logging (ADR 0001 R7).
-    val client =
-        httpClient.config {
-            install(serializedRequestBodies(InnerTubeXJson))
-            install(HostAllowlist)
-        }
-    val innerTube = InnerTube(client)
-    // No remote solver configuration store: cipher solving uses only the solvers bundled in the library.
-    val cipher = YouTubeCipherService(client)
-    val extractor =
-        InnerTubeExtractor(
-            configParser = YtConfigParserImpl(client, innerTube, cipherService = cipher),
-            cipherService = cipher,
-            innerTube = innerTube,
-            tokenProvider = poTokenMinter?.let(::InnerTubeXTokenProvider),
-        )
-    val hints = ContentHints().withStreamCapabilities(allowHls = false, allowSabr = false)
-    return Extraction { videoId, quality ->
-        extractor.extract(videoId, hints, excludedClients = excludedProfiles, audioQuality = quality)
+    trace: Trace,
+) {
+    val extraction: Extraction
+    val prewarm: suspend () -> Unit
+
+    init {
+        val logger = trace.asInnerTubeLogger()
+        // InnerTubeX sends request bodies as @Serializable objects and expects the caller's client to serialize them.
+        // Only this derived client gets that: same engine and OkHttpClient, no extra headers or logging (ADR 0001 R7).
+        val client =
+            httpClient.config {
+                install(serializedRequestBodies(InnerTubeXJson))
+                install(HostAllowlist)
+            }
+        val innerTube = InnerTube(client, logger = logger)
+        // No remote solver configuration store: cipher solving uses only the solvers bundled in the library.
+        val cipher = YouTubeCipherService(client, logger = logger)
+        val extractor =
+            InnerTubeExtractor(
+                configParser = YtConfigParserImpl(client, innerTube, logger = logger, cipherService = cipher),
+                cipherService = cipher,
+                innerTube = innerTube,
+                tokenProvider = poTokenMinter?.let(::InnerTubeXTokenProvider),
+                logger = logger,
+            )
+        val hints = ContentHints().withStreamCapabilities(allowHls = false, allowSabr = false)
+        extraction =
+            Extraction { videoId, quality ->
+                extractor.extract(videoId, hints, excludedClients = excludedProfiles, audioQuality = quality)
+            }
+        prewarm = { extractor.prewarm() }
     }
 }
 
