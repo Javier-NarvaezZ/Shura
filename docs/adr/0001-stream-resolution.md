@@ -371,6 +371,32 @@ These are binding for `:core:stream` and its platform code.
 - If that upgrade breaks InnerTubeX at compile time, in tests or in the live gate, the fix is to **align Shura's Ktor to the version InnerTubeX supports** (or upgrade InnerTubeX to a release built against the newer Ktor).
 - The library is never patched, forked or shimmed to tolerate a Ktor version it was not built for.
 
+### R7. One HTTP client for the app
+
+**The rule:**
+- `:core:network` builds the app's single `OkHttpClient`. Its host allowlist runs as both an application and a network interceptor, so it also covers redirect hops.
+- Every other HTTP consumer uses that client:
+  - the Ktor client used by the catalog and InnerTubeX, through the OkHttp engine with that client preconfigured. This also covers InnerTubeX's engine-level clients;
+  - Media3, through `OkHttpDataSource` with that client.
+- Stream request headers from `ResolvedStream` travel in the `DataSpec`.
+- No other HTTP stack may be used: no other Ktor engine, no `DefaultHttpDataSource` or `DefaultDataSource`, and no `HttpURLConnection`.
+
+**Enforcement:**
+- A source guard test fails the build if production code outside `:core:network` creates an `OkHttpClient` or Ktor `HttpClient`, uses another HTTP stack, or builds an `ExoPlayer` without an explicit media source factory. It also fails if a build file adds another Ktor engine or Media3 network module.
+
+**Exception, the PoToken `WebView` (R2):**
+- The Android `WebView` has its own network stack and does **not** go through OkHttp. Its allowlist is enforced inside the `WebView` itself (`shouldInterceptRequest` / `shouldOverrideUrlLoading`) as specified in R2.
+- The source guard does **not** cover the `WebView`, and must not be read as covering it.
+- R7 applies to everything else.
+
+**Host counter (diagnostics):**
+- An interceptor that counts requests per host exists only in the Android **debug** source set. It is not compiled into release builds.
+- It records and logs **host names only**: never URLs, paths, query parameters or headers.
+
+**Media3 version:**
+- The spike uses Media3 1.11.1 for foreground playback only.
+- The final version is decided in Phase 2, together with `MediaSession`. Metrolist pins 1.10.1 because 1.11.1 hid the Android 17 media controls; whether that is still the case is checked then.
+
 ## Consequences
 
 - Shura depends on a young, single-maintainer GPL-3.0 library for its riskiest part. This is mitigated by:
