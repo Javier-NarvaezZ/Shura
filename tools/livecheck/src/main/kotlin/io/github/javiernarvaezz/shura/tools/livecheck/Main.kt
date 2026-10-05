@@ -33,6 +33,8 @@ private const val PAUSE_BETWEEN_TRACKS_MS = 8_000L
 private const val PAUSE_BETWEEN_CHUNKS_MS = 300L
 private const val UNBOUNDED_CHUNK_BYTES = 1_048_576L
 private const val HTTP_PARTIAL = 206
+private const val KB = 1024L
+private const val MS_PER_S = 1000L
 private const val FFPROBE_TIMEOUT_SECONDS = 30L
 
 private class HostRecorder : Interceptor {
@@ -111,9 +113,12 @@ private suspend fun download(
                     .apply { stream.requestHeaders.forEach { (name, value) -> header(name, value) } }
                     .header("Range", "bytes=$position-$end")
                     .build()
+            val chunkStarted = System.currentTimeMillis()
             network.okHttp.newCall(request).execute().use { response ->
                 statuses.merge(response.code, 1, Int::plus)
                 val bytes = if (response.code == HTTP_PARTIAL) response.body.bytes() else ByteArray(0)
+                val ms = (System.currentTimeMillis() - chunkStarted).coerceAtLeast(1)
+                println("    range ${bytes.size / KB} KB in ${ms}ms (${bytes.size * MS_PER_S / KB / ms} KB/s)")
                 out.write(bytes)
                 position += bytes.size
                 finished = bytes.isEmpty()

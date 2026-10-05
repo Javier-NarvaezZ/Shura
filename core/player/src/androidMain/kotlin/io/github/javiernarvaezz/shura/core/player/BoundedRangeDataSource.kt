@@ -1,6 +1,7 @@
 package io.github.javiernarvaezz.shura.core.player
 
 import android.net.Uri
+import android.os.SystemClock
 import androidx.annotation.OptIn
 import androidx.media3.common.C
 import androidx.media3.common.util.UnstableApi
@@ -26,9 +27,7 @@ internal class BoundedRangeDataSource(
         override fun createDataSource(): DataSource = BoundedRangeDataSource(upstream.createDataSource(), trace)
     }
 
-    // Debug timing of the current upstream range (bytes, open time); only reported through [trace].
-    private var chunkBytes = 0L
-    private var chunkOpenedAt = 0L
+    private val timer = RangeTimer(trace)
 
     private var spec: DataSpec? = null
     private var chunkSize = 0L
@@ -44,7 +43,7 @@ internal class BoundedRangeDataSource(
         chunkSize = stream?.takeIf { it.requiresBoundedRange }?.rangeChunkSizeBytes ?: 0L
         if (chunkSize <= 0L) {
             spec = null
-            markChunkOpened()
+            timer.opened()
             return upstream.open(dataSpec)
         }
         spec = dataSpec
@@ -78,7 +77,7 @@ internal class BoundedRangeDataSource(
             read = upstream.read(buffer, offset, length)
         }
         if (spec != null && read > 0) position += read
-        recordChunkProgress(read)
+        timer.progress(read)
         return read
     }
 
@@ -91,43 +90,8 @@ internal class BoundedRangeDataSource(
         upstream.close()
     }
 
-    private fun recordChunkProgress(read: Int) {
-        if (trace === Trace.NONE) return
-        if (read > 0) {
-            if (chunkBytes ==
-                0L
-            ) {
-                trace.event("player: first byte", mapOf("afterOpenMs" to elapsedSinceOpen().toString()))
-            }
-            chunkBytes += read
-        } else if (read == C.RESULT_END_OF_INPUT && chunkBytes > 0) {
-            reportChunk()
-        }
-    }
-
-    private fun reportChunk() {
-        val ms = elapsedSinceOpen().coerceAtLeast(1)
-        trace.event(
-            "player: range done",
-            mapOf(
-                "bytes" to chunkBytes.toString(),
-                "ms" to ms.toString(),
-                "kbPerS" to (chunkBytes * MS_PER_S / BYTES_PER_KB / ms).toString(),
-            ),
-        )
-        chunkBytes = 0
-    }
-
-    private fun elapsedSinceOpen() = android.os.SystemClock.elapsedRealtime() - chunkOpenedAt
-
-    private fun markChunkOpened() {
-        if (chunkBytes > 0) reportChunk()
-        chunkOpenedAt = android.os.SystemClock.elapsedRealtime()
-        chunkBytes = 0
-    }
-
     private fun openChunk() {
-        markChunkOpened()
+        timer.opened()
         val current = requireNotNull(spec)
         val chunkEnd = RangeChunks.chunkEnd(position, chunkSize, endExclusive)
         upstream.open(
@@ -138,9 +102,69 @@ internal class BoundedRangeDataSource(
                 .build(),
         )
     }
+}
+
+/** Debug timing of upstream ranges: first byte, byte milestones and per-range speed, reported through [trace]. */
+private class RangeTimer(
+    private val trace: Trace,
+) {
+    private var bytes = 0L
+    private var openedAt = 0L
+
+    fun opened() {
+        if (trace === Trace.NONE) return
+        if (bytes > 0) reportRange()
+        openedAt = SystemClock.elapsedRealtime()
+        bytes = 0
+    }
+
+    fun progress(read: Int) {
+        if (trace === Trace.NONE) return
+        if (read > 0) {
+            val before = bytes
+            bytes += read
+            if (before == 0L) trace.event("player: first byte", mapOf("afterOpenMs" to elapsed().toString()))
+            BYTE_MILESTONES.firstOrNull { before < it && bytes >= it }?.let(::reportMilestone)
+        } else if (read == C.RESULT_END_OF_INPUT && bytes > 0) {
+            reportRange()
+        }
+    }
+
+    private fun reportMilestone(milestone: Long) {
+        val ms = elapsed().coerceAtLeast(1)
+        trace.event(
+            "player: bytes milestone",
+            mapOf(
+                "kb" to (milestone / KB).toString(),
+                "afterOpenMs" to ms.toString(),
+                "kbPerS" to speed(milestone, ms),
+            ),
+        )
+    }
+
+    private fun reportRange() {
+        val ms = elapsed().coerceAtLeast(1)
+        trace.event(
+            "player: range done",
+            mapOf(
+                "bytes" to bytes.toString(),
+                "ms" to ms.toString(),
+                "kbPerS" to speed(bytes, ms),
+            ),
+        )
+        bytes = 0
+    }
+
+    private fun elapsed() = SystemClock.elapsedRealtime() - openedAt
+
+    private fun speed(
+        byteCount: Long,
+        ms: Long,
+    ) = (byteCount * MS_PER_S / KB / ms).toString()
 
     private companion object {
         const val MS_PER_S = 1000L
-        const val BYTES_PER_KB = 1024L
+        const val KB = 1024L
+        val BYTE_MILESTONES = listOf(64L * KB, 256L * KB, 1024L * KB)
     }
 }
