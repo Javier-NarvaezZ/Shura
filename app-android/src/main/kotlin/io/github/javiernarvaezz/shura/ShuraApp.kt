@@ -8,6 +8,8 @@ import io.github.javiernarvaezz.shura.core.innertube.InnerTubeClient
 import io.github.javiernarvaezz.shura.core.network.ShuraNetwork
 import io.github.javiernarvaezz.shura.core.player.AndroidAudioPlayer
 import io.github.javiernarvaezz.shura.core.player.AudioPlayer
+import io.github.javiernarvaezz.shura.core.player.PlaybackDependencies
+import io.github.javiernarvaezz.shura.core.player.PlaybackDependenciesProvider
 import io.github.javiernarvaezz.shura.core.player.PlaybackWarmup
 import io.github.javiernarvaezz.shura.core.stream.BotGuardPoTokenMinter
 import io.github.javiernarvaezz.shura.core.stream.FilePreprocessedPlayerStore
@@ -18,9 +20,13 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import java.io.File
 
-class ShuraApp : Application() {
-    /** Created on first use from the main thread (ExoPlayer binds to the creating thread's looper). */
+class ShuraApp :
+    Application(),
+    PlaybackDependenciesProvider {
+    /** Created on first use from the main thread (the media controller binds to the creating thread's looper). */
     val graph: AppGraph by lazy { AppGraph(this) }
+
+    override val playbackDependencies: PlaybackDependencies get() = graph.playbackDependencies
 }
 
 /**
@@ -50,13 +56,15 @@ class AppGraph(
 
     val catalog = InnerTubeClient(network.ktor)
 
-    val player: AudioPlayer =
-        AndroidAudioPlayer(
-            context = context,
+    /** Used by `PlaybackService`, where the player lives; media and artwork go through the single client. */
+    val playbackDependencies =
+        PlaybackDependencies(
             callFactory = network.okHttp,
             resolver = debugStreamResolver(streamResolver),
             trace = trace,
         )
+
+    val player: AudioPlayer = AndroidAudioPlayer(context, trace)
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 

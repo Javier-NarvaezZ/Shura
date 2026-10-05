@@ -91,7 +91,7 @@ As defense in depth, the Ktor `HttpClient` given to InnerTubeX gets a **host all
 - The binding enforcement is at the engine level, in the platform wiring: for example, the OkHttp interceptor of the single client in `:core:network` (R7), as in the live gate.
 - `:core:stream` has an offline test that runs the real InnerTubeX wiring on a `MockEngine`, which sees every request including the engine-level ones, and fails if any host falls outside the policy.
 
-Artwork is loaded by a different HTTP client (Coil), so it does not go through this allowlist. If Shura later adds an app-wide allowlist, it must also include the artwork hosts seen in search and player responses on 2026-10-04: `i.ytimg.com` (video thumbnails), `lh3.googleusercontent.com` (album and track art), and `yt3.ggpht.com` and `yt3.googleusercontent.com` (artist and channel images).
+Artwork goes through the same single client and allowlist (R7). The artwork hosts seen in search and player responses on 2026-10-04 are allowed as **exact hosts** since Phase 2 (2026-10-05): `i.ytimg.com` (video thumbnails), `lh3.googleusercontent.com` (album and track art), and `yt3.ggpht.com` and `yt3.googleusercontent.com` (artist and channel images). No other `ytimg.com`, `googleusercontent.com` or `ggpht.com` host is allowed.
 
 **Remaining remote code, and it is unavoidable:** YouTube's own `player.js` is downloaded from `www.youtube.com` and evaluated in QuickJS to solve the `sig`/`n` challenges. Every working extractor does this (NewPipeExtractor evaluates it in Rhino).
 
@@ -457,7 +457,9 @@ These are binding for `:core:stream` and its platform code.
 
 **The rule:**
 - `:core:network` builds the app's single `OkHttpClient`. Its host allowlist runs as both an application and a network interceptor, so it also covers redirect hops.
-- Allowed hosts (`HostPolicy`): `*.youtube.com` and `*.googlevideo.com`, plus exactly `www.google.com` and `www.gstatic.com`. The last two serve the BotGuard interpreter fetched for the PoToken minter; its URL path is validated by InnerTubeX's `requireTrustedAttestationInterpreterUrl`. No other `google.com` or `gstatic.com` host is allowed.
+- Allowed hosts (`HostPolicy`): `*.youtube.com` and `*.googlevideo.com`, plus these exact hosts:
+  - `www.google.com` and `www.gstatic.com` serve the BotGuard interpreter fetched for the PoToken minter; its URL path is validated by InnerTubeX's `requireTrustedAttestationInterpreterUrl`. No other `google.com` or `gstatic.com` host is allowed.
+  - `i.ytimg.com`, `lh3.googleusercontent.com`, `yt3.ggpht.com` and `yt3.googleusercontent.com` serve artwork (Phase 2). The media session loads notification artwork with a `BitmapLoader` built on the single client, never with Media3's default HTTP stack.
 - Every other HTTP consumer uses that client:
   - the Ktor client used by the catalog and InnerTubeX, through the OkHttp engine with that client preconfigured. This also covers InnerTubeX's engine-level clients;
   - Media3, through `OkHttpDataSource` with that client.

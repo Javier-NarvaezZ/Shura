@@ -1,187 +1,167 @@
 package io.github.javiernarvaezz.shura.core.player
 
+import android.content.ComponentName
 import android.content.Context
+import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.os.SystemClock
 import android.util.Log
-import androidx.annotation.OptIn
-import androidx.media3.common.MediaItem
-import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
-import androidx.media3.common.util.UnstableApi
-import androidx.media3.datasource.HttpDataSource
-import androidx.media3.datasource.ResolvingDataSource
-import androidx.media3.datasource.okhttp.OkHttpDataSource
-import androidx.media3.exoplayer.DefaultLoadControl
-import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.exoplayer.source.ProgressiveMediaSource
+import androidx.media3.session.MediaController
+import androidx.media3.session.SessionToken
 import io.github.javiernarvaezz.shura.core.model.Song
-import io.github.javiernarvaezz.shura.core.stream.AudioQuality
-import io.github.javiernarvaezz.shura.core.stream.StreamResolutionException
-import io.github.javiernarvaezz.shura.core.stream.StreamResolver
 import io.github.javiernarvaezz.shura.core.stream.Trace
 import io.github.javiernarvaezz.shura.core.stream.event
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import okhttp3.Call
+import java.util.concurrent.CancellationException
+import java.util.concurrent.ExecutionException
 import kotlin.time.Duration
 
 /**
- * Foreground-only Media3 player for the spike (no MediaSession yet; Phase 2).
- *
- * All media traffic goes through [callFactory], the app's single OkHttpClient (ADR 0001 R7): ExoPlayer is built
- * with an explicit media source factory so it never falls back to its default HTTP stack. Call from the main thread.
+ * [AudioPlayer] backed by a Media3 `MediaController` connected to [PlaybackService], where the player lives.
+ * Commands issued before the connection completes are queued. Create and call from the main thread; one instance
+ * per process.
  */
-@OptIn(UnstableApi::class)
 class AndroidAudioPlayer(
     context: Context,
-    callFactory: Call.Factory,
-    resolver: StreamResolver,
-    quality: AudioQuality = AudioQuality.Auto,
     private val trace: Trace = Trace.NONE,
 ) : AudioPlayer {
-    private val specResolver = StreamSpecResolver(resolver, quality, trace)
     private val mutableState = MutableStateFlow<PlaybackState>(PlaybackState.Idle)
+    private val gate = CommandGate<MediaController>()
     private var current: Song? = null
+    private var connectionFailed = false
+    private val createdAt = SystemClock.elapsedRealtime()
 
     override val state: StateFlow<PlaybackState> = mutableState.asStateFlow()
 
-    private val player: ExoPlayer =
-        ExoPlayer
-            .Builder(context)
-            .setMediaSourceFactory(
-                ProgressiveMediaSource.Factory(
-                    ResolvingDataSource.Factory(
-                        BoundedRangeDataSource.Factory(OkHttpDataSource.Factory(callFactory), trace),
-                        specResolver,
-                    ),
-                ),
-            ).build()
-            .apply {
-                addListener(Listener())
-                if (trace !== Trace.NONE) addAnalyticsListener(TraceAnalytics(trace))
-            }
-
-    init {
-        trace.event(
-            "player: buffer config",
-            mapOf(
-                "bufferForPlaybackMs" to DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_MS.toString(),
-                "minBufferMs" to DefaultLoadControl.DEFAULT_MIN_BUFFER_MS.toString(),
-            ),
-        )
-    }
+    private val controllerFuture =
+        context.applicationContext.let { appContext ->
+            MediaController
+                .Builder(appContext, SessionToken(appContext, ComponentName(appContext, PlaybackService::class.java)))
+                .setListener(ControllerListener())
+                .buildAsync()
+                .also { future ->
+                    val mainThread = Handler(Looper.getMainLooper())
+                    future.addListener({ onConnected(future.getOrNull()) }, mainThread::post)
+                }
+        }
 
     override fun play(song: Song) {
-        trace.event("player: play")
+        trace.event("player: play", mapOf("queued" to (!gate.isConnected).toString()))
         current = song
-        mutableState.value = PlaybackState.Loading(song)
-        player.setMediaItem(
-            MediaItem
-                .Builder()
-                .setMediaId(song.videoId.value)
-                .setUri(StreamUri.of(song.videoId))
-                .build(),
-        )
-        player.prepare()
-        player.play()
+        mutableState.value =
+            if (connectionFailed) PlaybackState.Failed(song, PlaybackError.Unknown) else PlaybackState.Loading(song)
+        gate.run {
+            it.setMediaItem(song.toMediaItem())
+            it.prepare()
+            it.play()
+        }
     }
 
-    override fun pause() = player.pause()
+    override fun pause() = gate.run { it.pause() }
 
-    override fun resume() = player.play()
+    override fun resume() = gate.run { it.play() }
 
-    override fun seekBy(offset: Duration) {
-        val target = player.currentPosition + offset.inWholeMilliseconds
-        val duration = player.duration.takeIf { it > 0 } ?: Long.MAX_VALUE
-        player.seekTo(target.coerceIn(0, duration))
-    }
+    override fun seekBy(offset: Duration) =
+        gate.run {
+            val target = it.currentPosition + offset.inWholeMilliseconds
+            val duration = it.duration.takeIf { d -> d > 0 } ?: Long.MAX_VALUE
+            it.seekTo(target.coerceIn(0, duration))
+        }
 
     override fun retry() {
         val song = current ?: return
-        specResolver.invalidate(song.videoId)
-        play(song)
+        mutableState.value = PlaybackState.Loading(song)
+        gate.run { it.sendCustomCommand(SessionContract.RETRY, Bundle.EMPTY) }
     }
 
     override fun stop() {
-        player.stop()
+        gate.run {
+            it.stop()
+            it.clearMediaItems()
+        }
         current = null
         mutableState.value = PlaybackState.Idle
     }
 
     override fun release() {
-        player.release()
+        gate.release()
+        MediaController.releaseFuture(controllerFuture)
         current = null
         mutableState.value = PlaybackState.Idle
     }
 
-    private inner class Listener : Player.Listener {
-        override fun onIsPlayingChanged(isPlaying: Boolean) {
-            val song = current ?: return
-            if (isPlaying) {
-                mutableState.value = PlaybackState.Playing(song)
-            } else if (player.playbackState == Player.STATE_READY) {
-                mutableState.value = PlaybackState.Paused(song)
-            }
+    private fun onConnected(controller: MediaController?) {
+        if (controller == null) {
+            connectionFailed = true
+            current?.let { mutableState.value = PlaybackState.Failed(it, PlaybackError.Unknown) }
+            Log.w(TAG, "Could not connect to the playback service")
+            return
         }
+        trace.event(
+            "player: controller connected",
+            mapOf("afterCreateMs" to (SystemClock.elapsedRealtime() - createdAt).toString()),
+        )
+        controller.addListener(PlayerListener(controller))
+        gate.connect(controller)
+        publish(controller)
+    }
 
-        override fun onPlaybackStateChanged(playbackState: Int) {
-            val song = current ?: return
-            when (playbackState) {
-                Player.STATE_BUFFERING -> mutableState.value = PlaybackState.Loading(song)
-                Player.STATE_ENDED -> mutableState.value = PlaybackState.Ended(song)
-                else -> Unit
+    private fun publish(controller: MediaController) {
+        val error =
+            controller.playerError?.let {
+                PlaybackErrorCodec.decode(controller.sessionExtras.getString(SessionContract.EXTRA_ERROR))
             }
-        }
+        mutableState.value = playbackStateOf(current, controller.isPlaying, controller.playbackState.toPhase(), error)
+    }
 
-        override fun onPlayerError(error: PlaybackException) {
-            val song = current ?: return
-            val classified = PlaybackError.from(error, ::classifyPlatformError)
-            if (classified is PlaybackError.Http) specResolver.invalidate(song.videoId)
-            mutableState.value = PlaybackState.Failed(song, classified)
-            // Sanitized: error code and typed failure only, never URLs, headers or the exception message.
-            val streamFailure =
-                generateSequence<Throwable>(error) { it.cause }
-                    .filterIsInstance<StreamResolutionException>()
-                    .firstOrNull()
-            Log.w(TAG, "Playback failed: ${error.errorCodeName} -> $classified ${streamFailure ?: ""}".trim())
+    private inner class PlayerListener(
+        private val controller: MediaController,
+    ) : Player.Listener {
+        override fun onEvents(
+            player: Player,
+            events: Player.Events,
+        ) = publish(controller)
+    }
+
+    /** The error code arrives as a session extra, possibly after the player error itself. */
+    private inner class ControllerListener : MediaController.Listener {
+        override fun onExtrasChanged(
+            controller: MediaController,
+            extras: Bundle,
+        ) = publish(controller)
+
+        override fun onDisconnected(controller: MediaController) {
+            Log.w(TAG, "Playback service disconnected")
         }
     }
 
-    private fun classifyPlatformError(error: Throwable): PlaybackError? =
-        when (error) {
-            is HttpDataSource.InvalidResponseCodeException -> {
-                PlaybackError.Http(error.responseCode)
-            }
-
-            is HttpDataSource.HttpDataSourceException -> {
-                PlaybackError.Network
-            }
-
-            is PlaybackException -> {
-                when (error.errorCode) {
-                    in DECODING_ERRORS -> PlaybackError.Decoding
-
-                    PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED,
-                    PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT,
-                    -> PlaybackError.Network
-
-                    else -> null
-                }
-            }
-
-            else -> {
-                null
-            }
-        }
-
     private companion object {
         const val TAG = "ShuraPlayer"
-        val DECODING_ERRORS =
-            setOf(
-                PlaybackException.ERROR_CODE_DECODER_INIT_FAILED,
-                PlaybackException.ERROR_CODE_DECODING_FAILED,
-                PlaybackException.ERROR_CODE_PARSING_CONTAINER_MALFORMED,
-                PlaybackException.ERROR_CODE_PARSING_CONTAINER_UNSUPPORTED,
-            )
+
+        fun Int.toPhase(): PlayerPhase =
+            when (this) {
+                Player.STATE_BUFFERING -> PlayerPhase.Buffering
+                Player.STATE_READY -> PlayerPhase.Ready
+                Player.STATE_ENDED -> PlayerPhase.Ended
+                else -> PlayerPhase.Idle
+            }
+
+        fun <T> java.util.concurrent.Future<T>.getOrNull(): T? =
+            try {
+                get()
+            } catch (
+                // Connection failures surface as a visible failed state; the cause adds nothing for the user.
+                @Suppress("SwallowedException") e: ExecutionException,
+            ) {
+                null
+            } catch (
+                @Suppress("SwallowedException") e: CancellationException,
+            ) {
+                null
+            }
     }
 }

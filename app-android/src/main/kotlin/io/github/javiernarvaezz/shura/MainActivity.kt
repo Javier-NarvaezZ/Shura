@@ -33,10 +33,4 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
-
-    // Spike plays in the foreground only; background playback with MediaSession comes in Phase 2.
-    override fun onStop() {
-        super.onStop()
-        graph.player.pause()
-    }
 }

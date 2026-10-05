@@ -51,6 +51,25 @@ class HostPolicyTest {
     }
 
     @Test
+    fun allowsOnlyTheExactArtworkHosts() {
+        listOf(
+            "i.ytimg.com",
+            "lh3.googleusercontent.com",
+            "yt3.ggpht.com",
+            "yt3.googleusercontent.com",
+        ).forEach { assertTrue(HostPolicy.isAllowed(it), it) }
+        listOf(
+            "ytimg.com",
+            "evil.ytimg.com",
+            "ggpht.com",
+            "googleusercontent.com",
+            "evil.googleusercontent.com",
+            "lh3.googleusercontent.com.evil.com",
+            "x.lh3.googleusercontent.com",
+        ).forEach { assertFalse(HostPolicy.isAllowed(it), it) }
+    }
+
+    @Test
     fun hostMatchingIsCaseInsensitive() {
         assertTrue(HostPolicy.isAllowed("Music.YouTube.com"))
     }
