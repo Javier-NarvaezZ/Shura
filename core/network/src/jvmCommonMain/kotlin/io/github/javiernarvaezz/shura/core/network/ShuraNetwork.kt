@@ -2,6 +2,7 @@ package io.github.javiernarvaezz.shura.core.network
 
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.okhttp.OkHttp
+import okhttp3.EventListener
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import java.util.concurrent.TimeUnit
@@ -17,8 +18,18 @@ import java.util.concurrent.TimeUnit
 class ShuraNetwork internal constructor(
     extraNetworkInterceptors: List<Interceptor>,
     terminalForTests: Interceptor?,
+    eventListenerFactory: EventListener.Factory?,
 ) {
-    constructor(extraNetworkInterceptors: List<Interceptor> = emptyList()) : this(extraNetworkInterceptors, null)
+    /** [eventListenerFactory] is for debug timing diagnostics only; release passes none. */
+    constructor(
+        extraNetworkInterceptors: List<Interceptor> = emptyList(),
+        eventListenerFactory: EventListener.Factory? = null,
+    ) : this(extraNetworkInterceptors, null, eventListenerFactory)
+
+    internal constructor(
+        extraNetworkInterceptors: List<Interceptor>,
+        terminalForTests: Interceptor?,
+    ) : this(extraNetworkInterceptors, terminalForTests, null)
 
     val okHttp: OkHttpClient =
         OkHttpClient
@@ -27,6 +38,7 @@ class ShuraNetwork internal constructor(
             .apply { terminalForTests?.let(::addInterceptor) }
             .addNetworkInterceptor(HostGuardInterceptor())
             .apply { extraNetworkInterceptors.forEach(::addNetworkInterceptor) }
+            .apply { eventListenerFactory?.let(::eventListenerFactory) }
             .connectTimeout(CONNECT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
             .readTimeout(READ_TIMEOUT_SECONDS, TimeUnit.SECONDS)
             .build()

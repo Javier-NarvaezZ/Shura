@@ -2,13 +2,21 @@ package io.github.javiernarvaezz.shura
 
 import android.app.Application
 import android.content.Context
+import android.net.ConnectivityManager
+import android.os.PowerManager
 import io.github.javiernarvaezz.shura.core.innertube.InnerTubeClient
 import io.github.javiernarvaezz.shura.core.network.ShuraNetwork
 import io.github.javiernarvaezz.shura.core.player.AndroidAudioPlayer
 import io.github.javiernarvaezz.shura.core.player.AudioPlayer
+import io.github.javiernarvaezz.shura.core.player.PlaybackWarmup
 import io.github.javiernarvaezz.shura.core.stream.BotGuardPoTokenMinter
+import io.github.javiernarvaezz.shura.core.stream.FilePreprocessedPlayerStore
 import io.github.javiernarvaezz.shura.core.stream.InnerTubeXStreamResolver
 import io.github.javiernarvaezz.shura.core.stream.WebViewJsRuntime
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import java.io.File
 
 class ShuraApp : Application() {
     /** Created on first use from the main thread (ExoPlayer binds to the creating thread's looper). */
@@ -23,10 +31,22 @@ class ShuraApp : Application() {
 class AppGraph(
     context: Context,
 ) {
-    private val network = ShuraNetwork(debugNetworkInterceptors())
+    private val trace = debugTrace()
+
+    private val network = ShuraNetwork(debugNetworkInterceptors(), debugEventListenerFactory())
 
     private val poTokenMinter =
         debugPoTokenMinter(BotGuardPoTokenMinter(network.ktor) { WebViewJsRuntime.create(context) })
+
+    private val streamResolver =
+        InnerTubeXStreamResolver(
+            network.ktor,
+            poTokenMinter,
+            debugExcludedStreamProfiles(),
+            trace,
+            // App-private cache: generated on device from YouTube's player script, rebuilt if the system clears it.
+            debugPreprocessedPlayerStore(FilePreprocessedPlayerStore(File(context.cacheDir, "ejs-players")), trace),
+        )
 
     val catalog = InnerTubeClient(network.ktor)
 
@@ -34,9 +54,32 @@ class AppGraph(
         AndroidAudioPlayer(
             context = context,
             callFactory = network.okHttp,
-            resolver =
-                debugStreamResolver(
-                    InnerTubeXStreamResolver(network.ktor, poTokenMinter, debugExcludedStreamProfiles()),
-                ),
+            resolver = debugStreamResolver(streamResolver),
+            trace = trace,
         )
+
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    private val connectivity = context.getSystemService(ConnectivityManager::class.java)
+
+    /**
+     * One per process: at most one warm-up, never in battery saver, nor on a metered network while Data Saver
+     * restricts this app.
+     */
+    val playbackWarmup =
+        PlaybackWarmup(
+            warmUp = debugWarmUp(streamResolver::warmUp, trace),
+            scope = scope,
+            isEnabled = ::playbackWarmupEnabled,
+            isPowerSaveMode = { context.getSystemService(PowerManager::class.java)?.isPowerSaveMode == true },
+            isActiveNetworkMetered = { connectivity?.isActiveNetworkMetered != false },
+            isDataSaverRestricting = {
+                connectivity?.restrictBackgroundStatus == ConnectivityManager.RESTRICT_BACKGROUND_STATUS_ENABLED
+            },
+            trace = trace,
+        )
+
+    init {
+        debugMaybePrewarm(streamResolver, trace)
+    }
 }

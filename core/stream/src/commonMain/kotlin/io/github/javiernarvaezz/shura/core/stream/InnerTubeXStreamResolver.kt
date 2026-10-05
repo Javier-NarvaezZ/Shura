@@ -12,6 +12,8 @@ import io.github.javiernarvaezz.shura.core.model.VideoId
 import io.github.javiernarvaezz.shura.core.network.HostAllowlist
 import io.ktor.client.HttpClient
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import com.metrolist.innertubex.extraction.AudioQuality as InnerTubeXAudioQuality
@@ -30,18 +32,39 @@ internal fun interface Extraction {
  */
 class InnerTubeXStreamResolver internal constructor(
     private val extraction: Extraction,
+    private val prewarmAction: suspend () -> Unit = {},
+    private val warmUpAction: suspend () -> Unit = {},
 ) : StreamResolver {
     /**
      * The caller owns [httpClient]'s engine; requests are restricted to the app host policy.
      *
      * @param excludedProfiles InnerTubeX profile ids never to use. Diagnostics only (e.g. forcing a non-legacy
      *   client in a device test); production passes none.
+     * @param trace Stage timings for debug builds; release passes [Trace.NONE].
+     * @param preprocessedPlayerStore Keeps EJS preprocessed players across restarts, which turns a cold cipher
+     *   solve of ~19 s into ~3 s on a phone; without it they live in memory only.
      */
     constructor(
         httpClient: HttpClient,
         poTokenMinter: PoTokenMinter? = null,
         excludedProfiles: Set<String> = emptySet(),
-    ) : this(innerTubeXExtraction(httpClient, poTokenMinter, excludedProfiles))
+        trace: Trace = Trace.NONE,
+        preprocessedPlayerStore: PreprocessedPlayerStore? = null,
+    ) : this(InnerTubeXWiring(httpClient, poTokenMinter, excludedProfiles, trace, preprocessedPlayerStore))
+
+    private constructor(wiring: InnerTubeXWiring) : this(wiring.extraction, wiring.prewarm, wiring.warmUp)
+
+    /**
+     * Warms InnerTubeX up (watch config, player script and solvers) without resolving a track. Costs data and CPU;
+     * callers decide when (ADR 0001, startup measurements).
+     */
+    suspend fun prewarm() = prewarmAction()
+
+    /**
+     * Cheap warm-up for a likely playback: fetches the session's visitor data (~1.5 KB) when it has none, so the
+     * first resolution can skip the watch page. Never throws except for cancellation.
+     */
+    suspend fun warmUp() = warmUpAction()
 
     override suspend fun resolve(
         videoId: VideoId,
@@ -107,31 +130,88 @@ private fun StreamResolutionException.withTokenFailure(token: PoTokenUnavailable
 
 private val TOKEN_MASKABLE_FAILURES = setOf(StreamFailure.NoPlayableStream, StreamFailure.Unknown)
 
-private fun innerTubeXExtraction(
+private class InnerTubeXWiring(
     httpClient: HttpClient,
     poTokenMinter: PoTokenMinter?,
     excludedProfiles: Set<String>,
-): Extraction {
-    // InnerTubeX sends request bodies as @Serializable objects and expects the caller's client to serialize them.
-    // Only this derived client gets that: same engine and OkHttpClient, no extra headers or logging (ADR 0001 R7).
-    val client =
-        httpClient.config {
-            install(serializedRequestBodies(InnerTubeXJson))
-            install(HostAllowlist)
+    trace: Trace,
+    preprocessedPlayerStore: PreprocessedPlayerStore?,
+) {
+    val extraction: Extraction
+    val prewarm: suspend () -> Unit
+    val warmUp: suspend () -> Unit
+
+    private val storeMutex = Mutex()
+    private var storeInstalled = preprocessedPlayerStore == null
+
+    init {
+        val logger = trace.asInnerTubeLogger()
+        // InnerTubeX sends request bodies as @Serializable objects and expects the caller's client to serialize them.
+        // Only this derived client gets that: same engine and OkHttpClient, no extra headers or logging (ADR 0001 R7).
+        val client =
+            httpClient.config {
+                install(serializedRequestBodies(InnerTubeXJson))
+                install(HostAllowlist)
+            }
+        val innerTube = InnerTube(client, logger = logger)
+        // No remote solver configuration store: cipher solving uses only the solvers bundled in the library.
+        val cipher = YouTubeCipherService(client, logger = logger)
+        val extractor =
+            InnerTubeExtractor(
+                configParser = YtConfigParserImpl(client, innerTube, logger = logger, cipherService = cipher),
+                cipherService = cipher,
+                innerTube = innerTube,
+                tokenProvider = poTokenMinter?.let(::InnerTubeXTokenProvider),
+                logger = logger,
+            )
+        // Installing the store suspends, so it happens once, before the first use of the cipher service.
+        val installStore: suspend () -> Unit = {
+            if (preprocessedPlayerStore != null) {
+                storeMutex.withLock {
+                    if (!storeInstalled) {
+                        cipher.setPreprocessedPlayerCache(preprocessedPlayerStore::read, preprocessedPlayerStore::write)
+                        storeInstalled = true
+                    }
+                }
+            }
         }
-    val innerTube = InnerTube(client)
-    // No remote solver configuration store: cipher solving uses only the solvers bundled in the library.
-    val cipher = YouTubeCipherService(client)
-    val extractor =
-        InnerTubeExtractor(
-            configParser = YtConfigParserImpl(client, innerTube, cipherService = cipher),
-            cipherService = cipher,
-            innerTube = innerTube,
-            tokenProvider = poTokenMinter?.let(::InnerTubeXTokenProvider),
-        )
-    val hints = ContentHints().withStreamCapabilities(allowHls = false, allowSabr = false)
-    return Extraction { videoId, quality ->
-        extractor.extract(videoId, hints, excludedClients = excludedProfiles, audioQuality = quality)
+        // Without visitor data InnerTubeX fetches the whole watch page (~300 KB) only to obtain it before trying the
+        // config-free clients; the service-worker endpoint returns it in ~1.5 KB.
+        warmUp = {
+            ensureVisitorData(
+                current = { innerTube.sessionSnapshot().visitorData },
+                fetch = { innerTube.fetchFreshVisitorData(innerTube.sessionSnapshot()) },
+            )
+        }
+        val hints = ContentHints().withStreamCapabilities(allowHls = false, allowSabr = false)
+        extraction =
+            Extraction { videoId, quality ->
+                installStore()
+                warmUp()
+                extractor.extract(videoId, hints, excludedClients = excludedProfiles, audioQuality = quality)
+            }
+        prewarm = {
+            installStore()
+            extractor.prewarm()
+        }
+    }
+}
+
+/** Calls [fetch] when [current] has no visitor data. A failed fetch is ignored: extraction then works as before. */
+internal suspend fun ensureVisitorData(
+    current: () -> String?,
+    fetch: suspend () -> Unit,
+) {
+    if (!current().isNullOrBlank()) return
+    try {
+        fetch()
+    } catch (e: CancellationException) {
+        throw e
+    } catch (
+        // Best effort on purpose: without visitor data InnerTubeX falls back to the watch page as before.
+        @Suppress("TooGenericExceptionCaught", "SwallowedException") e: Exception,
+    ) {
+        return
     }
 }
 

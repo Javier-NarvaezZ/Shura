@@ -332,6 +332,39 @@ Android 12 phone, debug build. Legacy `VISIONOS` profiles were excluded with the
 - **App log during the run:** host names only. No tokens, visitor data, URLs or video ids. The `WebView` attempted only `favicon.ico` and `generate_204`, both blocked.
 - With legacy clients allowed, InnerTubeX still prefers `VISIONOS_0_1` and never calls the minter, so normal playback keeps its current speed. The minter is the fallback that keeps playback alive if that client closes.
 
+### Playback start-up measurements (2026-10-05)
+
+**Test device:** a mid-range phone under real memory pressure, which is representative of Shura's intended users.
+- Samsung Galaxy A31 (SM-A315G), Android 12, 4 GB of RAM.
+- Typically ~100–150 MB free, ~1.1–1.3 GB available and ~2 GB of swap in use, with `kswapd` active.
+- Residential Wi‑Fi, debug build.
+
+**Method:**
+- Before each run: battery saver off, charging, and at least 85 % idle CPU over 5 s (`/proc/stat`). The load average is not usable as a criterion on this device: it stays at 20–35 with the CPU mostly idle, because it also counts tasks waiting on memory.
+- Times run from the tap to the first audio actually played.
+- Runs with and without a change alternate, so both see similar conditions.
+
+**Tap → first audio, cold, `VISIONOS` (the default path):**
+
+| Change (branch `perf/playback-startup`) | Cold | Warm |
+|---|---|---|
+| Before (open-ended media range, no persistence) | 3.0–3.1 s | 1.3–1.4 s |
+| Always bounded ranges (256 KiB first, then 1 MiB) | 2.7–2.8 s | 1.0 s |
+| Visitor data from `/sw.js_data` (~1.5 KB) instead of the watch page (~300 KB) | 1.45–1.57 s | — |
+| Plus the intent warm-up (visitor data fetched while the user types a search) | **1.13–1.18 s** | — |
+
+**Fallback path (`WEB_REMIX` with PoToken), cold:**
+- Without persistence: 25.5 s.
+- With persisted EJS preprocessed players (see R3): 10.5–10.9 s.
+
+What remains of the fallback cold start:
+- the PoToken attestation, ~3.8 s;
+- the cipher solve, ~3.3 s per track, because EJS recompiles the preprocessed player on every solve. This needs an upstream change to keep the prepared solvers.
+
+**Intent warm-up:** one `/sw.js_data` request per process, 1.5 KB and 0.45–0.76 s in the background.
+- It only runs on intent, at most once per process.
+- It never runs in battery saver, nor on a metered network while Data Saver restricts the app.
+
 ## Implementation requirements (accepted 2026-10-04)
 
 These are binding for `:core:stream` and its platform code.
@@ -391,6 +424,7 @@ These are binding for `:core:stream` and its platform code.
 - Nothing from `MetrolistGroup/faraday` (no license) or `ZemerTeam/zemer-cipher` is fetched, bundled or copied.
 - `raw.githubusercontent.com`, `github.com` and `cdn.jsdelivr.net` are never on the allowlist.
 - A unit test in `:core:stream` fails the build if the InnerTubeX wiring receives a non-null `RemotePlayerConfigStore`.
+- EJS preprocessed players are not remote configs: InnerTubeX generates them on the device from YouTube's own player script. `FilePreprocessedPlayerStore` keeps up to 3 of them (~3.6 MB each, measured) in the app-private cache (`cacheDir/ejs-players`) so that a cold start does not regenerate them. Measured on device: the cold cipher solve drops from 18.7 s to 3.7–3.8 s, and `player.js` is no longer downloaded.
 
 ### R4. Visible errors, never silent failures
 

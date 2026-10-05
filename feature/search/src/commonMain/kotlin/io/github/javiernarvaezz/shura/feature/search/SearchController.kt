@@ -23,11 +23,17 @@ data class SearchUiState(
     val failureType: String? = null,
 )
 
-/** Search-and-play state holder for the spike screen. Wired manually (no DI framework yet). */
+/**
+ * Search-and-play state holder for the spike screen. Wired manually (no DI framework yet).
+ *
+ * [onPlaybackIntent] is called while the user types or submits a query, a likely prelude to playing a result; the
+ * receiver decides whether to warm anything up.
+ */
 class SearchController(
     private val search: suspend (String) -> List<Song>,
     private val player: AudioPlayer,
     private val scope: CoroutineScope,
+    private val onPlaybackIntent: () -> Unit = {},
 ) {
     private val mutableState = MutableStateFlow(SearchUiState())
     private var searchJob: Job? = null
@@ -35,13 +41,17 @@ class SearchController(
     val state: StateFlow<SearchUiState> = mutableState.asStateFlow()
     val playback: StateFlow<PlaybackState> = player.state
 
-    fun onQueryChange(query: String) = mutableState.update { it.copy(query = query) }
+    fun onQueryChange(query: String) {
+        mutableState.update { it.copy(query = query) }
+        if (query.isNotBlank()) onPlaybackIntent()
+    }
 
     /** Runs (or re-runs, as a retry) the search for the current query; only the latest search wins. */
     @Suppress("TooGenericExceptionCaught") // Any failure must become a visible, retryable state.
     fun submit() {
         val query = mutableState.value.query.trim()
         if (query.isEmpty()) return
+        onPlaybackIntent()
         searchJob?.cancel()
         mutableState.update { it.copy(status = SearchStatus.Loading) }
         searchJob =
