@@ -9,6 +9,7 @@ import com.metrolist.innertubex.extraction.StreamAttemptDiagnostic
 import com.metrolist.innertubex.extraction.StreamResolveException
 import com.metrolist.innertubex.extraction.YtConfigParserImpl
 import io.github.javiernarvaezz.shura.core.model.VideoId
+import io.github.javiernarvaezz.shura.core.network.HostAllowlist
 import io.ktor.client.HttpClient
 import kotlinx.coroutines.CancellationException
 import com.metrolist.innertubex.extraction.AudioQuality as InnerTubeXAudioQuality
@@ -28,7 +29,7 @@ internal fun interface Extraction {
 class InnerTubeXStreamResolver internal constructor(
     private val extraction: Extraction,
 ) : StreamResolver {
-    /** The caller owns [httpClient]'s engine; requests are restricted to [StreamHostPolicy]. */
+    /** The caller owns [httpClient]'s engine; requests are restricted to the app host policy. */
     constructor(httpClient: HttpClient) : this(innerTubeXExtraction(httpClient))
 
     override suspend fun resolve(
@@ -74,7 +75,7 @@ private fun Exception.toResolutionException(): StreamResolutionException =
     }
 
 private fun innerTubeXExtraction(httpClient: HttpClient): Extraction {
-    val client = httpClient.config { install(StreamHostAllowlist) }
+    val client = httpClient.config { install(HostAllowlist) }
     val innerTube = InnerTube(client)
     // No remote solver configuration store: cipher solving uses only the solvers bundled in the library.
     val cipher = YouTubeCipherService(client)

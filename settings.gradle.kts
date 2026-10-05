@@ -31,6 +31,7 @@ include(
     ":core:model",
     ":core:innertube",
     ":core:stream",
+    ":core:network",
     ":core:data",
     ":core:player",
     ":core:auth",

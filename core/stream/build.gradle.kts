@@ -6,6 +6,7 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             implementation(projects.core.model)
+            implementation(projects.core.network)
             api(libs.ktor.client.core)
             implementation(libs.innertubex)
         }

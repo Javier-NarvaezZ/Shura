@@ -1,0 +1,90 @@
+package io.github.javiernarvaezz.shura.core.network
+
+import java.io.File
+import kotlin.test.Test
+import kotlin.test.assertTrue
+import kotlin.test.fail
+
+/**
+ * ADR 0001 R7: the whole app uses the single OkHttpClient built by [ShuraNetwork].
+ *
+ * Scans production sources and build files of the repository. It does NOT cover the PoToken `WebView`,
+ * which has its own network stack and enforces its allowlist inside the WebView (R2).
+ */
+class SingleHttpClientGuardTest {
+    private val root = File("../..").canonicalFile
+    private val networkMain = File(root, "core/network/src").canonicalPath
+
+    private val ktorEngines = "cio|android|java|apache5?|jetty|curl|darwin|winhttp"
+    private val media3HttpStacks = "DefaultHttpDataSource|DefaultDataSource|cronet"
+
+    private val forbiddenOutsideNetwork =
+        mapOf(
+            "creates an OkHttpClient" to Regex("""OkHttpClient\s*(\.Builder\s*)?\("""),
+            "creates a Ktor HttpClient" to Regex("""\bHttpClient\s*\("""),
+            "uses another Ktor engine" to Regex("""io\.ktor\.client\.engine\.($ktorEngines)"""),
+            "uses Media3's default HTTP stack" to Regex("""androidx\.media3\.datasource\.($media3HttpStacks)"""),
+            "uses HttpURLConnection" to Regex("""(java\.net\.HttpURLConnection|javax\.net\.ssl\.HttpsURLConnection)"""),
+            "uses java.net.http" to Regex("""java\.net\.http\."""),
+            "opens a URL connection" to Regex("""\.(openConnection|openStream)\s*\("""),
+        )
+
+    private val forbiddenInBuildFiles =
+        Regex("""ktor-client-($ktorEngines)|media3-datasource-(cronet|rtmp)""")
+
+    private fun productionSources(): List<File> =
+        root
+            .walkTopDown()
+            .onEnter { it.name != "build" && !it.name.startsWith(".") }
+            .filter { it.isFile && it.extension == "kt" }
+            .filter { file ->
+                val path = file.relativeTo(root).invariantSeparatorsPath
+                val sourceSet = path.substringAfter("/src/", "").substringBefore('/')
+                sourceSet == "main" || sourceSet == "debug" || sourceSet == "release" || sourceSet.endsWith("Main")
+            }.toList()
+
+    @Test
+    fun scansTheRepository() {
+        assertTrue(File(root, "settings.gradle.kts").isFile, "Unexpected working directory: $root")
+        assertTrue(productionSources().size > 10, "Too few production sources found")
+    }
+
+    @Test
+    fun noOtherHttpStackInProductionCode() {
+        val violations =
+            productionSources()
+                .filterNot { it.canonicalPath.startsWith(networkMain) }
+                .flatMap { file ->
+                    val text = file.readText()
+                    val found = forbiddenOutsideNetwork.filterValues { it.containsMatchIn(text) }.keys.toMutableList()
+                    if ("ExoPlayer.Builder(" in text && "setMediaSourceFactory(" !in text) {
+                        found += "builds ExoPlayer without an explicit media source factory"
+                    }
+                    found.map { "${file.relativeTo(root)}: $it" }
+                }
+        if (violations.isNotEmpty()) fail("Network code outside :core:network:\n${violations.joinToString("\n")}")
+    }
+
+    @Test
+    fun networkModuleBuildsItsClientsInOnePlace() {
+        val builders =
+            productionSources()
+                .filter { it.canonicalPath.startsWith(networkMain) }
+                .filter { forbiddenOutsideNetwork.getValue("creates an OkHttpClient").containsMatchIn(it.readText()) }
+                .map { it.name }
+        assertTrue(builders == listOf("ShuraNetwork.kt"), "OkHttpClient built outside ShuraNetwork: $builders")
+    }
+
+    @Test
+    fun noOtherHttpStackInBuildFiles() {
+        val violations =
+            root
+                .walkTopDown()
+                .onEnter { it.name != "build" && !it.name.startsWith(".") }
+                .filter { it.isFile && (it.name.endsWith(".gradle.kts") || it.name == "libs.versions.toml") }
+                .filter { forbiddenInBuildFiles.containsMatchIn(it.readText()) }
+                .map { it.relativeTo(root).path }
+                .toList()
+        if (violations.isNotEmpty()) fail("Other HTTP stacks declared in: $violations")
+    }
+}

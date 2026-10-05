@@ -1,13 +1,15 @@
-package io.github.javiernarvaezz.shura.core.stream
+package io.github.javiernarvaezz.shura.core.network
 
 import io.ktor.client.plugins.api.Send
 import io.ktor.client.plugins.api.createClientPlugin
 
 /**
- * Hosts the stream resolver may contact (ADR 0001): YouTube for resolution and googlevideo for media.
- * Remote solver-config hosts are never allowed (R3).
+ * Hosts the app may contact over HTTP (ADR 0001): YouTube for catalog and stream resolution, googlevideo
+ * for media. Remote solver-config hosts are never allowed (R3).
+ *
+ * Does not cover the PoToken `WebView`, which has its own network stack and allowlist (R2, R7).
  */
-object StreamHostPolicy {
+object HostPolicy {
     private val allowedDomains = listOf("youtube.com", "googlevideo.com")
 
     fun isAllowed(host: String): Boolean {
@@ -16,22 +18,22 @@ object StreamHostPolicy {
     }
 }
 
-/** Thrown before any connection is opened to a host outside [StreamHostPolicy]. Only the host is reported. */
+/** Thrown before any connection is opened to a host outside [HostPolicy]. Only the host is reported. */
 class BlockedHostException(
     val host: String,
 ) : IllegalStateException("Blocked request to host $host")
 
 /**
- * Enforces [StreamHostPolicy] on every send of a Ktor client, including redirects.
+ * Enforces [HostPolicy] on every send of a Ktor client, including redirects.
  *
- * Not sufficient on its own: InnerTubeX also builds clients directly on the caller's engine (watch page,
- * player script), which bypass client plugins. Platform wiring must enforce the same policy at the engine level.
+ * Defense in depth only: the binding enforcement is the OkHttp interceptor of the app's single client,
+ * which also sees requests from clients that libraries build directly on the engine.
  */
-val StreamHostAllowlist =
-    createClientPlugin("StreamHostAllowlist") {
+val HostAllowlist =
+    createClientPlugin("HostAllowlist") {
         on(Send) { request ->
             val host = request.url.host
-            if (!StreamHostPolicy.isAllowed(host)) throw BlockedHostException(host)
+            if (!HostPolicy.isAllowed(host)) throw BlockedHostException(host)
             proceed(request)
         }
     }

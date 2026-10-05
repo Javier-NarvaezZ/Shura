@@ -1,4 +1,4 @@
-package io.github.javiernarvaezz.shura.core.stream
+package io.github.javiernarvaezz.shura.core.network
 
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
@@ -11,7 +11,7 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
-class StreamHostPolicyTest {
+class HostPolicyTest {
     @Test
     fun allowsYouTubeAndMediaHosts() {
         listOf(
@@ -19,7 +19,7 @@ class StreamHostPolicyTest {
             "www.youtube.com",
             "music.youtube.com",
             "rr3---sn-ja5gvjv-c59z.googlevideo.com",
-        ).forEach { assertTrue(StreamHostPolicy.isAllowed(it), it) }
+        ).forEach { assertTrue(HostPolicy.isAllowed(it), it) }
     }
 
     @Test
@@ -32,12 +32,12 @@ class StreamHostPolicyTest {
             "youtube.com.evil.net",
             "googlevideo.com.evil.net",
             "",
-        ).forEach { assertFalse(StreamHostPolicy.isAllowed(it), it) }
+        ).forEach { assertFalse(HostPolicy.isAllowed(it), it) }
     }
 
     @Test
     fun hostMatchingIsCaseInsensitive() {
-        assertTrue(StreamHostPolicy.isAllowed("Music.YouTube.com"))
+        assertTrue(HostPolicy.isAllowed("Music.YouTube.com"))
     }
 
     @Test
@@ -50,7 +50,7 @@ class StreamHostPolicyTest {
                         engineCalls++
                         respondOk()
                     },
-                ) { install(StreamHostAllowlist) }
+                ) { install(HostAllowlist) }
 
             val error =
                 assertFailsWith<BlockedHostException> {

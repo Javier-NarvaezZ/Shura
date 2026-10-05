@@ -87,8 +87,8 @@ As defense in depth, the Ktor `HttpClient` given to InnerTubeX gets a **host all
 
 **Where the allowlist must be enforced:**
 - InnerTubeX v0.7.4 builds some `HttpClient`s directly on the caller's **engine**: the watch page and `iframe_api` in `YtConfigParserImpl`, the `player.js` download in `YouTubeCipherService`, and the TV bearer player call.
-- Those requests bypass any plugin installed on the client passed to the library. The `StreamHostAllowlist` Ktor plugin in `:core:stream` therefore covers only part of the traffic.
-- The binding enforcement is at the engine level, in the platform wiring: for example, an OkHttp interceptor using `StreamHostPolicy`, as in the live gate.
+- Those requests bypass any plugin installed on the client passed to the library. The `HostAllowlist` Ktor plugin (now in `:core:network`) therefore covers only part of the traffic.
+- The binding enforcement is at the engine level, in the platform wiring: for example, the OkHttp interceptor of the single client in `:core:network` (R7), as in the live gate.
 - `:core:stream` has an offline test that runs the real InnerTubeX wiring on a `MockEngine`, which sees every request including the engine-level ones, and fails if any host falls outside the policy.
 
 Artwork is loaded by a different HTTP client (Coil), so it does not go through this allowlist. If Shura later adds an app-wide allowlist, it must also include the artwork hosts seen in search and player responses on 2026-10-04: `i.ytimg.com` (video thumbnails), `lh3.googleusercontent.com` (album and track art), and `yt3.ggpht.com` and `yt3.googleusercontent.com` (artist and channel images).

@@ -1,6 +1,7 @@
 package io.github.javiernarvaezz.shura.core.stream
 
 import io.github.javiernarvaezz.shura.core.model.VideoId
+import io.github.javiernarvaezz.shura.core.network.HostPolicy
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respondError
@@ -33,7 +34,7 @@ class InnerTubeXWiringTest {
             }
 
             assertTrue(hosts.isNotEmpty(), "expected the library to attempt requests")
-            val disallowed = hosts.filterNot(StreamHostPolicy::isAllowed).distinct()
+            val disallowed = hosts.filterNot(HostPolicy::isAllowed).distinct()
             assertTrue(disallowed.isEmpty(), "requests to disallowed hosts: $disallowed")
         }
 }
