@@ -12,6 +12,12 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        // InnerTubeX is only published on JitPack. Exclusive content: that group can only come from
+        // JitPack, and JitPack can serve nothing else (ADR 0001, supply chain).
+        exclusiveContent {
+            forRepository { maven("https://jitpack.io") }
+            filter { includeGroup("com.github.MetrolistGroup.innertubex") }
+        }
     }
 }
 
@@ -25,6 +31,7 @@ include(
     ":core:model",
     ":core:innertube",
     ":core:stream",
+    ":core:network",
     ":core:data",
     ":core:player",
     ":core:auth",
@@ -35,4 +42,5 @@ include(
     ":feature:library",
     ":feature:lyrics",
     ":feature:settings",
+    ":tools:livecheck",
 )

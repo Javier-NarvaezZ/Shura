@@ -10,6 +10,8 @@ trim_trailing_whitespace = true
 
 [*.{kt,kts}]
 ktlint_code_style = ktlint_official
+# Match detekt MaxLineLength (120) so ktlintFormat never produces lines detekt rejects.
+max_line_length = 120
 ktlint_function_naming_ignore_when_annotated_with = Composable
 
 [*.{yml,yaml}]

@@ -1,0 +1,25 @@
+// Used only when regenerating gradle/verification-metadata.xml (see docs/dependencies.md).
+// compose.desktop.currentOs resolves OS-specific natives, so a Linux-only run would miss the
+// Windows artifacts that the Windows CI runner needs. This adds a throwaway configuration that
+// resolves the windows-x64 variant so its checksums are written too.
+allprojects {
+    if (path == ':app-desktop') {
+        afterEvaluate {
+            def catalog = rootProject.file('gradle/libs.versions.toml').text
+            def composeVersion = (catalog =~ /(?m)^compose-multiplatform\s*=\s*"([^"]+)"/)[0][1]
+            def runtime = configurations.getByName('runtimeClasspath')
+            def natives = configurations.create('verificationWindowsNatives') {
+                canBeResolved = true
+                canBeConsumed = false
+            }
+            runtime.attributes.keySet().each { key ->
+                natives.attributes.attribute(key, runtime.attributes.getAttribute(key))
+            }
+            dependencies.add('verificationWindowsNatives', "org.jetbrains.compose.desktop:desktop-jvm-windows-x64:$composeVersion")
+            tasks.register('resolveWindowsNatives') {
+                def files = natives
+                doLast { println "Resolved ${files.files.size()} Windows desktop artifacts" }
+            }
+        }
+    }
+}
