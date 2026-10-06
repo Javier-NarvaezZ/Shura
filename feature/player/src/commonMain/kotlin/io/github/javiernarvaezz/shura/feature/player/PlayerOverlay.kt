@@ -149,7 +149,8 @@ private fun FlyingCover(
                         lerp(thumbRadius / scale.coerceAtLeast(MIN_SCALE), artworkRadius, f),
                     )
                 clip = true
-                shadowElevation = elevation * f
+                // Only at rest: a shadow that changes every frame of the flight is costly to render.
+                shadowElevation = if (f >= 1f) elevation else 0f
             },
     ) {
         Artwork(
