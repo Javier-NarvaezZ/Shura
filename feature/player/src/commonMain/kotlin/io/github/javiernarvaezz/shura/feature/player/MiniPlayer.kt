@@ -18,6 +18,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -35,7 +36,8 @@ import io.github.javiernarvaezz.shura.core.player.PlaybackError
 import io.github.javiernarvaezz.shura.core.ui.artwork.Artwork
 import io.github.javiernarvaezz.shura.core.ui.components.ChromeSurface
 import io.github.javiernarvaezz.shura.core.ui.components.PlayPauseButton
-import io.github.javiernarvaezz.shura.core.ui.components.rememberFrameTick
+import io.github.javiernarvaezz.shura.core.ui.components.progressStepMs
+import io.github.javiernarvaezz.shura.core.ui.components.rememberProgressTick
 import io.github.javiernarvaezz.shura.core.ui.icons.ShuraIcons
 import io.github.javiernarvaezz.shura.core.ui.theme.Shura
 import io.github.javiernarvaezz.shura.feature.player.resources.Res
@@ -60,8 +62,12 @@ fun MiniPlayer(
     val scope = rememberCoroutineScope()
     val tint = Shura.colors.surface2
     val line = Shura.colors.text
-    // No per-frame redraws while the player covers the mini-player.
-    val tick = rememberFrameTick(running = state.showsPause && !sheet.isShown)
+    // Redraws only as the line moves by a pixel, and not at all while the player covers the mini-player.
+    val lineWidth = remember { floatArrayOf(0f) }
+    val tick =
+        rememberProgressTick(running = state.showsPause && !sheet.isShown) {
+            progressStepMs(model.progress().duration?.inWholeMilliseconds, lineWidth[0])
+        }
     val openLabel = stringResource(Res.string.open_player)
     ChromeSurface(
         tint = { tint },
@@ -84,6 +90,7 @@ fun MiniPlayer(
                 .padding(horizontal = Shura.spacing.s)
                 .drawBehind {
                     tick.value
+                    lineWidth[0] = size.width
                     val y = size.height - LINE_HEIGHT.toPx() / 2
                     val end = size.width * model.progress().fraction
                     drawLine(line, Offset(0f, y), Offset(end, y), LINE_HEIGHT.toPx())

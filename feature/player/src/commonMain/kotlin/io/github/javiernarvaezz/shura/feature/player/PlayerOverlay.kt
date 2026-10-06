@@ -48,7 +48,6 @@ import io.github.javiernarvaezz.shura.core.player.RepeatMode
 import io.github.javiernarvaezz.shura.core.ui.artwork.Artwork
 import io.github.javiernarvaezz.shura.core.ui.components.PlayPauseButton
 import io.github.javiernarvaezz.shura.core.ui.components.Scrubber
-import io.github.javiernarvaezz.shura.core.ui.components.rememberFrameTick
 import io.github.javiernarvaezz.shura.core.ui.icons.ShuraIcons
 import io.github.javiernarvaezz.shura.core.ui.text.toClock
 import io.github.javiernarvaezz.shura.core.ui.theme.Shura
@@ -224,12 +223,12 @@ private fun Progress(
     model: PlayerModel,
     playing: Boolean,
 ) {
-    val tick = rememberFrameTick(running = playing)
     val color = Shura.colors.text
     Scrubber(
         fraction = { model.progress().fraction },
         bufferedFraction = { model.progress().bufferedFraction },
-        tick = tick,
+        playing = playing,
+        durationMs = { model.progress().duration?.inWholeMilliseconds },
         onSeek = model::seekToFraction,
         color = color,
     )
