@@ -29,6 +29,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.semantics.Role
@@ -118,7 +119,9 @@ fun ShuraAppShell(
             .background(Shura.colors.background)
             .onSizeChanged { sheet.travelPx = it.height * PLAYER_TRAVEL },
     ) {
-        Column(Modifier.fillMaxSize()) {
+        // Not drawn while the open player covers it (a layer with alpha 0 is skipped), but still composed, so
+        // scroll positions and typed text survive the player.
+        Column(Modifier.fillMaxSize().graphicsLayer { alpha = if (sheet.isOpen) 0f else 1f }) {
             Box(Modifier.weight(1f)) {
                 tabs.SaveableStateProvider(shell.tab) {
                     val stack = shell.stacks.getValue(shell.tab)

@@ -32,5 +32,7 @@ class MainActivity : ComponentActivity() {
                 )
             }
         }
+        // Compose paints the whole background itself; the window's own fill under it is wasted work every frame.
+        window.setBackgroundDrawable(null)
     }
 }
