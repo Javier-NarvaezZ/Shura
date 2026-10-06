@@ -37,6 +37,7 @@ include(
     ":core:player",
     ":core:auth",
     ":core:ui",
+    ":core:testing",
     ":feature:home",
     ":feature:search",
     ":feature:player",

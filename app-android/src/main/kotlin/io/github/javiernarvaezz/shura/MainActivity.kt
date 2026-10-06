@@ -8,6 +8,7 @@ import androidx.compose.runtime.remember
 import io.github.javiernarvaezz.shura.appshell.ShellDependencies
 import io.github.javiernarvaezz.shura.appshell.ShuraAppShell
 import io.github.javiernarvaezz.shura.core.ui.theme.ShuraTheme
+import java.time.LocalTime
 
 class MainActivity : ComponentActivity() {
     private val graph get() = (application as ShuraApp).graph
@@ -22,8 +23,10 @@ class MainActivity : ComponentActivity() {
                     remember {
                         ShellDependencies(
                             player = graph.player,
+                            history = graph.store,
                             searchSongs = graph.catalog::searchSongs,
                             onPlaybackIntent = graph.playbackWarmup::onPlaybackIntent,
+                            currentHour = { LocalTime.now().hour },
                         )
                     },
                 )

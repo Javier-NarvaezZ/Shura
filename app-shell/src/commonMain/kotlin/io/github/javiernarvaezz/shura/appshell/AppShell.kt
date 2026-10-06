@@ -40,11 +40,13 @@ import io.github.javiernarvaezz.shura.appshell.resources.tab_home
 import io.github.javiernarvaezz.shura.appshell.resources.tab_search
 import io.github.javiernarvaezz.shura.core.model.Song
 import io.github.javiernarvaezz.shura.core.player.AudioPlayer
+import io.github.javiernarvaezz.shura.core.player.PlayHistory
 import io.github.javiernarvaezz.shura.core.ui.components.ChromeSurface
 import io.github.javiernarvaezz.shura.core.ui.icons.ShuraIcons
 import io.github.javiernarvaezz.shura.core.ui.theme.Shura
 import io.github.javiernarvaezz.shura.core.ui.theme.ShuraMotion
 import io.github.javiernarvaezz.shura.feature.home.HomeScreen
+import io.github.javiernarvaezz.shura.feature.home.HomeViewModel
 import io.github.javiernarvaezz.shura.feature.search.SearchScreen
 import io.github.javiernarvaezz.shura.feature.search.SearchViewModel
 import org.jetbrains.compose.resources.stringResource
@@ -52,8 +54,11 @@ import org.jetbrains.compose.resources.stringResource
 /** What the shell needs from the app (manual wiring, no DI framework). */
 class ShellDependencies(
     val player: AudioPlayer,
+    val history: PlayHistory,
     val searchSongs: suspend (String) -> List<Song>,
     val onPlaybackIntent: () -> Unit,
+    /** The local hour (0..23), for Home's greeting. */
+    val currentHour: () -> Int,
 )
 
 enum class Tab { Home, Search }
@@ -85,6 +90,7 @@ fun ShuraAppShell(
     modifier: Modifier = Modifier,
 ) {
     val shell = viewModel { ShellViewModel() }
+    val home = viewModel { HomeViewModel(deps.player, deps.history, deps.currentHour) }
     val search = viewModel { SearchViewModel(deps.searchSongs, deps.player, deps.onPlaybackIntent) }
     val tabs = rememberSaveableStateHolder()
     Column(modifier.fillMaxSize().background(Shura.colors.background)) {
@@ -97,7 +103,7 @@ fun ShuraAppShell(
                     entryDecorators = listOf(rememberSaveableStateHolderNavEntryDecorator()),
                     entryProvider =
                         entryProvider {
-                            entry<Route.Home> { HomeScreen() }
+                            entry<Route.Home> { HomeScreen(home.model, onSearch = { shell.tab = Tab.Search }) }
                             entry<Route.Search> { SearchScreen(search.controller) }
                         },
                 )

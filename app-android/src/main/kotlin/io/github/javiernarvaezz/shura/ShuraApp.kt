@@ -65,14 +65,16 @@ class AppGraph(
 
     val catalog = InnerTubeClient(network.ktor)
 
+    /** Queue and play history: app-private database (excluded from backups), opened off the main thread. */
+    val store = androidQueueStore(context, Dispatchers.IO)
+
     /** Used by `PlaybackService`, where the player lives; media and artwork go through the single client. */
     val playbackDependencies =
         PlaybackDependencies(
             callFactory = network.okHttp,
             resolver = debugStreamResolver(streamResolver),
             trace = trace,
-            // App-private database (excluded from backups); opened on first use, off the main thread.
-            queueStore = androidQueueStore(context, Dispatchers.IO),
+            queueStore = store,
             prefetchNext = ::nextItemPrefetchEnabled,
         )
 
