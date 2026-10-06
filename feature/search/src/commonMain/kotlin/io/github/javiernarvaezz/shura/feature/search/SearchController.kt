@@ -2,9 +2,7 @@ package io.github.javiernarvaezz.shura.feature.search
 
 import io.github.javiernarvaezz.shura.core.model.Song
 import io.github.javiernarvaezz.shura.core.player.AudioPlayer
-import io.github.javiernarvaezz.shura.core.player.PlaybackState
 import io.github.javiernarvaezz.shura.core.player.QueueState
-import io.github.javiernarvaezz.shura.core.player.RepeatMode
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -13,7 +11,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlin.time.Duration
 
 enum class SearchStatus { Idle, Loading, Done, Empty, Failed }
 
@@ -26,7 +23,7 @@ data class SearchUiState(
 )
 
 /**
- * Search-and-play state holder for the spike screen. Wired manually (no DI framework yet).
+ * Search state and the actions on its results; plain so it can be tested without Android.
  *
  * [onPlaybackIntent] is called while the user types or submits a query, a likely prelude to playing a result; the
  * receiver decides whether to warm anything up.
@@ -41,7 +38,6 @@ class SearchController(
     private var searchJob: Job? = null
 
     val state: StateFlow<SearchUiState> = mutableState.asStateFlow()
-    val playback: StateFlow<PlaybackState> = player.state
 
     fun onQueryChange(query: String) {
         mutableState.update { it.copy(query = query) }
@@ -75,6 +71,7 @@ class SearchController(
             }
     }
 
+    /** The queue, to mark the song that is playing in the results. */
     val queue: StateFlow<QueueState> = player.queue
 
     /** Plays [song] with the current results as the queue (as YouTube Music does), or alone if not in them. */
@@ -87,31 +84,6 @@ class SearchController(
     /** Plays [song] right after the current one (or starts it if nothing is queued). */
     fun playNext(song: Song) = player.playNext(listOf(song))
 
-    fun next() = player.next()
-
-    fun previous() = player.previous()
-
-    fun toggleShuffle() = player.setShuffle(!queue.value.shuffle)
-
-    /** Off → all → one → off. */
-    fun cycleRepeat() =
-        player.setRepeat(
-            when (queue.value.repeat) {
-                RepeatMode.Off -> RepeatMode.All
-                RepeatMode.All -> RepeatMode.One
-                RepeatMode.One -> RepeatMode.Off
-            },
-        )
-
-    fun togglePause() {
-        when (playback.value) {
-            is PlaybackState.Playing -> player.pause()
-            is PlaybackState.Paused -> player.resume()
-            else -> Unit
-        }
-    }
-
-    fun seekBy(offset: Duration) = player.seekBy(offset)
-
-    fun retryPlayback() = player.retry()
+    /** Adds [song] at the end of the queue. */
+    fun enqueue(song: Song) = player.enqueue(listOf(song))
 }
