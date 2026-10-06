@@ -18,6 +18,9 @@ innertubex = "0.7.4"
 sqldelight = "2.4.0"
 # Coil fetches through our OkHttpClient only (coil-network-okhttp with ShuraNetwork.okHttp; ADR 0001 R7).
 coil = "3.6.3"
+# JetBrains multiplatform builds of AndroidX lifecycle and Navigation 3.
+jetbrains-lifecycle = "2.11.0"
+jetbrains-navigation3 = "1.1.2"
 android-minSdk = "26"
 android-compileSdk = "37"
 android-targetSdk = "37"
@@ -38,6 +41,9 @@ media3-datasource-okhttp = { module = "androidx.media3:media3-datasource-okhttp"
 media3-session = { module = "androidx.media3:media3-session", version.ref = "media3" }
 coil-compose = { module = "io.coil-kt.coil3:coil-compose", version.ref = "coil" }
 coil-network-okhttp = { module = "io.coil-kt.coil3:coil-network-okhttp", version.ref = "coil" }
+compose-components-resources = { module = "org.jetbrains.compose.components:components-resources", version.ref = "compose-multiplatform" }
+lifecycle-viewmodel-compose = { module = "org.jetbrains.androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "jetbrains-lifecycle" }
+navigation3-ui = { module = "org.jetbrains.androidx.navigation3:navigation3-ui", version.ref = "jetbrains-navigation3" }
 ktor-client-mock = { module = "io.ktor:ktor-client-mock", version.ref = "ktor" }
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinx-serialization" }
 innertubex = { module = "com.github.MetrolistGroup.innertubex:innertubex", version.ref = "innertubex" }
