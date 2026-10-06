@@ -65,6 +65,7 @@ class AppGraph(
             trace = trace,
             // App-private database (excluded from backups); opened on first use, off the main thread.
             queueStore = androidQueueStore(context, Dispatchers.IO),
+            prefetchNext = ::nextItemPrefetchEnabled,
         )
 
     val player: AudioPlayer = AndroidAudioPlayer(context, trace)

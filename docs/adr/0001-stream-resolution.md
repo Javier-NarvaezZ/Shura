@@ -365,6 +365,21 @@ What remains of the fallback cold start:
 - It only runs on intent, at most once per process.
 - It never runs in battery saver, nor on a metered network while Data Saver restricts the app.
 
+### Next-track measurements (2026-10-05)
+
+Same device, method and guard as above. While a track plays, the player resolves the URL of the item that plays next in its own order (`NextItemPrefetcher`); only the URL, no audio. Measured from the item transition to the first audio, after media-key skips 8 s apart on a 20-song search queue, alternating debug runs with and without `shura.debug.noPrefetch`.
+
+| Skip → first audio (20 skips each) | Median | P25–P75 |
+|---|---|---|
+| Without pre-resolution | 0.92 s | 0.84–1.03 s |
+| With pre-resolution | **0.57 s** | 0.45–0.74 s |
+| With pre-resolution, shuffle on (10 skips) | 0.46 s | — |
+
+- The pre-resolved item was the one that played in every skip, with shuffle on as well (checked in the trace by a match flag, never the id).
+- What remains after a skip is googlevideo's time to first byte (0.07–0.8 s; higher when it moves to another host) plus ~0.25 s from ready to audible output. Preloading audio (Media3 preload configuration) would target it. Not done: it costs data, and it is not yet verified when Media3 starts preloading.
+- Automatic transitions had no rebuffer (no new ready or first-audio event) in two natural transitions; ExoPlayer already buffers the next item there.
+- Cost: one `player` request per track (10.4–10.9 KB measured), only while audio plays.
+
 ## Implementation requirements (accepted 2026-10-04)
 
 These are binding for `:core:stream` and its platform code.

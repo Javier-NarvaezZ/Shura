@@ -39,6 +39,7 @@ class PlaybackService : MediaSessionService() {
     private lateinit var specResolver: StreamSpecResolver
     private var trace: Trace = Trace.NONE
     private var persistence: QueuePersistence? = null
+    private var prefetcher: NextItemPrefetcher? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -63,6 +64,9 @@ class PlaybackService : MediaSessionService() {
                 .build()
                 .also { exo.addListener(ErrorListener(it, exo)) }
         persistence = dependencies.queueStore?.let { QueuePersistence(player, it, trace).also(QueuePersistence::start) }
+        prefetcher =
+            NextItemPrefetcher(player, specResolver::prefetch, dependencies.prefetchNext, trace)
+                .also(NextItemPrefetcher::start)
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = session
@@ -78,11 +82,14 @@ class PlaybackService : MediaSessionService() {
             stop()
         }
         persistence = null
+        prefetcher?.stop()
+        prefetcher = null
         session?.run {
             player.release()
             release()
         }
         session = null
+        specResolver.close()
         super.onDestroy()
     }
 

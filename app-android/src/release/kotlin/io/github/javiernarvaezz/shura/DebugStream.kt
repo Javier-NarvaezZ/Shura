@@ -19,6 +19,9 @@ internal fun debugExcludedStreamProfiles(): Set<String> = emptySet()
 @Suppress("FunctionOnlyReturningConstant")
 internal fun playbackWarmupEnabled(): Boolean = true
 
+@Suppress("FunctionOnlyReturningConstant")
+internal fun nextItemPrefetchEnabled(): Boolean = true
+
 internal fun debugWarmUp(
     warmUp: suspend () -> Unit,
     @Suppress("UnusedParameter") trace: Trace,

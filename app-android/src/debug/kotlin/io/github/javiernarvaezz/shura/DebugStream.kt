@@ -22,6 +22,7 @@ private const val TAG = "ShuraStream"
 private const val EXTRA_NO_LEGACY = "shura.debug.noLegacyClients"
 private const val EXTRA_PREWARM = "shura.debug.prewarm"
 private const val EXTRA_WARMUP = "shura.debug.warmup"
+private const val EXTRA_NO_PREFETCH = "shura.debug.noPrefetch"
 
 // Every variant of the legacy VISIONOS manifests, to force a non-legacy (PoToken) client in device tests.
 private val LEGACY_PROFILES =
@@ -36,6 +37,9 @@ internal var prewarmRequested = false
 @Volatile
 private var warmupEnabled = false
 
+@Volatile
+private var prefetchEnabled = true
+
 /** `adb shell am start -n <app>/.MainActivity --ez shura.debug.noLegacyClients true` after a force-stop. */
 internal fun applyDebugLaunchOptions(intent: Intent) {
     if (intent.getBooleanExtra(EXTRA_NO_LEGACY, false)) {
@@ -44,10 +48,14 @@ internal fun applyDebugLaunchOptions(intent: Intent) {
     }
     if (intent.getBooleanExtra(EXTRA_PREWARM, false)) prewarmRequested = true
     warmupEnabled = intent.getBooleanExtra(EXTRA_WARMUP, false)
+    prefetchEnabled = !intent.getBooleanExtra(EXTRA_NO_PREFETCH, false)
 }
 
 /** Debug: off unless launched with `--ez shura.debug.warmup true`, so cold-start measurements stay comparable. */
 internal fun playbackWarmupEnabled(): Boolean = warmupEnabled
+
+/** Debug: on unless launched with `--ez shura.debug.noPrefetch true`, to measure skips with and without it. */
+internal fun nextItemPrefetchEnabled(): Boolean = prefetchEnabled
 
 internal fun debugExcludedStreamProfiles(): Set<String> = if (noLegacyClients) LEGACY_PROFILES else emptySet()
 

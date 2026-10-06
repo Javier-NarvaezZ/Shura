@@ -13,6 +13,8 @@ class PlaybackDependencies(
     val trace: Trace = Trace.NONE,
     /** Saves and restores the queue and records the play history; null keeps the queue in memory only. */
     val queueStore: QueueStore? = null,
+    /** Whether to resolve the next item ahead of playback; checked before each pre-resolution. */
+    val prefetchNext: () -> Boolean = { true },
 )
 
 /** Implemented by the `Application`, so the service gets its dependencies without a DI framework. */
