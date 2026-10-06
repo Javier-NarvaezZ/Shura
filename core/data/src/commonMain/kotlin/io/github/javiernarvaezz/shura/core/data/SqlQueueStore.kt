@@ -6,6 +6,7 @@ import io.github.javiernarvaezz.shura.core.data.db.Play_history
 import io.github.javiernarvaezz.shura.core.data.db.Queue_item
 import io.github.javiernarvaezz.shura.core.data.db.ShuraDatabase
 import io.github.javiernarvaezz.shura.core.model.Song
+import io.github.javiernarvaezz.shura.core.player.PlayHistory
 import io.github.javiernarvaezz.shura.core.player.QueueSnapshot
 import io.github.javiernarvaezz.shura.core.player.QueueStore
 import io.github.javiernarvaezz.shura.core.player.RepeatMode
@@ -24,13 +25,15 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlin.coroutines.CoroutineContext
 
 /**
- * [QueueStore] on SQLite. Every call runs on [context] (an IO dispatcher in the app). A saved queue that cannot be
- * restored (corrupt rows, a play order that is not a permutation) is deleted and reported as absent.
+ * [QueueStore] and [PlayHistory] on SQLite. Every call runs on [context] (an IO dispatcher in the app). A saved
+ * queue that cannot be restored (corrupt rows, a play order that is not a permutation) is deleted and reported as
+ * absent.
  */
 class SqlQueueStore(
     private val database: ShuraDatabase,
     private val context: CoroutineContext,
-) : QueueStore {
+) : QueueStore,
+    PlayHistory {
     private val queue get() = database.queueQueries
     private val history get() = database.historyQueries
 
@@ -85,10 +88,9 @@ class SqlQueueStore(
         }
     }
 
-    /** Most recently played songs first, for the home screen. */
-    fun recentHistory(limit: Int): Flow<List<Song>> =
+    override fun recent(limit: Int): Flow<List<Song>> =
         history
-            .recent(limit.toLong())
+            .recentDistinct(limit.toLong())
             .asFlow()
             .mapToList(context)
             .map { rows -> rows.mapNotNull { it.toSong() } }
