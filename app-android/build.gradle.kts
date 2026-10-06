@@ -44,6 +44,7 @@ kotlin {
 }
 
 dependencies {
+    implementation(projects.appShell)
     implementation(projects.core.ui)
     implementation(projects.core.network)
     implementation(projects.core.innertube)

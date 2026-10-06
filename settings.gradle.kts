@@ -28,6 +28,7 @@ enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
 include(
     ":app-android",
     ":app-desktop",
+    ":app-shell",
     ":core:model",
     ":core:innertube",
     ":core:stream",
