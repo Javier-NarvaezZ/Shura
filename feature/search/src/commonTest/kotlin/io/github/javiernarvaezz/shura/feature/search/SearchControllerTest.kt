@@ -5,6 +5,7 @@ import io.github.javiernarvaezz.shura.core.model.Song
 import io.github.javiernarvaezz.shura.core.model.VideoId
 import io.github.javiernarvaezz.shura.core.player.AudioPlayer
 import io.github.javiernarvaezz.shura.core.player.PlaybackError
+import io.github.javiernarvaezz.shura.core.player.PlaybackProgress
 import io.github.javiernarvaezz.shura.core.player.PlaybackState
 import io.github.javiernarvaezz.shura.core.player.QueueState
 import io.github.javiernarvaezz.shura.core.player.RepeatMode
@@ -90,6 +91,12 @@ class SearchControllerTest {
         override fun seekBy(offset: Duration) {
             calls += "seek:${offset.inWholeSeconds}"
         }
+
+        override fun seekTo(position: Duration) {
+            calls += "seekTo:${position.inWholeSeconds}"
+        }
+
+        override fun progress(): PlaybackProgress = PlaybackProgress.ZERO
 
         override fun retry() {
             calls += "retry"

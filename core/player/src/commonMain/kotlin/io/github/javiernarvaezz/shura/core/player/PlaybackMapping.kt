@@ -80,6 +80,9 @@ class CommandGate<T : Any> {
         target?.let(command) ?: pending.addLast(command)
     }
 
+    /** Reads from the connected target right away; null before it connects or after [release]. Never queued. */
+    fun <R> read(query: (T) -> R): R? = target?.let(query)
+
     fun connect(target: T) {
         if (released) return
         this.target = target

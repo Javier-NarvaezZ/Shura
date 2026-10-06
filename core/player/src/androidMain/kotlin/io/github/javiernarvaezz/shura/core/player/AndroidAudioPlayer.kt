@@ -123,11 +123,15 @@ class AndroidAudioPlayer(
     }
 
     override fun seekBy(offset: Duration) =
-        gate.run {
-            val target = it.currentPosition + offset.inWholeMilliseconds
-            val duration = it.duration.takeIf { d -> d > 0 } ?: Long.MAX_VALUE
-            it.seekTo(target.coerceIn(0, duration))
-        }
+        gate.run { it.seekTo(seekTarget(it.currentPosition + offset.inWholeMilliseconds, it.duration)) }
+
+    override fun seekTo(position: Duration) =
+        gate.run { it.seekTo(seekTarget(position.inWholeMilliseconds, it.duration)) }
+
+    // MediaController caches the session's position and extrapolates it while playing, so this is a cheap
+    // in-process read (no IPC per frame).
+    override fun progress(): PlaybackProgress =
+        gate.read { playbackProgress(it.currentPosition, it.duration, it.bufferedPosition) } ?: PlaybackProgress.ZERO
 
     override fun retry() {
         val song = mutableQueue.value.current ?: pending ?: return
