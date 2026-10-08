@@ -43,14 +43,18 @@ fun Artwork(
     modifier: Modifier = Modifier,
     shape: Shape = Shura.shapes.thumbnail,
 ) {
+    // The music note only stands in when there is no cover or it failed: drawn under every cover, each row paid
+    // for a vector subcomposition that the image then hid (measured on the first frames of a scroll).
+    var failed by remember(url) { mutableStateOf(false) }
     Box(modifier.clip(shape).background(Shura.colors.surface2), contentAlignment = Alignment.Center) {
-        Icon(
-            ShuraIcons.MusicNote,
-            contentDescription = null,
-            tint = Shura.colors.textMuted,
-            modifier = Modifier.fillMaxWidth(PLACEHOLDER_ICON_FRACTION),
-        )
-        if (url != null) {
+        if (url == null || failed) {
+            Icon(
+                ShuraIcons.MusicNote,
+                contentDescription = null,
+                tint = Shura.colors.textMuted,
+                modifier = Modifier.fillMaxWidth(PLACEHOLDER_ICON_FRACTION),
+            )
+        } else {
             AsyncImage(
                 model =
                     ImageRequest
@@ -60,6 +64,7 @@ fun Artwork(
                         .build(),
                 contentDescription = contentDescription,
                 contentScale = ContentScale.Crop,
+                onError = { failed = true },
                 modifier = Modifier.fillMaxSize(),
             )
         }
