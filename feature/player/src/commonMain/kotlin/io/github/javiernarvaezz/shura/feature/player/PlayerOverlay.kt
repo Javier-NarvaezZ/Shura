@@ -37,9 +37,11 @@ import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.lerp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -65,10 +67,12 @@ import io.github.javiernarvaezz.shura.feature.player.resources.shuffle_off
 import io.github.javiernarvaezz.shura.feature.player.resources.shuffle_on
 import kotlinx.coroutines.delay
 import org.jetbrains.compose.resources.stringResource
+import kotlin.math.roundToInt
 
 /**
- * The full player, drawn above everything while [PlayerSheetState.isShown]. A layer, not a destination: the page
- * underneath stays alive, so dragging the player down reveals the real content.
+ * The full player, above everything. Composed while there is a song, but drawn only while
+ * [PlayerSheetState.isShown]. A layer, not a destination: the page underneath stays alive, so dragging the player
+ * down reveals the real content.
  *
  * Motion (driven by [PlayerSheetState.fraction], read only in layer lambdas): the cover flies between the
  * mini-player and its slot here; the background fades in, and the rest of the body arrives late and leaves early.
@@ -79,7 +83,6 @@ fun PlayerOverlay(
     sheet: PlayerSheetState,
     modifier: Modifier = Modifier,
 ) {
-    if (!sheet.isShown) return
     val state by model.state.collectAsStateWithLifecycle()
     val song = state.song ?: return
     val scope = rememberCoroutineScope()
@@ -87,6 +90,7 @@ fun PlayerOverlay(
     Box(
         modifier
             .fillMaxSize()
+            .placedOnlyWhenShown(sheet)
             .draggable(
                 state = rememberDraggableState { delta -> sheet.dragBy(-delta) },
                 orientation = Orientation.Vertical,
@@ -119,6 +123,18 @@ fun PlayerOverlay(
     }
 }
 
+/**
+ * Keeps the player composed (so opening it composes nothing) but unplaced while it is closed: unplaced content is
+ * neither drawn nor hit by touches, so the app underneath works normally. Only placement changes on open/close.
+ */
+private fun Modifier.placedOnlyWhenShown(sheet: PlayerSheetState): Modifier =
+    layout { measurable, constraints ->
+        val placeable = measurable.measure(constraints)
+        layout(placeable.width, placeable.height) {
+            if (sheet.isShown) placeable.place(0, 0)
+        }
+    }
+
 /** The one visible cover while the player is out: moves and scales from the mini cover to the player slot. */
 @Composable
 private fun FlyingCover(
@@ -126,17 +142,23 @@ private fun FlyingCover(
     sheet: PlayerSheetState,
 ) {
     val density = LocalDensity.current
-    val target = sheet.playerCover
-    if (target.width <= 0f) return
     val thumbRadius = with(density) { Shura.shapes.thumbnailRadius.toPx() }
     val artworkRadius = with(density) { Shura.shapes.artworkRadius.toPx() }
     val elevation = with(density) { COVER_ELEVATION.toPx() }
+    // The slot moves with the body while it animates: read it only in layout and layer lambdas, so the flight
+    // never recomposes.
     Box(
         Modifier
-            .size(with(density) { target.width.toDp() }, with(density) { target.height.toDp() })
-            .graphicsLayer {
+            .layout { measurable, _ ->
+                val target = sheet.playerCover
+                val w = target.width.roundToInt()
+                val h = target.height.roundToInt()
+                val placeable = measurable.measure(Constraints.fixed(w, h))
+                layout(w, h) { if (w > 0) placeable.place(0, 0) }
+            }.graphicsLayer {
                 val f = sheet.fraction
                 val start = sheet.miniCover
+                val target = sheet.playerCover
                 val scale = lerp(if (target.width > 0f) start.width / target.width else 1f, 1f, f)
                 transformOrigin = TransformOrigin(0f, 0f)
                 translationX = lerp(start.left, target.left, f)
@@ -212,7 +234,8 @@ private fun PlayerBody(
         if (error != null) {
             ErrorRow(stringResource(playbackErrorMessage(error)), model::retry)
         } else {
-            Progress(model, playing = state.showsPause)
+            // Hidden: no progress redraws and no time updates.
+            Progress(model, playing = state.showsPause && sheet.isShown)
         }
         Spacer(Modifier.height(Shura.spacing.m))
         Controls(model, state)
