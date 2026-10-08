@@ -33,8 +33,14 @@ class SingleHttpClientGuardTest {
     private val exoPlayerBuilder = Regex("""\bExoPlayer\s*\.\s*Builder\s*\(""")
     private val mediaSessionBuilder = Regex("""\b(MediaSession|MediaLibrarySession)\s*\.\s*Builder\s*\(""")
 
+    // Coil: its default loader, and any loader with the service loader on, fetch through Coil's own OkHttpClient.
+    private val coilDefaultLoader = Regex("""\bImageLoader\s*\(""")
+    private val coilLoaderBuilder = Regex("""\bImageLoader\s*\.\s*Builder\s*\(""")
+    private val coilFetcherWithoutClient = Regex("""OkHttpNetworkFetcherFactory\s*\(\s*\)""")
+    private val coilImageRequests = Regex("""\b(AsyncImage|SubcomposeAsyncImage|rememberAsyncImagePainter)\s*\(""")
+
     private val forbiddenInBuildFiles =
-        Regex("""ktor-client-($ktorEngines)|media3-datasource-(cronet|rtmp)""")
+        Regex("""ktor-client-($ktorEngines)|media3-datasource-(cronet|rtmp)|coil-network-ktor""")
 
     /** Drops block and line comments so KDoc mentioning a type is not mistaken for code. */
     private fun code(file: File): String =
@@ -78,9 +84,36 @@ class SingleHttpClientGuardTest {
                     if ("DataSourceBitmapLoader" in text && "setDataSourceFactory(" !in text) {
                         found += "builds a DataSourceBitmapLoader without our data source factory"
                     }
+                    found += coilViolations(text)
                     found.map { "${file.relativeTo(root)}: $it" }
                 }
         if (violations.isNotEmpty()) fail("Network code outside :core:network:\n${violations.joinToString("\n")}")
+    }
+
+    private fun coilViolations(text: String): List<String> =
+        buildList {
+            if (coilDefaultLoader.containsMatchIn(text)) add("builds Coil's default image loader")
+            if (coilLoaderBuilder.containsMatchIn(text)) {
+                if ("serviceLoaderEnabled(false)" !in text) add("builds an image loader with Coil's service loader on")
+                if ("OkHttpNetworkFetcherFactory(callFactory" !in text) add("builds an image loader without our client")
+            }
+            if (coilFetcherWithoutClient.containsMatchIn(text)) add("creates Coil's OkHttp fetcher without our client")
+        }
+
+    /** Compose image requests use the app's singleton loader, which must be ours ([coilViolations] checks it). */
+    @Test
+    fun coilImagesUseOurImageLoader() {
+        val texts = productionSources().associateWith(::code)
+        if (texts.values.none { coilImageRequests.containsMatchIn(it) }) return
+        val providers =
+            texts.filterValues {
+                "SingletonImageLoader.Factory" in it &&
+                    coilLoaderBuilder.containsMatchIn(it)
+            }
+        assertTrue(
+            providers.isNotEmpty(),
+            "Coil images are requested but no SingletonImageLoader.Factory builds our image loader",
+        )
     }
 
     @Test

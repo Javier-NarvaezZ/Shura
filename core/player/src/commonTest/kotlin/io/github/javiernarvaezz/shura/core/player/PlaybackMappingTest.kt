@@ -114,4 +114,27 @@ class PlaybackMappingTest {
 
         assertTrue(target.isEmpty())
     }
+
+    @Test
+    fun gateReadsReturnNullUntilConnectedAndAfterRelease() {
+        val gate = CommandGate<MutableList<String>>()
+        assertNull(gate.read { it.size })
+
+        gate.connect(mutableListOf("a", "b"))
+        assertEquals(2, gate.read { it.size })
+
+        gate.release()
+        assertNull(gate.read { it.size })
+    }
+
+    @Test
+    fun gateReadsAreNotQueuedAsCommands() {
+        val gate = CommandGate<MutableList<String>>()
+        gate.read { it += "read" }
+        val target = mutableListOf<String>()
+
+        gate.connect(target)
+
+        assertTrue(target.isEmpty())
+    }
 }

@@ -44,6 +44,7 @@ kotlin {
 }
 
 dependencies {
+    implementation(projects.appShell)
     implementation(projects.core.ui)
     implementation(projects.core.network)
     implementation(projects.core.innertube)
@@ -53,4 +54,5 @@ dependencies {
     implementation(projects.feature.search)
     implementation(libs.compose.runtime)
     implementation(libs.androidx.activity.compose)
+    implementation(libs.coil.network.okhttp)
 }

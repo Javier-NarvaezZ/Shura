@@ -1,0 +1,14 @@
+<resources>
+    <string name="title">Buscar</string>
+    <string name="field_hint">Canciones o artistas</string>
+    <string name="clear">Borrar</string>
+    <string name="idle_hint">Busca una canción o un artista para empezar.</string>
+    <string name="empty">Sin resultados para “%1$s”.</string>
+    <string name="failed">No se pudo buscar. Revisa tu conexión.</string>
+    <string name="retry">Reintentar</string>
+    <string name="more_actions">Más opciones</string>
+    <string name="play_next">Reproducir a continuación</string>
+    <string name="add_to_queue">Añadir a la cola</string>
+    <string name="queued_next">Sonará a continuación</string>
+    <string name="queued_end">Añadida a la cola</string>
+</resources>

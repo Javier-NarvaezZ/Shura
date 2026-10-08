@@ -380,6 +380,76 @@ Same device, method and guard as above. While a track plays, the player resolves
 - Automatic transitions had no rebuffer (no new ready or first-audio event) in two natural transitions; ExoPlayer already buffers the next item there.
 - Cost: one `player` request per track (10.4–10.9 KB measured), only while audio plays.
 
+### Player and scroll frame measurements (Phase 2 E5, 2026-10-07)
+
+**Target:** on the test phone (60 Hz), opening and closing the player and scrolling covers: p90 frame time under ~20 ms and under 1 % of frames dropped.
+
+**Method:**
+- Release build signed locally with the debug key and compiled with `cmd package compile -m speed`.
+- Music playing, the usual guard, versions alternated in every round, 3 valid runs each. Runs with the screen off or locked are invalid.
+- Dropped frames come from SurfaceFlinger presents (`dumpsys SurfaceFlinger --latency`), scored only inside each animation:
+  - an interval of n refresh periods counts as n-1 dropped frames;
+  - intervals over 100 ms are idle, not drops.
+- They are reported in full and split into phases:
+  - start: the first 2 intervals;
+  - tail: after the animation's nominal length (350 ms open, 280 ms close), or the last 2 intervals;
+  - middle: the rest.
+- Frame-time percentiles come from `gfxinfo`.
+- Calibration: the system Settings app with the same method, opening a sub-screen and scrolling its main list.
+
+| Scroll over search results with covers | Total | Start | Middle | Tail | p90 |
+|---|---|---|---|---|---|
+| Before (progress redrawn every frame) | 0.2–0.5 % | — | 0.2–0.5 % | 0 % | 30–31 ms |
+| After the adjustments below | 2.9–3.8 % | 17–20 % | 0.8–1.9 % | 13–20 % | 18–21 ms |
+| System Settings | 0.6–1.2 % | 0–6.7 % | 0.3–1.0 % | 0 % | 18–28 ms |
+
+| Opening the player | Total | Start | Middle | Tail | p90 |
+|---|---|---|---|---|---|
+| Before | 2.7–4.2 % | — | 3.7–5.3 % | 0–2 % | 21–27 ms |
+| After | 5.3–7.4 % | 26–36 % | 2.2–3.9 % | 0–9 % | 23–24 ms |
+| System Settings (open a sub-screen) | 4.4–5.8 % | 13–26 % | 3.3–4.7 % | 0 % | 32 ms |
+
+"Before" redrew the whole screen on every frame while music played, so its first measured frame never followed an idle period: its start phase is not comparable.
+
+**Adjustments made:**
+- The progress line and the scrubber redraw only when they move a pixel: about 5 per second instead of 60. GPU p50 went from 11–12 ms to 6–8 ms during transitions.
+- The app underneath is not drawn while the open player covers it, but stays composed (scroll and typed text survive).
+- The window no longer paints a second full-screen background.
+- The cover's shadow appears only at rest.
+- The player stays composed while closed, unplaced and fully idle (debug counters: no recompositions or ticks in 10 s). Memory: about +2 MB PSS, within noise.
+- The flying cover reads its slot only in layout and layer lambdas, so it never recomposes.
+- Covers draw the music-note placeholder only when there is no cover.
+
+**Known debt (accepted 2026-10-07):**
+- In the middle of animations the app is at the system's level. The owner's visual check on the phone found opening, closing and scrolling after idle smooth and on par with Settings.
+- The full-figure target is not met. Losses concentrate in the first frame after an idle period:
+  - scroll start: 17–20 %, against the system's 0–6.7 %;
+  - player open and close start: 26–36 %, where the system loses 13–26 % when it opens a screen.
+- Cause, from a system trace:
+  - when opening, the first animated frame recomposes the player body once (to start the time refresh), places it for the first time and records its first drawing: about 12 ms on the UI thread, plus about 11 ms of rendering;
+  - when scrolling, the first fling frame composes the rows entering the screen (up to about 25 ms on the UI thread), and its first render flushes layers (about 14 ms);
+  - CPU frequencies can still be low when the first frame starts.
+- Tail drops are ambiguous: the content may have stopped moving.
+- Options if it is ever worth it:
+  - start the time refresh without recomposing the body;
+  - prefetch rows ahead of a fling;
+  - make rows cheaper (text measurement).
+
+**Cover tint (2026-10-08).** The mini-player and the player are tinted by the cover (gradient of its edges plus a glow of its main color). Drawing the player's two full-screen gradients on every frame raised the transition GPU p90 from 13–15 ms to 21–22 ms. They are now rendered once per set of colors into a quarter-resolution bitmap (about 0.6 MB, no visible banding) drawn scaled. Same method; 3 runs before the tint, 2 valid with the bitmap (the third could not start playback: the queued song failed to resolve, unrelated):
+
+| | Before the tint (847ec49) | Tint, gradients per frame | Tint, cached bitmap |
+|---|---|---|---|
+| Open/close: GPU p90 | 13–15 ms | 21–22 ms | 15 ms |
+| Open/close: p90 | 21–24 ms | 29–30 ms | 24 ms |
+| Open: middle drops | 2.8–4.0 % | 0.6–1.4 % | 1.7–4.4 % |
+| Close: middle drops | 0–0.8 % | 2.3–2.5 % | 0.8–2.2 % |
+| Scroll: p90 | 16–22 ms | 22–24 ms | 21–27 ms |
+| Scroll: middle drops | 0.4–1.5 % | 1.2–2.0 % | 2.2–2.4 % |
+| Memory (PSS) | 129.9–133.8 MB | — | 131.4–136.2 MB |
+
+- Transition GPU time and p90 are back to their pre-tint level.
+- **Known debt:** with the bitmap, close and scroll middle drops sit slightly above the pre-tint range, from only 2 runs. The scroll does not draw the player background, so this is probably run-to-run spread; to be confirmed with more runs.
+
 ## Implementation requirements (accepted 2026-10-04)
 
 These are binding for `:core:stream` and its platform code.
@@ -481,6 +551,7 @@ These are binding for `:core:stream` and its platform code.
 - Allowed hosts (`HostPolicy`): `*.youtube.com` and `*.googlevideo.com`, plus these exact hosts:
   - `www.google.com` and `www.gstatic.com` serve the BotGuard interpreter fetched for the PoToken minter; its URL path is validated by InnerTubeX's `requireTrustedAttestationInterpreterUrl`. No other `google.com` or `gstatic.com` host is allowed.
   - `i.ytimg.com`, `lh3.googleusercontent.com`, `yt3.ggpht.com` and `yt3.googleusercontent.com` serve artwork (Phase 2). The media session loads notification artwork with a `BitmapLoader` built on the single client, never with Media3's default HTTP stack. `SingleHttpClientGuardTest` fails if a media session is built without `setBitmapLoader` or a `DataSourceBitmapLoader` without `setDataSourceFactory`. Checked on device on 2026-10-05: the artwork downloaded when the queue is restored (~8 KB) goes through the single client (host counter and request timer), and the app holds no other connection.
+  - In-app artwork (Coil, Phase 2 E5) uses one `ImageLoader` built with `OkHttpNetworkFetcherFactory(callFactory = { network.okHttp })` and Coil's service loader off, because the service loader would also register Coil's default network fetcher with its own `OkHttpClient`. The app provides it as Coil's singleton (`SingletonImageLoader.Factory`). `SingleHttpClientGuardTest` fails on Coil's default `ImageLoader(...)`, a loader builder without `serviceLoaderEnabled(false)` or without our client, the OkHttp fetcher without a client, `AsyncImage`-style requests with no singleton factory, and `coil-network-ktor*` in build files (each checked with an injected violation on 2026-10-06).
 - Every other HTTP consumer uses that client:
   - the Ktor client used by the catalog and InnerTubeX, through the OkHttp engine with that client preconfigured. This also covers InnerTubeX's engine-level clients;
   - Media3, through `OkHttpDataSource` with that client.

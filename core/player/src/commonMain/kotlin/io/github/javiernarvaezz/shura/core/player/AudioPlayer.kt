@@ -29,6 +29,15 @@ interface PlaybackControls {
     /** Moves the playback position by [offset] (negative goes back), clamped to the track. */
     fun seekBy(offset: Duration)
 
+    /** Moves the playback position to [position], clamped to the track. */
+    fun seekTo(position: Duration)
+
+    /**
+     * The current position, read on demand: the UI polls it per frame only while a progress bar is visible, so
+     * nothing publishes at frame rate in the background. [PlaybackProgress.ZERO] while not connected.
+     */
+    fun progress(): PlaybackProgress
+
     /** Re-resolves the current song's stream and starts it again after a failure. */
     fun retry()
 

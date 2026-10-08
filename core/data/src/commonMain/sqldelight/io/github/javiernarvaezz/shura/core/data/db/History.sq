@@ -22,8 +22,12 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 prune:
 DELETE FROM play_history WHERE id NOT IN (SELECT id FROM play_history ORDER BY played_at DESC, id DESC LIMIT :keep);
 
-recent:
-SELECT * FROM play_history ORDER BY played_at DESC, id DESC LIMIT :limit;
+-- One row per song: its latest play (highest id), so replays move a song up instead of repeating it.
+recentDistinct:
+SELECT play_history.* FROM play_history
+JOIN (SELECT max(id) AS latest_id FROM play_history GROUP BY video_id) latest ON play_history.id = latest.latest_id
+ORDER BY play_history.played_at DESC, play_history.id DESC
+LIMIT :limit;
 
 countPlays:
 SELECT count(*) FROM play_history;

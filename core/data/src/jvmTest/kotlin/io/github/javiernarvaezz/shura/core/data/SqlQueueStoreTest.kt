@@ -108,9 +108,43 @@ class SqlQueueStoreTest {
             val many = songs(SqlQueueStore.MAX_HISTORY + 20)
             many.forEachIndexed { i, song -> store.recordPlay(song, atMillis = 1_000L + i) }
 
-            val recent = store.recentHistory(limit = 3).first()
+            val recent = store.recent(limit = 3).first()
 
             assertEquals(many.takeLast(3).reversed(), recent)
             assertEquals(SqlQueueStore.MAX_HISTORY.toLong(), database.historyQueries.countPlays().executeAsOne())
+        }
+
+    @Test
+    fun aSongPlayedAgainAppearsOnceAtItsLatestPlay() =
+        runTest {
+            val store = store()
+            store.recordPlay(full, atMillis = 1_000)
+            store.recordPlay(minimal, atMillis = 2_000)
+            store.recordPlay(third, atMillis = 3_000)
+            store.recordPlay(full, atMillis = 4_000)
+
+            assertEquals(listOf(full, third, minimal), store.recent(limit = 10).first())
+        }
+
+    @Test
+    fun theLimitCountsDistinctSongs() =
+        runTest {
+            val store = store()
+            repeat(5) { store.recordPlay(full, atMillis = 1_000L + it) }
+            store.recordPlay(minimal, atMillis = 2_000)
+            store.recordPlay(third, atMillis = 3_000)
+
+            assertEquals(listOf(third, minimal), store.recent(limit = 2).first())
+        }
+
+    @Test
+    fun theLatestPlayCarriesTheSongDetails() =
+        runTest {
+            val store = store()
+            store.recordPlay(minimal, atMillis = 1_000)
+            val renamed = minimal.copy(title = "Minimal (Remastered)")
+            store.recordPlay(renamed, atMillis = 2_000)
+
+            assertEquals(listOf(renamed), store.recent(limit = 10).first())
         }
 }

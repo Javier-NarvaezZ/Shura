@@ -1,0 +1,32 @@
+<resources>
+    <string name="open_player">Abrir reproductor</string>
+    <string name="close_player">Cerrar reproductor</string>
+    <string name="play">Reproducir</string>
+    <string name="pause">Pausar</string>
+    <string name="next">Siguiente</string>
+    <string name="previous">Anterior</string>
+    <string name="shuffle_on">Aleatorio activado</string>
+    <string name="shuffle_off">Aleatorio desactivado</string>
+    <string name="repeat_off">Repetir desactivado</string>
+    <string name="repeat_all">Repetir todo</string>
+    <string name="repeat_one">Repetir una</string>
+    <string name="queue">Cola</string>
+    <string name="show_queue">Mostrar la cola</string>
+    <string name="hide_queue">Volver a la portada</string>
+    <string name="queue_shuffled_hint">Con aleatorio, el orden lo decide el aleatorio.</string>
+    <string name="move_up">Subir</string>
+    <string name="move_down">Bajar</string>
+    <string name="remove_from_queue">Quitar de la cola</string>
+    <string name="removed_from_queue">Quitada de la cola</string>
+    <string name="undo">Deshacer</string>
+    <string name="loading">Cargando…</string>
+    <string name="retry">Reintentar</string>
+    <!-- Playback failures (ADR 0001 R4): plain language, full sentences, no technical details. -->
+    <string name="error_unplayable">Esta canción no se puede reproducir por ahora.</string>
+    <string name="error_age_restricted">Esta canción tiene restricción de edad y necesita una cuenta.</string>
+    <string name="error_unavailable">Esta canción ya no está disponible.</string>
+    <string name="error_offline">No se pudo cargar la canción. Revisa tu conexión e inténtalo de nuevo.</string>
+    <string name="error_audio">No se pudo cargar el audio. Inténtalo de nuevo.</string>
+    <string name="error_format">Este dispositivo no puede reproducir el formato de esta canción.</string>
+    <string name="error_generic">Algo salió mal al cargar la canción.</string>
+</resources>

@@ -1,6 +1,7 @@
 package io.github.javiernarvaezz.shura.core.player
 
 import io.github.javiernarvaezz.shura.core.model.Song
+import kotlinx.coroutines.flow.Flow
 
 /** Everything needed to restore the play queue where it was left. [playOrder] lists queue indices in play order. */
 data class QueueSnapshot(
@@ -33,4 +34,10 @@ interface QueueStore {
         song: Song,
         atMillis: Long,
     )
+}
+
+/** Read side of the play history, for the home screen. */
+interface PlayHistory {
+    /** Distinct songs, most recently played first, each with the details of its latest play. */
+    fun recent(limit: Int): Flow<List<Song>>
 }

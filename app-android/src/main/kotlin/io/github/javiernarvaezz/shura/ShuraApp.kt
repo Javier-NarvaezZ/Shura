@@ -4,6 +4,10 @@ import android.app.Application
 import android.content.Context
 import android.net.ConnectivityManager
 import android.os.PowerManager
+import coil3.ImageLoader
+import coil3.SingletonImageLoader
+import coil3.network.okhttp.OkHttpNetworkFetcherFactory
+import coil3.serviceLoaderEnabled
 import io.github.javiernarvaezz.shura.core.data.androidQueueStore
 import io.github.javiernarvaezz.shura.core.innertube.InnerTubeClient
 import io.github.javiernarvaezz.shura.core.network.ShuraNetwork
@@ -23,11 +27,15 @@ import java.io.File
 
 class ShuraApp :
     Application(),
-    PlaybackDependenciesProvider {
+    PlaybackDependenciesProvider,
+    SingletonImageLoader.Factory {
     /** Created on first use from the main thread (the media controller binds to the creating thread's looper). */
     val graph: AppGraph by lazy { AppGraph(this) }
 
     override val playbackDependencies: PlaybackDependencies get() = graph.playbackDependencies
+
+    // Every Compose image request uses this loader, so artwork never reaches Coil's default HTTP stack.
+    override fun newImageLoader(context: Context): ImageLoader = graph.imageLoader(context)
 }
 
 /**
@@ -57,18 +65,31 @@ class AppGraph(
 
     val catalog = InnerTubeClient(network.ktor)
 
+    /** Queue and play history: app-private database (excluded from backups), opened off the main thread. */
+    val store = androidQueueStore(context, Dispatchers.IO)
+
     /** Used by `PlaybackService`, where the player lives; media and artwork go through the single client. */
     val playbackDependencies =
         PlaybackDependencies(
             callFactory = network.okHttp,
             resolver = debugStreamResolver(streamResolver),
             trace = trace,
-            // App-private database (excluded from backups); opened on first use, off the main thread.
-            queueStore = androidQueueStore(context, Dispatchers.IO),
+            queueStore = store,
             prefetchNext = ::nextItemPrefetchEnabled,
         )
 
     val player: AudioPlayer = AndroidAudioPlayer(context, trace)
+
+    /**
+     * Artwork through the single OkHttpClient and its host allowlist (R7). The service loader stays off: it would
+     * also register Coil's default network fetcher, which builds its own OkHttpClient.
+     */
+    fun imageLoader(context: Context): ImageLoader =
+        ImageLoader
+            .Builder(context)
+            .serviceLoaderEnabled(false)
+            .components { add(OkHttpNetworkFetcherFactory(callFactory = { network.okHttp })) }
+            .build()
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 

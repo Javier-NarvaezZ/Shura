@@ -20,7 +20,6 @@ kotlin {
 
 dependencies {
     implementation(projects.core.ui)
-    implementation(projects.feature.home)
     implementation(compose.desktop.currentOs)
     implementation(libs.compose.runtime)
 }

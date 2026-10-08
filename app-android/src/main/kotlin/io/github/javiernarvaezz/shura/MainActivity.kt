@@ -5,10 +5,10 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
+import io.github.javiernarvaezz.shura.appshell.ShellDependencies
+import io.github.javiernarvaezz.shura.appshell.ShuraAppShell
 import io.github.javiernarvaezz.shura.core.ui.theme.ShuraTheme
-import io.github.javiernarvaezz.shura.feature.search.SearchController
-import io.github.javiernarvaezz.shura.feature.search.SearchScreen
+import java.time.LocalTime
 
 class MainActivity : ComponentActivity() {
     private val graph get() = (application as ShuraApp).graph
@@ -19,18 +19,20 @@ class MainActivity : ComponentActivity() {
         applyDebugLaunchOptions(intent) // Debug builds only; before the graph is first used.
         setContent {
             ShuraTheme {
-                val scope = rememberCoroutineScope()
-                val controller =
+                ShuraAppShell(
                     remember {
-                        SearchController(
-                            graph.catalog::searchSongs,
-                            graph.player,
-                            scope,
-                            graph.playbackWarmup::onPlaybackIntent,
+                        ShellDependencies(
+                            player = graph.player,
+                            history = graph.store,
+                            searchSongs = graph.catalog::searchSongs,
+                            onPlaybackIntent = graph.playbackWarmup::onPlaybackIntent,
+                            currentHour = { LocalTime.now().hour },
                         )
-                    }
-                SearchScreen(controller)
+                    },
+                )
             }
         }
+        // Compose paints the whole background itself; the window's own fill under it is wasted work every frame.
+        window.setBackgroundDrawable(null)
     }
 }
