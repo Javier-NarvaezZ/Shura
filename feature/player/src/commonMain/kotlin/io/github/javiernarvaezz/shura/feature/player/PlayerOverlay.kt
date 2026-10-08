@@ -103,6 +103,7 @@ fun PlayerOverlay(
     val song = state.song ?: return
     val scope = rememberCoroutineScope()
     val tint = rememberArtworkTint(song.thumbnailUrl)
+    val background = remember { TintBackground() }
     Box(
         modifier
             .fillMaxSize()
@@ -121,16 +122,7 @@ fun PlayerOverlay(
                 .graphicsLayer {
                     alpha = sheet.fraction
                     compositingStrategy = CompositingStrategy.ModulateAlpha
-                }.drawBehind {
-                    drawRect(Brush.verticalGradient(listOf(tint.top, tint.deep, lerp(tint.deep, Color.Black, DEPTH))))
-                    drawRect(
-                        Brush.radialGradient(
-                            listOf(tint.glow.copy(alpha = GLOW_ALPHA), Color.Transparent),
-                            center = Offset(size.width / 2, size.height * GLOW_Y),
-                            radius = size.width,
-                        ),
-                    )
-                },
+                }.drawBehind { with(background) { drawTint(tint) } },
         )
         OnTintTheme {
             PlayerBody(
@@ -446,6 +438,3 @@ private val PLAY_SIZE = 72.dp
 private val SKIP_TOUCH = 56.dp
 private val SKIP_ICON = 36.dp
 private val SNACKBAR_TOP = 56.dp
-private const val DEPTH = 0.35f
-private const val GLOW_ALPHA = 0.35f
-private const val GLOW_Y = 0.3f
