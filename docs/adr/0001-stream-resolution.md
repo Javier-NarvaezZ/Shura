@@ -435,6 +435,21 @@ Same device, method and guard as above. While a track plays, the player resolves
   - prefetch rows ahead of a fling;
   - make rows cheaper (text measurement).
 
+**Cover tint (2026-10-08).** The mini-player and the player are tinted by the cover (gradient of its edges plus a glow of its main color). Drawing the player's two full-screen gradients on every frame raised the transition GPU p90 from 13–15 ms to 21–22 ms. They are now rendered once per set of colors into a quarter-resolution bitmap (about 0.6 MB, no visible banding) drawn scaled. Same method; 3 runs before the tint, 2 valid with the bitmap (the third could not start playback: the queued song failed to resolve, unrelated):
+
+| | Before the tint (847ec49) | Tint, gradients per frame | Tint, cached bitmap |
+|---|---|---|---|
+| Open/close: GPU p90 | 13–15 ms | 21–22 ms | 15 ms |
+| Open/close: p90 | 21–24 ms | 29–30 ms | 24 ms |
+| Open: middle drops | 2.8–4.0 % | 0.6–1.4 % | 1.7–4.4 % |
+| Close: middle drops | 0–0.8 % | 2.3–2.5 % | 0.8–2.2 % |
+| Scroll: p90 | 16–22 ms | 22–24 ms | 21–27 ms |
+| Scroll: middle drops | 0.4–1.5 % | 1.2–2.0 % | 2.2–2.4 % |
+| Memory (PSS) | 129.9–133.8 MB | — | 131.4–136.2 MB |
+
+- Transition GPU time and p90 are back to their pre-tint level.
+- **Known debt:** with the bitmap, close and scroll middle drops sit slightly above the pre-tint range, from only 2 runs. The scroll does not draw the player background, so this is probably run-to-run spread; to be confirmed with more runs.
+
 ## Implementation requirements (accepted 2026-10-04)
 
 These are binding for `:core:stream` and its platform code.
