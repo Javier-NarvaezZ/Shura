@@ -10,6 +10,7 @@ import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import coil3.serviceLoaderEnabled
 import io.github.javiernarvaezz.shura.core.data.androidQueueStore
 import io.github.javiernarvaezz.shura.core.innertube.InnerTubeClient
+import io.github.javiernarvaezz.shura.core.innertube.InnerTubeConfig
 import io.github.javiernarvaezz.shura.core.network.ShuraNetwork
 import io.github.javiernarvaezz.shura.core.player.AndroidAudioPlayer
 import io.github.javiernarvaezz.shura.core.player.AudioPlayer
@@ -24,6 +25,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import java.io.File
+import java.util.Locale
 
 class ShuraApp :
     Application(),
@@ -63,7 +65,11 @@ class AppGraph(
             debugPreprocessedPlayerStore(FilePreprocessedPlayerStore(File(context.cacheDir, "ejs-players")), trace),
         )
 
-    val catalog = InnerTubeClient(network.ktor)
+    /** Catalog language and region follow the device locale at startup. */
+    val catalog =
+        Locale.getDefault().let { locale ->
+            InnerTubeClient(network.ktor, InnerTubeConfig.forDevice(locale.language, locale.country))
+        }
 
     /** Queue and play history: app-private database (excluded from backups), opened off the main thread. */
     val store = androidQueueStore(context, Dispatchers.IO)
