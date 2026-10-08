@@ -24,6 +24,10 @@ import com.google.common.util.concurrent.ListenableFuture
 import io.github.javiernarvaezz.shura.core.stream.StreamResolutionException
 import io.github.javiernarvaezz.shura.core.stream.Trace
 import io.github.javiernarvaezz.shura.core.stream.event
+import java.io.File
+import java.io.FileDescriptor
+import java.io.PrintWriter
+import kotlin.time.Clock
 
 /**
  * Hosts the player in a [MediaSessionService], so playback continues in the background with the media
@@ -40,12 +44,14 @@ class PlaybackService : MediaSessionService() {
     private var trace: Trace = Trace.NONE
     private var persistence: QueuePersistence? = null
     private var prefetcher: NextItemPrefetcher? = null
+    private var errorJournal: PlaybackErrorJournal? = null
 
     override fun onCreate() {
         super.onCreate()
         val dependencies = (application as PlaybackDependenciesProvider).playbackDependencies
         trace = dependencies.trace
         trace.event("player: service created")
+        errorJournal = PlaybackErrorJournal(File(noBackupFilesDir, ERROR_JOURNAL_FILE))
         specResolver = StreamSpecResolver(dependencies.resolver, dependencies.quality, dependencies.trace)
         val exo = buildShuraExoPlayer(this, dependencies, specResolver)
         val player = ShuraPlayer(exo)
@@ -90,7 +96,27 @@ class PlaybackService : MediaSessionService() {
         }
         session = null
         specResolver.close()
+        errorJournal?.close()
+        errorJournal = null
         super.onDestroy()
+    }
+
+    /**
+     * Prints the last playback errors (sanitized: no URLs, tokens or video ids). Read them with
+     * `adb shell dumpsys activity service <package>/io.github.javiernarvaezz.shura.core.player.PlaybackService`.
+     */
+    override fun dump(
+        fd: FileDescriptor?,
+        writer: PrintWriter,
+        args: Array<out String>?,
+    ) {
+        val records = errorJournal?.snapshot(DUMP_TIMEOUT_MS)
+        writer.println("Playback errors (newest first, at most ${PlaybackErrorLog.CAPACITY}):")
+        when {
+            records == null -> writer.println("  unavailable")
+            records.isEmpty() -> writer.println("  none")
+            else -> records.forEach { writer.println("  " + PlaybackErrorLog.describe(it)) }
+        }
     }
 
     /** Opens the app when the notification is tapped. */
@@ -216,6 +242,17 @@ class PlaybackService : MediaSessionService() {
                     .filterIsInstance<StreamResolutionException>()
                     .firstOrNull()
             Log.w(TAG, "Playback failed: ${error.errorCodeName} -> $classified ${streamFailure ?: ""}".trim())
+            errorJournal?.record(
+                PlaybackErrorRecord(
+                    at = Clock.System.now(),
+                    appVersion = appVersionName(),
+                    network = networkSnapshot(),
+                    error = classified,
+                    platformCode = error.errorCodeName,
+                    causeType = streamFailure?.causeType,
+                    attempts = streamFailure?.attempts.orEmpty(),
+                ),
+            )
         }
     }
 
@@ -224,5 +261,8 @@ class PlaybackService : MediaSessionService() {
 
         // The process may be about to die: wait briefly for the last save, never block the shutdown for long.
         const val LAST_SAVE_TIMEOUT_MS = 300L
+
+        const val ERROR_JOURNAL_FILE = "playback-errors.txt"
+        const val DUMP_TIMEOUT_MS = 1_000L
     }
 }
