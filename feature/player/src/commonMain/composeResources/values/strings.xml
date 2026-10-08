@@ -11,6 +11,14 @@
     <string name="repeat_all">Repetir todo</string>
     <string name="repeat_one">Repetir una</string>
     <string name="queue">Cola</string>
+    <string name="show_queue">Mostrar la cola</string>
+    <string name="hide_queue">Volver a la portada</string>
+    <string name="queue_shuffled_hint">Con aleatorio, el orden lo decide el aleatorio.</string>
+    <string name="move_up">Subir</string>
+    <string name="move_down">Bajar</string>
+    <string name="remove_from_queue">Quitar de la cola</string>
+    <string name="removed_from_queue">Quitada de la cola</string>
+    <string name="undo">Deshacer</string>
     <string name="loading">Cargando…</string>
     <string name="retry">Reintentar</string>
     <!-- Playback failures (ADR 0001 R4): plain language, full sentences, no technical details. -->

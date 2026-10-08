@@ -111,6 +111,17 @@ object ShuraIcons {
         )
     }
 
+    /** Material Symbols Rounded `keyboard_arrow_up`. */
+    val MoveUp: ImageVector by lazy {
+        symbol(
+            "MoveUp",
+            "M480-528 324-372q-11 11-28 11t-28-11q-11-11-11-28t11-28l184-184q12-12 28-12t28 12l184 184q11 11 11 28t-11 28q-11 11-28 11t-28-11L480-528Z",
+        )
+    }
+
+    /** Same arrow as [Collapse], named for moving an item down a list. */
+    val MoveDown: ImageVector get() = Collapse
+
     /** Material Symbols Rounded `drag_indicator`. */
     val DragHandle: ImageVector by lazy {
         symbol(

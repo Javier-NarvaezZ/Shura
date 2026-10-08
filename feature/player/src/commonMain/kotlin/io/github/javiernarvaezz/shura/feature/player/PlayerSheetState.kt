@@ -35,6 +35,9 @@ class PlayerSheetState(
     /** The player's cover slot, in root coordinates: where the flying cover lands. */
     var playerCover by mutableStateOf(Rect.Zero)
 
+    /** The queue replaces the cover while the player is open; it is reset whenever the player closes. */
+    var showsQueue by mutableStateOf(false)
+
     /** Drag distance, in pixels, for a full open or close. */
     var travelPx by mutableFloatStateOf(1f)
 
@@ -52,7 +55,12 @@ class PlayerSheetState(
     /** Follows the finger; [deltaPx] is positive upwards. */
     fun dragBy(deltaPx: Float) {
         animation?.cancel()
-        fraction = (fraction + deltaPx / travelPx).coerceIn(0f, 1f)
+        moveTo((fraction + deltaPx / travelPx).coerceIn(0f, 1f))
+    }
+
+    private fun moveTo(value: Float) {
+        fraction = value
+        if (value == 0f) showsQueue = false
     }
 
     /** Settles after a drag: a fling, or past halfway, commits; otherwise it springs back. */
@@ -76,7 +84,7 @@ class PlayerSheetState(
         spec: AnimationSpec<Float>,
     ) {
         animation?.cancel()
-        animation = scope.launch { animate(fraction, target, animationSpec = spec) { value, _ -> fraction = value } }
+        animation = scope.launch { animate(fraction, target, animationSpec = spec) { value, _ -> moveTo(value) } }
     }
 
     companion object {

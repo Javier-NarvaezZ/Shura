@@ -21,6 +21,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -55,17 +59,22 @@ import io.github.javiernarvaezz.shura.core.ui.text.toClock
 import io.github.javiernarvaezz.shura.core.ui.theme.Shura
 import io.github.javiernarvaezz.shura.feature.player.resources.Res
 import io.github.javiernarvaezz.shura.feature.player.resources.close_player
+import io.github.javiernarvaezz.shura.feature.player.resources.hide_queue
 import io.github.javiernarvaezz.shura.feature.player.resources.next
 import io.github.javiernarvaezz.shura.feature.player.resources.pause
 import io.github.javiernarvaezz.shura.feature.player.resources.play
 import io.github.javiernarvaezz.shura.feature.player.resources.previous
+import io.github.javiernarvaezz.shura.feature.player.resources.removed_from_queue
 import io.github.javiernarvaezz.shura.feature.player.resources.repeat_all
 import io.github.javiernarvaezz.shura.feature.player.resources.repeat_off
 import io.github.javiernarvaezz.shura.feature.player.resources.repeat_one
 import io.github.javiernarvaezz.shura.feature.player.resources.retry
+import io.github.javiernarvaezz.shura.feature.player.resources.show_queue
 import io.github.javiernarvaezz.shura.feature.player.resources.shuffle_off
 import io.github.javiernarvaezz.shura.feature.player.resources.shuffle_on
+import io.github.javiernarvaezz.shura.feature.player.resources.undo
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
 import kotlin.math.roundToInt
 
@@ -171,6 +180,7 @@ private fun FlyingCover(
                         lerp(thumbRadius / scale.coerceAtLeast(MIN_SCALE), artworkRadius, f),
                     )
                 clip = true
+                alpha = if (sheet.showsQueue) 0f else 1f
                 // Only at rest: a shadow that changes every frame of the flight is costly to render.
                 shadowElevation = if (f >= 1f) elevation else 0f
             },
@@ -194,19 +204,88 @@ private fun PlayerBody(
     modifier: Modifier = Modifier,
 ) {
     val state by model.state.collectAsStateWithLifecycle()
-    Column(
-        modifier
-            .fillMaxSize()
-            .statusBarsPadding()
-            .navigationBarsPadding()
-            .padding(horizontal = Shura.spacing.xl),
-    ) {
-        Row(Modifier.fillMaxWidth().padding(top = Shura.spacing.s), verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onClose) {
-                Icon(ShuraIcons.Collapse, stringResource(Res.string.close_player), tint = Shura.colors.text)
+    val snackbars = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+    val removedLabel = stringResource(Res.string.removed_from_queue)
+    val undoLabel = stringResource(Res.string.undo)
+    Box(modifier.fillMaxSize()) {
+        Column(
+            Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
+                .navigationBarsPadding(),
+        ) {
+            // Side padding per section: the queue's rows bring their own.
+            val side = Modifier.padding(horizontal = Shura.spacing.xl)
+            TopRow(sheet, onClose, side)
+            if (sheet.showsQueue) {
+                PlayerQueue(
+                    model = model,
+                    canReorder = state.canReorder,
+                    onRemoved = { removed ->
+                        scope.launch {
+                            snackbars.currentSnackbarData?.dismiss()
+                            val result =
+                                snackbars.showSnackbar(
+                                    removedLabel,
+                                    undoLabel,
+                                    duration = SnackbarDuration.Short,
+                                )
+                            if (result == SnackbarResult.ActionPerformed) model.queue.undoRemove(removed)
+                        }
+                    },
+                    modifier = Modifier.weight(1f),
+                )
+            } else {
+                CoverAndTitle(song, sheet, side.weight(1f))
             }
+            Spacer(Modifier.height(Shura.spacing.l))
+            val error = state.error
+            Column(side) {
+                if (error != null) {
+                    ErrorRow(stringResource(playbackErrorMessage(error)), model::retry)
+                } else {
+                    // Hidden: no progress redraws and no time updates.
+                    Progress(model, playing = state.showsPause && sheet.isShown)
+                }
+                Spacer(Modifier.height(Shura.spacing.m))
+                Controls(model, state)
+            }
+            Spacer(Modifier.height(Shura.spacing.l))
         }
-        Spacer(Modifier.height(Shura.spacing.l))
+        // At the top, under the close and queue buttons: at the bottom it would cover the playback controls.
+        SnackbarHost(snackbars, Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = SNACKBAR_TOP))
+    }
+}
+
+@Composable
+private fun TopRow(
+    sheet: PlayerSheetState,
+    onClose: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(modifier.fillMaxWidth().padding(top = Shura.spacing.s), verticalAlignment = Alignment.CenterVertically) {
+        IconButton(onClick = onClose) {
+            Icon(ShuraIcons.Collapse, stringResource(Res.string.close_player), tint = Shura.colors.text)
+        }
+        Spacer(Modifier.weight(1f))
+        IconButton(onClick = { sheet.showsQueue = !sheet.showsQueue }) {
+            Icon(
+                ShuraIcons.Queue,
+                stringResource(if (sheet.showsQueue) Res.string.hide_queue else Res.string.show_queue),
+                tint = if (sheet.showsQueue) Shura.colors.text else Shura.colors.textMuted,
+            )
+        }
+    }
+}
+
+@Composable
+private fun CoverAndTitle(
+    song: Song,
+    sheet: PlayerSheetState,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier, verticalArrangement = Arrangement.Center) {
         // The cover slot: the flying cover lands here.
         Spacer(
             Modifier
@@ -229,16 +308,6 @@ private fun PlayerBody(
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
-        Spacer(Modifier.height(Shura.spacing.l))
-        val error = state.error
-        if (error != null) {
-            ErrorRow(stringResource(playbackErrorMessage(error)), model::retry)
-        } else {
-            // Hidden: no progress redraws and no time updates.
-            Progress(model, playing = state.showsPause && sheet.isShown)
-        }
-        Spacer(Modifier.height(Shura.spacing.m))
-        Controls(model, state)
     }
 }
 
@@ -357,3 +426,4 @@ private val COVER_ELEVATION = 16.dp
 private val PLAY_SIZE = 72.dp
 private val SKIP_TOUCH = 56.dp
 private val SKIP_ICON = 36.dp
+private val SNACKBAR_TOP = 56.dp

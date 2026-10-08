@@ -13,6 +13,7 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration
@@ -150,5 +151,62 @@ class PlayerModelTest {
             model.previous()
 
             assertEquals(listOf("next", "previous"), player.calls)
+        }
+
+    private val c = testSong(3, "C")
+
+    @Test
+    fun queueRowsFollowThePlayOrderAndMarkTheCurrentSong() =
+        runTest {
+            val model = model()
+            player.queue.value = QueueState(items = listOf(a, b, c), currentIndex = 2, playOrder = listOf(2, 0, 1))
+            runCurrent()
+
+            val rows = model.queue.queueRows.value
+            assertEquals(listOf(c, a, b), rows.map { it.song })
+            assertEquals(listOf(2, 0, 1), rows.map { it.index })
+            assertEquals(listOf(true, false, false), rows.map { it.isCurrent })
+        }
+
+    @Test
+    fun tappingARowPlaysThatSong() =
+        runTest {
+            val model = model()
+            model.queue.playAt(2)
+
+            assertEquals(listOf("skipTo:2"), player.calls)
+        }
+
+    @Test
+    fun aRemovedSongCanBePutBackWhereItWas() =
+        runTest {
+            val model = model()
+            player.queue.value = QueueState(items = listOf(a, b, c), currentIndex = 0, playOrder = listOf(0, 1, 2))
+            runCurrent()
+
+            val removed = model.queue.remove(1)
+            model.queue.undoRemove(assertNotNull(removed))
+
+            assertEquals(listOf("remove:1", "enqueue:B", "move:2>1"), player.calls)
+        }
+
+    @Test
+    fun songsMoveUpAndDownOnlyWithoutShuffle() =
+        runTest {
+            val model = model()
+            player.queue.value = QueueState(items = listOf(a, b, c), currentIndex = 0, playOrder = listOf(0, 1, 2))
+            runCurrent()
+            assertTrue(model.state.value.canReorder)
+            model.queue.moveUp(1)
+            model.queue.moveDown(1)
+            model.queue.moveUp(0) // already first: nothing
+            model.queue.moveDown(2) // already last: nothing
+
+            player.queue.value = player.queue.value.copy(shuffle = true)
+            runCurrent()
+            assertFalse(model.state.value.canReorder)
+            model.queue.moveUp(1)
+
+            assertEquals(listOf("move:1>0", "move:1>2"), player.calls)
         }
 }

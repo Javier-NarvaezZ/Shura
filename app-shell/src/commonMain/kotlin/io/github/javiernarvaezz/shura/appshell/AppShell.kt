@@ -107,11 +107,11 @@ fun ShuraAppShell(
     val sheet = rememberPlayerSheetState()
     val scope = rememberCoroutineScope()
     val tabs = rememberSaveableStateHolder()
-    // Back closes the player before it navigates.
+    // Back leaves the queue, then closes the player, before it navigates.
     NavigationBackHandler(
         state = rememberNavigationEventState(NavigationEventInfo.None),
         isBackEnabled = sheet.isShown,
-        onBackCompleted = { sheet.close(scope) },
+        onBackCompleted = { if (sheet.showsQueue) sheet.showsQueue = false else sheet.close(scope) },
     )
     Box(
         modifier
