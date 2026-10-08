@@ -11,7 +11,9 @@ import kotlin.math.roundToInt
  * Colors taken from a cover, shared by everything tinted by what is playing.
  * - [top] and [bottom]: the cover's edges, so a backdrop can continue the image without a seam.
  * - [accent]: the cover's main color, or null for a greyscale cover (callers use the neutral accent).
- * - [deep]: the bottom edge darkened until white text on it reaches WCAG AA (4.5:1).
+ * - [deep]: the bottom edge darkened until white text on it reaches WCAG AA (4.5:1). When that edge is dark or
+ *   grey (a black frame, a dark background) and the cover has a main color, that color is used instead, so the
+ *   tint stays alive.
  * - [deepTop]: the same for the top edge, so a gradient from top to bottom carries white text everywhere.
  */
 data class ArtworkColors(
@@ -33,12 +35,13 @@ object ArtworkPalette {
         val band = max(1, (height * EDGE_BAND).roundToInt())
         val bottom = average(argb, width, height - band until height)
         val top = average(argb, width, 0 until band)
+        val accent = accent(argb, width * height)
         return ArtworkColors(
             top = top,
             bottom = bottom,
-            accent = accent(argb, width * height),
-            deep = readableUnderWhite(lerp(bottom, Color.Black, DEEP_PULL)),
-            deepTop = readableUnderWhite(lerp(top, Color.Black, DEEP_PULL)),
+            accent = accent,
+            deep = deepFrom(bottom, accent),
+            deepTop = deepFrom(top, accent),
         )
     }
 
@@ -94,6 +97,16 @@ object ArtworkPalette {
         return mean.copy(l = mean.l.coerceIn(ACCENT_LIGHTNESS)).toColor()
     }
 
+    private fun deepFrom(
+        edge: Color,
+        accent: Color?,
+    ): Color {
+        val hsl = Hsl.of(edge.red, edge.green, edge.blue)
+        val dull = hsl.l < DARK_EDGE || hsl.s < GREY_EDGE
+        val base = if (dull && accent != null) accent else edge
+        return readableUnderWhite(lerp(base, Color.Black, DEEP_PULL))
+    }
+
     private fun readableUnderWhite(color: Color): Color {
         var c = color
         while (contrast(Color.White, c) < MIN_CONTRAST) c = lerp(c, Color.Black, DARKEN_STEP)
@@ -102,6 +115,8 @@ object ArtworkPalette {
 
     private const val EDGE_BAND = 0.08f
     private const val DEEP_PULL = 0.4f
+    private const val DARK_EDGE = 0.12f
+    private const val GREY_EDGE = 0.15f
     private const val DARKEN_STEP = 0.12f
     private const val MIN_CONTRAST = 4.5f
     private const val HUE_BINS = 36

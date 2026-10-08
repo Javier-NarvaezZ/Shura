@@ -94,6 +94,36 @@ class ArtworkPaletteTest {
     }
 
     @Test
+    fun aDarkOrGreyBorderGivesWayToTheCoversMainColor() {
+        val red = Color(0xFFD62828)
+        // A black frame around a red picture: the edges alone would give a near-black tint.
+        val framed = image { x, y -> if (x in 6..33 && y in 6..33) red else Color(0xFF080808) }
+
+        val colors = assertNotNull(ArtworkPalette.from(framed, size, size))
+
+        for (tint in listOf(colors.deep, colors.deepTop)) {
+            assertTrue(abs(tint.hueDegrees() - red.hueDegrees()) < 12f, "tint $tint is not red")
+            assertTrue(contrast(Color.White, tint) >= 4.5f, "white on $tint")
+            assertTrue(tint.red > tint.green + 0.08f, "tint $tint is too dull")
+        }
+    }
+
+    @Test
+    fun aColorfulBorderIsKept() {
+        val teal = Color(0xFF2A9D8F)
+        val orange = Color(0xFFE76F51)
+        // Teal bands at the top and bottom (the edges the palette reads), orange in between.
+        val banded = image { _, y -> if (y < 4 || y > 35) teal else orange }
+
+        val colors = assertNotNull(ArtworkPalette.from(banded, size, size))
+
+        assertTrue(
+            abs(colors.deep.hueDegrees() - teal.hueDegrees()) < 12f,
+            "deep ${colors.deep} should follow the edge",
+        )
+    }
+
+    @Test
     fun theDeepColorKeepsTheHueOfTheBottomEdge() {
         val teal = Color(0xFF2A9D8F)
         val deep = assertNotNull(ArtworkPalette.from(image { _, _ -> teal }, size, size)).deep
