@@ -24,6 +24,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -34,11 +35,13 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.javiernarvaezz.shura.core.model.Song
 import io.github.javiernarvaezz.shura.core.player.PlaybackError
 import io.github.javiernarvaezz.shura.core.ui.artwork.Artwork
+import io.github.javiernarvaezz.shura.core.ui.artwork.rememberArtworkTint
 import io.github.javiernarvaezz.shura.core.ui.components.ChromeSurface
 import io.github.javiernarvaezz.shura.core.ui.components.PlayPauseButton
 import io.github.javiernarvaezz.shura.core.ui.components.progressStepMs
 import io.github.javiernarvaezz.shura.core.ui.components.rememberProgressTick
 import io.github.javiernarvaezz.shura.core.ui.icons.ShuraIcons
+import io.github.javiernarvaezz.shura.core.ui.theme.OnTintTheme
 import io.github.javiernarvaezz.shura.core.ui.theme.Shura
 import io.github.javiernarvaezz.shura.feature.player.resources.Res
 import io.github.javiernarvaezz.shura.feature.player.resources.open_player
@@ -60,8 +63,8 @@ fun MiniPlayer(
     val state by model.state.collectAsStateWithLifecycle()
     val song = state.song ?: return
     val scope = rememberCoroutineScope()
-    val tint = Shura.colors.surface2
-    val line = Shura.colors.text
+    // Tinted by the cover; the fade between covers only redraws (the tint is read at draw time).
+    val tint = rememberArtworkTint(song.thumbnailUrl)
     // Redraws only as the line moves by a pixel, and not at all while the player covers the mini-player.
     val lineWidth = remember { floatArrayOf(0f) }
     val tick =
@@ -70,7 +73,7 @@ fun MiniPlayer(
         }
     val openLabel = stringResource(Res.string.open_player)
     ChromeSurface(
-        tint = { tint },
+        tint = { tint.deep },
         shape = Shura.shapes.miniPlayer,
         modifier =
             modifier
@@ -84,32 +87,34 @@ fun MiniPlayer(
                     onDragStopped = { velocity -> sheet.settle(-velocity, scope) },
                 ),
     ) {
-        Row(
-            Modifier
-                .fillMaxSize()
-                .padding(horizontal = Shura.spacing.s)
-                .drawBehind {
-                    tick.value
-                    lineWidth[0] = size.width
-                    val y = size.height - LINE_HEIGHT.toPx() / 2
-                    val end = size.width * model.progress().fraction
-                    drawLine(line, Offset(0f, y), Offset(end, y), LINE_HEIGHT.toPx())
-                },
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(Shura.spacing.m),
-        ) {
-            Artwork(
-                song.thumbnailUrl,
-                sizePx = PLAYER_COVER_PX,
-                contentDescription = null,
-                modifier =
-                    Modifier
-                        .size(MINI_COVER)
-                        .onGloballyPositioned { sheet.miniCover = it.boundsInRoot() }
-                        .graphicsLayer { alpha = if (sheet.fraction > 0f) 0f else 1f },
-            )
-            MiniText(song, state.error, Modifier.weight(1f))
-            MiniAction(model, state)
+        OnTintTheme {
+            Row(
+                Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = Shura.spacing.s)
+                    .drawBehind {
+                        tick.value
+                        lineWidth[0] = size.width
+                        val y = size.height - LINE_HEIGHT.toPx() / 2
+                        val end = size.width * model.progress().fraction
+                        drawLine(Color.White, Offset(0f, y), Offset(end, y), LINE_HEIGHT.toPx())
+                    },
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Shura.spacing.m),
+            ) {
+                Artwork(
+                    song.thumbnailUrl,
+                    sizePx = PLAYER_COVER_PX,
+                    contentDescription = null,
+                    modifier =
+                        Modifier
+                            .size(MINI_COVER)
+                            .onGloballyPositioned { sheet.miniCover = it.boundsInRoot() }
+                            .graphicsLayer { alpha = if (sheet.fraction > 0f) 0f else 1f },
+                )
+                MiniText(song, state.error, Modifier.weight(1f))
+                MiniAction(model, state)
+            }
         }
     }
 }

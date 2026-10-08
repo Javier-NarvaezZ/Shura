@@ -36,10 +36,15 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -52,10 +57,12 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.javiernarvaezz.shura.core.model.Song
 import io.github.javiernarvaezz.shura.core.player.RepeatMode
 import io.github.javiernarvaezz.shura.core.ui.artwork.Artwork
+import io.github.javiernarvaezz.shura.core.ui.artwork.rememberArtworkTint
 import io.github.javiernarvaezz.shura.core.ui.components.PlayPauseButton
 import io.github.javiernarvaezz.shura.core.ui.components.Scrubber
 import io.github.javiernarvaezz.shura.core.ui.icons.ShuraIcons
 import io.github.javiernarvaezz.shura.core.ui.text.toClock
+import io.github.javiernarvaezz.shura.core.ui.theme.OnTintTheme
 import io.github.javiernarvaezz.shura.core.ui.theme.Shura
 import io.github.javiernarvaezz.shura.feature.player.resources.Res
 import io.github.javiernarvaezz.shura.feature.player.resources.close_player
@@ -95,7 +102,7 @@ fun PlayerOverlay(
     val state by model.state.collectAsStateWithLifecycle()
     val song = state.song ?: return
     val scope = rememberCoroutineScope()
-    val background = Shura.colors.background
+    val tint = rememberArtworkTint(song.thumbnailUrl)
     Box(
         modifier
             .fillMaxSize()
@@ -106,28 +113,40 @@ fun PlayerOverlay(
                 onDragStopped = { velocity -> sheet.settle(-velocity, scope) },
             ),
     ) {
-        // Background: one full-screen fade without an offscreen buffer.
+        // Background: the cover's colors continued into the screen (top edge to bottom edge) with a soft glow of its
+        // main color. One full-screen fade without an offscreen buffer; the tint is read at draw time.
         Box(
             Modifier
                 .fillMaxSize()
                 .graphicsLayer {
                     alpha = sheet.fraction
                     compositingStrategy = CompositingStrategy.ModulateAlpha
-                }.background(background),
-        )
-        PlayerBody(
-            song = song,
-            model = model,
-            sheet = sheet,
-            onClose = { sheet.close(scope) },
-            modifier =
-                Modifier.graphicsLayer {
-                    val f = sheet.fraction
-                    alpha = ((f - BODY_FADE_START) / (1f - BODY_FADE_START)).coerceIn(0f, 1f)
-                    translationY = (1f - f) * size.height * BODY_DRIFT
-                    compositingStrategy = CompositingStrategy.ModulateAlpha
+                }.drawBehind {
+                    drawRect(Brush.verticalGradient(listOf(tint.top, tint.deep, lerp(tint.deep, Color.Black, DEPTH))))
+                    drawRect(
+                        Brush.radialGradient(
+                            listOf(tint.glow.copy(alpha = GLOW_ALPHA), Color.Transparent),
+                            center = Offset(size.width / 2, size.height * GLOW_Y),
+                            radius = size.width,
+                        ),
+                    )
                 },
         )
+        OnTintTheme {
+            PlayerBody(
+                song = song,
+                model = model,
+                sheet = sheet,
+                onClose = { sheet.close(scope) },
+                modifier =
+                    Modifier.graphicsLayer {
+                        val f = sheet.fraction
+                        alpha = ((f - BODY_FADE_START) / (1f - BODY_FADE_START)).coerceIn(0f, 1f)
+                        translationY = (1f - f) * size.height * BODY_DRIFT
+                        compositingStrategy = CompositingStrategy.ModulateAlpha
+                    },
+            )
+        }
         FlyingCover(song, sheet)
     }
 }
@@ -296,7 +315,7 @@ private fun CoverAndTitle(
         Spacer(Modifier.height(Shura.spacing.xl))
         Text(
             song.title,
-            style = MaterialTheme.typography.headlineSmall,
+            style = MaterialTheme.typography.headlineMedium,
             color = Shura.colors.text,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
@@ -427,3 +446,6 @@ private val PLAY_SIZE = 72.dp
 private val SKIP_TOUCH = 56.dp
 private val SKIP_ICON = 36.dp
 private val SNACKBAR_TOP = 56.dp
+private const val DEPTH = 0.35f
+private const val GLOW_ALPHA = 0.35f
+private const val GLOW_Y = 0.3f

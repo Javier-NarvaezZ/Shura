@@ -85,6 +85,15 @@ class ArtworkPaletteTest {
     }
 
     @Test
+    fun theDeepTopColorAlsoCarriesWhiteText() {
+        val pale = Color(0xFFFFF4C2)
+        val navy = Color(0xFF1B2A4A)
+        val colors = assertNotNull(ArtworkPalette.from(image { _, y -> if (y < size / 2) pale else navy }, size, size))
+
+        assertTrue(contrast(Color.White, colors.deepTop) >= 4.5f, "white on ${colors.deepTop}")
+    }
+
+    @Test
     fun theDeepColorKeepsTheHueOfTheBottomEdge() {
         val teal = Color(0xFF2A9D8F)
         val deep = assertNotNull(ArtworkPalette.from(image { _, _ -> teal }, size, size)).deep

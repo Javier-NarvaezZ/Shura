@@ -12,12 +12,14 @@ import kotlin.math.roundToInt
  * - [top] and [bottom]: the cover's edges, so a backdrop can continue the image without a seam.
  * - [accent]: the cover's main color, or null for a greyscale cover (callers use the neutral accent).
  * - [deep]: the bottom edge darkened until white text on it reaches WCAG AA (4.5:1).
+ * - [deepTop]: the same for the top edge, so a gradient from top to bottom carries white text everywhere.
  */
 data class ArtworkColors(
     val top: Color,
     val bottom: Color,
     val accent: Color?,
     val deep: Color,
+    val deepTop: Color,
 )
 
 object ArtworkPalette {
@@ -30,11 +32,13 @@ object ArtworkPalette {
         if (width <= 0 || height <= 0 || argb.size < width * height) return null
         val band = max(1, (height * EDGE_BAND).roundToInt())
         val bottom = average(argb, width, height - band until height)
+        val top = average(argb, width, 0 until band)
         return ArtworkColors(
-            top = average(argb, width, 0 until band),
+            top = top,
             bottom = bottom,
             accent = accent(argb, width * height),
             deep = readableUnderWhite(lerp(bottom, Color.Black, DEEP_PULL)),
+            deepTop = readableUnderWhite(lerp(top, Color.Black, DEEP_PULL)),
         )
     }
 

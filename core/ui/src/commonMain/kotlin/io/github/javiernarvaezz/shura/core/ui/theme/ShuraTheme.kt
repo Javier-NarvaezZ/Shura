@@ -27,6 +27,17 @@ fun ShuraTheme(
     }
 }
 
+/**
+ * Content on cover-tinted chrome (the mini-player and the player): tints are always dark, so text and controls are
+ * white in both light and dark mode. Stock Material components inside follow it too.
+ */
+@Composable
+fun OnTintTheme(content: @Composable () -> Unit) {
+    CompositionLocalProvider(LocalShuraColors provides ShuraOnTintColors) {
+        MaterialTheme(colorScheme = ShuraOnTintColors.toMaterial(), typography = ShuraTypography, content = content)
+    }
+}
+
 /** Token access for screens: `Shura.colors.textMuted`, `Shura.spacing.gutter`, `Shura.shapes.artwork`. */
 object Shura {
     val colors: ShuraColors

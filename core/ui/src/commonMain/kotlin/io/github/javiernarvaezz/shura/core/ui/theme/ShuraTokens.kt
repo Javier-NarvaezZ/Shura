@@ -69,6 +69,20 @@ val ShuraLightColors =
         isDark = false,
     )
 
+/** Content colors on cover-tinted chrome (see OnTintTheme): white on a dark tint. */
+val ShuraOnTintColors =
+    ShuraDarkColors.copy(
+        background = Color.Transparent,
+        surface1 = Color(0x14FFFFFF),
+        surface2 = Color(0x1FFFFFFF),
+        surface3 = Color(0x2EFFFFFF),
+        line = Color(0x26FFFFFF),
+        text = Color.White,
+        textMuted = Color(0xB3FFFFFF),
+        accent = Color.White,
+        onAccent = Color(0xFF111112),
+    )
+
 /** Extra line height over the font size, in sp, when a style does not set its own. */
 private const val DEFAULT_LEADING = 6
 
