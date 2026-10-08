@@ -528,6 +528,9 @@ These are binding for `:core:stream` and its platform code.
 - The player maps any of them to a clear UI state: "Couldn't play this track" with a **Retry** action. Playback never stalls or skips silently.
 - Every failure is logged with a sanitized cause: error type, InnerTubeX reason, the attempted client profiles and outcomes, the HTTP status, and hosts only.
 - Logs never include URLs, query strings, cookies, visitor data or tokens.
+- The last five failures are also kept on the device (`PlaybackErrorLog`, a private file that is not backed up), with the time, app version, network state (transport, and whether the system validated it), the error code, the Media3 code, and the sanitized attempts. They survive process death and logcat rotation. Read them on any build, release included, with the app open:
+  `adb shell dumpsys activity service io.github.javiernarvaezz.shura/io.github.javiernarvaezz.shura.core.player.PlaybackService`.
+  Library labels go through `DiagnosticText`, which masks URLs and any loose 11-character token that could be a video id. Known labels of that length are kept; a JVM test checks that list against the real InnerTubeX profile names.
 
 ### R5. Dependency records
 
