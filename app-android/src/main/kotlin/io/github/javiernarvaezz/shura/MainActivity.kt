@@ -27,6 +27,7 @@ class MainActivity : ComponentActivity() {
                             searchSongs = graph.catalog::searchSongs,
                             onPlaybackIntent = graph.playbackWarmup::onPlaybackIntent,
                             currentHour = { LocalTime.now().hour },
+                            networkRegained = graph.networkRegained,
                         )
                     },
                 )

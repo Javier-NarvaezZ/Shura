@@ -8,6 +8,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -29,11 +31,13 @@ import io.github.javiernarvaezz.shura.core.ui.icons.ShuraIcons
 import io.github.javiernarvaezz.shura.core.ui.theme.Shura
 import io.github.javiernarvaezz.shura.core.ui.theme.ShuraMotion
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
 
 /**
  * A cover at about [sizePx] pixels (see [artworkUrl]), on a neutral placeholder that also stands in when there is
- * no cover or it fails to load. Loaded by the app's single image loader (ADR 0001 R7).
+ * no cover or it fails to load. A failed load is retried while the cover is shown (see [ArtworkRetry]). Loaded by
+ * the app's single image loader (ADR 0001 R7).
  */
 @Composable
 fun Artwork(
@@ -45,46 +49,73 @@ fun Artwork(
 ) {
     // The music note only stands in when there is no cover or it failed: drawn under every cover, each row paid
     // for a vector subcomposition that the image then hid (measured on the first frames of a scroll).
-    var failed by remember(url) { mutableStateOf(false) }
+    var failures by remember(url) { mutableIntStateOf(0) }
+    var waiting by remember(url) { mutableStateOf(false) }
+    var loaded by remember(url) { mutableStateOf(false) }
+    if (waiting) {
+        val networkRegained = LocalNetworkRegained.current
+        LaunchedEffect(url, failures) {
+            ArtworkRetry.awaitNextAttempt(failures, networkRegained)
+            waiting = false
+        }
+    }
     Box(modifier.clip(shape).background(Shura.colors.surface2), contentAlignment = Alignment.Center) {
-        if (url == null || failed) {
+        if (url == null || (failures > 0 && !loaded)) {
             Icon(
                 ShuraIcons.MusicNote,
                 contentDescription = null,
                 tint = Shura.colors.textMuted,
                 modifier = Modifier.fillMaxWidth(PLACEHOLDER_ICON_FRACTION),
             )
-        } else {
-            AsyncImage(
-                model =
-                    ImageRequest
-                        .Builder(LocalPlatformContext.current)
-                        .data(artworkUrl(url, sizePx))
-                        .crossfade(ShuraMotion.QUICK_MS)
-                        .build(),
-                contentDescription = contentDescription,
-                contentScale = ContentScale.Crop,
-                onError = { failed = true },
-                modifier = Modifier.fillMaxSize(),
-            )
+        }
+        if (url != null && !waiting) {
+            // A new key per attempt: the same request would otherwise not be loaded again.
+            key(failures) {
+                AsyncImage(
+                    model =
+                        ImageRequest
+                            .Builder(LocalPlatformContext.current)
+                            .data(artworkUrl(url, sizePx))
+                            .crossfade(ShuraMotion.QUICK_MS)
+                            .build(),
+                    contentDescription = contentDescription,
+                    contentScale = ContentScale.Crop,
+                    onSuccess = { loaded = true },
+                    onError = {
+                        failures++
+                        waiting = true
+                    },
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
         }
     }
 }
 
 /**
  * The colors of a cover, computed once per URL from a 64 px copy and shared by everyone who asks (an LRU of 32).
- * Null until computed, or when the cover cannot be loaded: callers fall back to the neutral tokens.
+ * Null until computed, or while the cover cannot be loaded (retried like the cover itself): callers fall back to
+ * the neutral tokens.
  */
 @Composable
 fun rememberArtworkColors(url: String?): ArtworkColors? {
     val context = LocalPlatformContext.current
+    val networkRegained = LocalNetworkRegained.current
     var colors by remember(url) { mutableStateOf(url?.let { ArtworkColorCache[it] }) }
     LaunchedEffect(url) {
         if (url == null || colors != null) return@LaunchedEffect
-        colors = loadArtworkColors(context, url)?.also { ArtworkColorCache[url] = it }
+        colors = cachedArtworkColors(context, url, networkRegained)
     }
     return colors
 }
+
+internal suspend fun cachedArtworkColors(
+    context: PlatformContext,
+    url: String,
+    networkRegained: Flow<Unit>,
+): ArtworkColors =
+    ArtworkColorCache[url]
+        ?: retryingLoad(networkRegained) { loadArtworkColors(context, url) }.also { ArtworkColorCache[url] = it }
 
 private object ArtworkColorCache {
     private val cache = LruCache<String, ArtworkColors>(capacity = 32)

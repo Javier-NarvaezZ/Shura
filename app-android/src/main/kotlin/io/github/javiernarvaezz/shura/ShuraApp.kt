@@ -101,6 +101,9 @@ class AppGraph(
 
     private val connectivity = context.getSystemService(ConnectivityManager::class.java)
 
+    /** One registration per process, for the app's lifetime. */
+    val networkRegained = networkRegained(connectivity)
+
     /**
      * One per process: at most one warm-up, never in battery saver, nor on a metered network while Data Saver
      * restricts this app.
