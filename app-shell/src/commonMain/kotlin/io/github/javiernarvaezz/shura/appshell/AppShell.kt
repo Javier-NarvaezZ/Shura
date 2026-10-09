@@ -18,6 +18,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -48,6 +49,8 @@ import io.github.javiernarvaezz.shura.appshell.resources.tab_search
 import io.github.javiernarvaezz.shura.core.model.Song
 import io.github.javiernarvaezz.shura.core.player.AudioPlayer
 import io.github.javiernarvaezz.shura.core.player.PlayHistory
+import io.github.javiernarvaezz.shura.core.ui.artwork.LocalNetworkRegained
+import io.github.javiernarvaezz.shura.core.ui.artwork.NeverRegained
 import io.github.javiernarvaezz.shura.core.ui.components.ChromeSurface
 import io.github.javiernarvaezz.shura.core.ui.icons.ShuraIcons
 import io.github.javiernarvaezz.shura.core.ui.theme.Shura
@@ -57,9 +60,11 @@ import io.github.javiernarvaezz.shura.feature.home.HomeViewModel
 import io.github.javiernarvaezz.shura.feature.player.MiniPlayer
 import io.github.javiernarvaezz.shura.feature.player.PlayerOverlay
 import io.github.javiernarvaezz.shura.feature.player.PlayerViewModel
+import io.github.javiernarvaezz.shura.feature.player.PreloadUpcomingArtwork
 import io.github.javiernarvaezz.shura.feature.player.rememberPlayerSheetState
 import io.github.javiernarvaezz.shura.feature.search.SearchScreen
 import io.github.javiernarvaezz.shura.feature.search.SearchViewModel
+import kotlinx.coroutines.flow.Flow
 import org.jetbrains.compose.resources.stringResource
 
 /** What the shell needs from the app (manual wiring, no DI framework). */
@@ -70,6 +75,8 @@ class ShellDependencies(
     val onPlaybackIntent: () -> Unit,
     /** The local hour (0..23), for Home's greeting. */
     val currentHour: () -> Int,
+    /** Emits when the device gets a network again, so covers that failed to load try once more. */
+    val networkRegained: Flow<Unit> = NeverRegained,
 )
 
 enum class Tab { Home, Search }
@@ -113,34 +120,37 @@ fun ShuraAppShell(
         isBackEnabled = sheet.isShown,
         onBackCompleted = { if (sheet.showsQueue) sheet.showsQueue = false else sheet.close(scope) },
     )
-    Box(
-        modifier
-            .fillMaxSize()
-            .background(Shura.colors.background)
-            .onSizeChanged { sheet.travelPx = it.height * PLAYER_TRAVEL },
-    ) {
-        // Not drawn while the open player covers it (a layer with alpha 0 is skipped), but still composed, so
-        // scroll positions and typed text survive the player.
-        Column(Modifier.fillMaxSize().graphicsLayer { alpha = if (sheet.isOpen) 0f else 1f }) {
-            Box(Modifier.weight(1f)) {
-                tabs.SaveableStateProvider(shell.tab) {
-                    val stack = shell.stacks.getValue(shell.tab)
-                    NavDisplay(
-                        backStack = stack,
-                        onBack = { if (stack.size > 1) stack.removeAt(stack.lastIndex) },
-                        entryDecorators = listOf(rememberSaveableStateHolderNavEntryDecorator()),
-                        entryProvider =
-                            entryProvider {
-                                entry<Route.Home> { HomeScreen(home.model, onSearch = { shell.tab = Tab.Search }) }
-                                entry<Route.Search> { SearchScreen(search.controller) }
-                            },
-                    )
+    CompositionLocalProvider(LocalNetworkRegained provides deps.networkRegained) {
+        Box(
+            modifier
+                .fillMaxSize()
+                .background(Shura.colors.background)
+                .onSizeChanged { sheet.travelPx = it.height * PLAYER_TRAVEL },
+        ) {
+            // Not drawn while the open player covers it (a layer with alpha 0 is skipped), but still composed, so
+            // scroll positions and typed text survive the player.
+            Column(Modifier.fillMaxSize().graphicsLayer { alpha = if (sheet.isOpen) 0f else 1f }) {
+                Box(Modifier.weight(1f)) {
+                    tabs.SaveableStateProvider(shell.tab) {
+                        val stack = shell.stacks.getValue(shell.tab)
+                        NavDisplay(
+                            backStack = stack,
+                            onBack = { if (stack.size > 1) stack.removeAt(stack.lastIndex) },
+                            entryDecorators = listOf(rememberSaveableStateHolderNavEntryDecorator()),
+                            entryProvider =
+                                entryProvider {
+                                    entry<Route.Home> { HomeScreen(home.model, onSearch = { shell.tab = Tab.Search }) }
+                                    entry<Route.Search> { SearchScreen(search.controller) }
+                                },
+                        )
+                    }
                 }
+                MiniPlayer(player.model, sheet, Modifier.padding(bottom = Shura.spacing.s))
+                BottomChrome(selected = shell.tab, onSelect = { shell.tab = it })
             }
-            MiniPlayer(player.model, sheet, Modifier.padding(bottom = Shura.spacing.s))
-            BottomChrome(selected = shell.tab, onSelect = { shell.tab = it })
+            PlayerOverlay(player.model, sheet)
+            PreloadUpcomingArtwork(player.model)
         }
-        PlayerOverlay(player.model, sheet)
     }
 }
 

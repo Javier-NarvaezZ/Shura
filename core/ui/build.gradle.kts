@@ -7,5 +7,8 @@ kotlin {
         commonMain.dependencies {
             api(libs.coil.compose)
         }
+        commonTest.dependencies {
+            implementation(libs.kotlinx.coroutines.test)
+        }
     }
 }

@@ -7,6 +7,7 @@ import io.github.javiernarvaezz.shura.core.player.AudioPlayer
 import io.github.javiernarvaezz.shura.core.player.PlaybackError
 import io.github.javiernarvaezz.shura.core.player.PlaybackProgress
 import io.github.javiernarvaezz.shura.core.player.PlaybackState
+import io.github.javiernarvaezz.shura.core.player.QueueState
 import io.github.javiernarvaezz.shura.core.player.RepeatMode
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.SharingStarted
@@ -36,6 +37,19 @@ data class PlayerUiState(
     val canReorder: Boolean get() = !shuffle
 }
 
+/**
+ * The song after the current one in play order; with repeat-all, the first one once the queue ends. Repeat-one
+ * still skips to the next song when asked, but at the end of the queue there is none.
+ */
+internal fun upcomingSong(queue: QueueState): Song? =
+    queue.next
+        ?: queue
+            .takeIf { it.repeat == RepeatMode.All }
+            ?.playOrder
+            ?.firstOrNull()
+            ?.let(queue.items::getOrNull)
+            ?.takeIf { it != queue.current }
+
 /** A queue item as shown: [index] is its position in the queue, rows come in play order. */
 data class QueueRow(
     val index: Int,
@@ -63,6 +77,12 @@ class PlayerModel(
 
     /** The queue in play order, and the actions on it. */
     val queue = QueueModel(player, scope) { state.value.canReorder }
+
+    /** The cover of the song that plays next, loaded ahead so a track change does not depend on the network. */
+    val upcomingArtworkUrl: StateFlow<String?> =
+        player.queue
+            .map { upcomingSong(it)?.thumbnailUrl }
+            .stateIn(scope, SharingStarted.Eagerly, null)
 
     /**
      * Read on demand (per frame while a progress bar is visible). Until the player knows the duration (e.g. a
