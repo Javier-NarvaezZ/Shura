@@ -60,6 +60,7 @@ import io.github.javiernarvaezz.shura.feature.home.HomeViewModel
 import io.github.javiernarvaezz.shura.feature.player.MiniPlayer
 import io.github.javiernarvaezz.shura.feature.player.PlayerOverlay
 import io.github.javiernarvaezz.shura.feature.player.PlayerViewModel
+import io.github.javiernarvaezz.shura.feature.player.PreloadUpcomingArtwork
 import io.github.javiernarvaezz.shura.feature.player.rememberPlayerSheetState
 import io.github.javiernarvaezz.shura.feature.search.SearchScreen
 import io.github.javiernarvaezz.shura.feature.search.SearchViewModel
@@ -148,6 +149,7 @@ fun ShuraAppShell(
                 BottomChrome(selected = shell.tab, onSelect = { shell.tab = it })
             }
             PlayerOverlay(player.model, sheet)
+            PreloadUpcomingArtwork(player.model)
         }
     }
 }
