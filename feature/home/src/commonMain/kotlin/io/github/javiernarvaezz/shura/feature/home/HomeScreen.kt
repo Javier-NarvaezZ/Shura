@@ -38,6 +38,7 @@ import io.github.javiernarvaezz.shura.feature.home.resources.Res
 import io.github.javiernarvaezz.shura.feature.home.resources.continue_listening
 import io.github.javiernarvaezz.shura.feature.home.resources.empty_action
 import io.github.javiernarvaezz.shura.feature.home.resources.empty_title
+import io.github.javiernarvaezz.shura.feature.home.resources.end_of_queue
 import io.github.javiernarvaezz.shura.feature.home.resources.greeting_afternoon
 import io.github.javiernarvaezz.shura.feature.home.resources.greeting_morning
 import io.github.javiernarvaezz.shura.feature.home.resources.greeting_night
@@ -73,7 +74,9 @@ fun HomeScreen(
 
             else -> {
                 state.current?.let { song ->
-                    item(key = "continue") { ContinueListening(song, state.isPlaying, model::togglePlay) }
+                    item(
+                        key = "continue",
+                    ) { ContinueListening(song, state.isPlaying, state.queueEnded, model::togglePlay) }
                 }
                 if (state.recent.isNotEmpty()) {
                     item(key = "recent") { RecentlyPlayed(state.recent, model::playRecent) }
@@ -113,6 +116,7 @@ private fun SectionTitle(text: String) {
 private fun ContinueListening(
     song: Song,
     isPlaying: Boolean,
+    queueEnded: Boolean,
     onToggle: () -> Unit,
 ) {
     Column {
@@ -145,7 +149,13 @@ private fun ContinueListening(
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    stringResource(if (isPlaying) Res.string.now_playing else Res.string.paused),
+                    stringResource(
+                        when {
+                            isPlaying -> Res.string.now_playing
+                            queueEnded -> Res.string.end_of_queue
+                            else -> Res.string.paused
+                        },
+                    ),
                     style = MaterialTheme.typography.labelMedium,
                     color = Shura.colors.textMuted,
                     modifier = Modifier.padding(top = Shura.spacing.xs),

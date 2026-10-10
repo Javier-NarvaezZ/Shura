@@ -50,6 +50,7 @@ import io.github.javiernarvaezz.shura.core.ui.theme.OnTintTheme
 import io.github.javiernarvaezz.shura.core.ui.theme.Shura
 import io.github.javiernarvaezz.shura.core.ui.theme.ShuraMotion
 import io.github.javiernarvaezz.shura.feature.player.resources.Res
+import io.github.javiernarvaezz.shura.feature.player.resources.end_of_queue
 import io.github.javiernarvaezz.shura.feature.player.resources.open_player
 import io.github.javiernarvaezz.shura.feature.player.resources.pause
 import io.github.javiernarvaezz.shura.feature.player.resources.play
@@ -122,7 +123,7 @@ fun MiniPlayer(
                             .onGloballyPositioned { sheet.miniCover = it.boundsInRoot() }
                             .graphicsLayer { alpha = if (sheet.fraction > 0f) 0f else 1f },
                 )
-                MiniText(song, state.error, Modifier.weight(1f))
+                MiniText(song, state.error, state.queueEnded, Modifier.weight(1f))
                 MiniAction(model, state)
             }
         }
@@ -133,6 +134,7 @@ fun MiniPlayer(
 private fun MiniText(
     song: Song,
     error: PlaybackError?,
+    queueEnded: Boolean,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier) {
@@ -144,7 +146,11 @@ private fun MiniText(
             overflow = TextOverflow.Ellipsis,
         )
         Text(
-            if (error != null) stringResource(playbackErrorMessage(error)) else song.artistNames,
+            when {
+                error != null -> stringResource(playbackErrorMessage(error))
+                queueEnded -> stringResource(Res.string.end_of_queue)
+                else -> song.artistNames
+            },
             style = MaterialTheme.typography.bodySmall,
             color = if (error != null) Shura.colors.error else Shura.colors.textMuted,
             maxLines = 1,

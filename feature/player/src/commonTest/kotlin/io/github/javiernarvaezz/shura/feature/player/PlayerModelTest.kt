@@ -77,17 +77,31 @@ class PlayerModelTest {
         }
 
     @Test
-    fun togglePlayPausesResumesAndRestartsAFinishedSong() =
+    fun togglePlayPausesAndResumesAndAFinishedQueueOnlyResumes() =
         runTest {
             val model = model()
             playing(PlaybackState.Playing(a))
             model.togglePlay()
             playing(PlaybackState.Paused(a))
             model.togglePlay()
-            playing(PlaybackState.Ended(a))
+            playing(PlaybackState.Ended(b))
             model.togglePlay()
 
-            assertEquals(listOf("pause", "resume", "seekTo:0", "resume"), player.calls)
+            // The player restarts a finished queue from its first song (ShuraPlayer); no seek within the last one.
+            assertEquals(listOf("pause", "resume", "resume"), player.calls)
+        }
+
+    @Test
+    fun aFinishedQueueIsShownAsEnded() =
+        runTest {
+            val model = model()
+            playing(PlaybackState.Ended(b))
+
+            assertTrue(model.state.value.queueEnded)
+            assertFalse(model.state.value.showsPause)
+
+            playing(PlaybackState.Playing(a))
+            assertFalse(model.state.value.queueEnded)
         }
 
     @Test

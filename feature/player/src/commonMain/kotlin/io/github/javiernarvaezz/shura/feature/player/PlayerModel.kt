@@ -33,6 +33,9 @@ data class PlayerUiState(
 
     val error: PlaybackError? get() = (playback as? PlaybackState.Failed)?.error
 
+    /** The queue played to its end; play starts it again from the first song. */
+    val queueEnded: Boolean get() = playback is PlaybackState.Ended
+
     /** Moving songs follows the queue order, which is only what plays when shuffle is off. */
     val canReorder: Boolean get() = !shuffle
 }
@@ -99,11 +102,7 @@ class PlayerModel(
                 player.pause()
             }
 
-            is PlaybackState.Ended -> {
-                player.seekTo(Duration.ZERO)
-                player.resume()
-            }
-
+            // A finished queue starts again from its first song (the player does it, for every controller).
             else -> {
                 player.resume()
             }

@@ -66,6 +66,7 @@ import io.github.javiernarvaezz.shura.core.ui.theme.OnTintTheme
 import io.github.javiernarvaezz.shura.core.ui.theme.Shura
 import io.github.javiernarvaezz.shura.feature.player.resources.Res
 import io.github.javiernarvaezz.shura.feature.player.resources.close_player
+import io.github.javiernarvaezz.shura.feature.player.resources.end_of_queue
 import io.github.javiernarvaezz.shura.feature.player.resources.hide_queue
 import io.github.javiernarvaezz.shura.feature.player.resources.next
 import io.github.javiernarvaezz.shura.feature.player.resources.pause
@@ -256,6 +257,14 @@ private fun PlayerBody(
                 if (error != null) {
                     ErrorRow(stringResource(playbackErrorMessage(error)), model::retry)
                 } else {
+                    if (state.queueEnded) {
+                        Text(
+                            stringResource(Res.string.end_of_queue),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = Shura.colors.textMuted,
+                            modifier = Modifier.padding(bottom = Shura.spacing.s),
+                        )
+                    }
                     // Hidden: no progress redraws and no time updates.
                     Progress(model, playing = state.showsPause && sheet.isShown)
                 }

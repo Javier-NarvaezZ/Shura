@@ -3,6 +3,7 @@ package io.github.javiernarvaezz.shura.core.player
 import androidx.annotation.OptIn
 import androidx.media3.common.ForwardingPlayer
 import androidx.media3.common.MediaItem
+import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import kotlin.random.Random
@@ -11,7 +12,8 @@ import kotlin.random.Random
  * The player given to the media session: ExoPlayer with native shuffle and repeat, so the notification, Bluetooth
  * and every controller see the real state, plus two queue rules:
  * - turning shuffle on (or loading a new queue while shuffled) draws a fresh order with the current item first;
- * - items added right after the current one ("play next") also play next in the shuffled order.
+ * - items added right after the current one ("play next") also play next in the shuffled order;
+ * - play on a finished queue starts it again from its first song.
  */
 @OptIn(UnstableApi::class)
 internal class ShuraPlayer(
@@ -20,6 +22,18 @@ internal class ShuraPlayer(
 ) : ForwardingPlayer(exo) {
     init {
         exo.setShuffleOrder(QueueShuffleOrder(PlayOrder.identity(exo.mediaItemCount)))
+    }
+
+    /**
+     * Pressing play on a finished queue (from any controller: our UI, the notification, Bluetooth) makes Media3 seek
+     * to the default position first; here that means the first song in play order, not the last song again.
+     */
+    override fun seekToDefaultPosition() {
+        if (exo.playbackState == Player.STATE_ENDED && exo.mediaItemCount > 0) {
+            super.seekToDefaultPosition(exo.currentTimeline.getFirstWindowIndex(exo.shuffleModeEnabled))
+        } else {
+            super.seekToDefaultPosition()
+        }
     }
 
     override fun setShuffleModeEnabled(shuffleModeEnabled: Boolean) {
