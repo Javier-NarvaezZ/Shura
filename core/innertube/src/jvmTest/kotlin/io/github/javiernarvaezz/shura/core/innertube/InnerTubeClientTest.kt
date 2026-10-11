@@ -192,4 +192,30 @@ class InnerTubeClientTest {
             assertEquals(first.continuation, bodies[1]["continuation"]!!.jsonPrimitive.content)
             assertEquals(150, first.tracks.size + more.tracks.size)
         }
+
+    @Test
+    fun filteredSearchesSendTheirChipAndParseTheirKind() =
+        runTest {
+            val pages =
+                listOf(
+                    "search/search_albums_juanes.json",
+                    "search/search_artists_juanes.json",
+                    "search/search_playlists_juanes.json",
+                )
+            var served = 0
+            val client = client { json(Fixtures.read(pages[served++])) }
+
+            assertEquals(19, client.searchAlbums("juanes").size)
+            assertEquals(8, client.searchArtists("juanes").size)
+            assertEquals(16, client.searchPlaylists("juanes").size)
+            val params =
+                requests.map {
+                    Json
+                        .parseToJsonElement(
+                            it.body.toByteArray().decodeToString(),
+                        ).jsonObject["params"]!!
+                        .jsonPrimitive.content
+                }
+            assertEquals(listOf(SearchParams.ALBUMS, SearchParams.ARTISTS, SearchParams.FEATURED_PLAYLISTS), params)
+        }
 }

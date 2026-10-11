@@ -1,9 +1,13 @@
 package io.github.javiernarvaezz.shura.core.innertube
 
 import io.github.javiernarvaezz.shura.core.model.AlbumPage
+import io.github.javiernarvaezz.shura.core.model.AlbumSummary
 import io.github.javiernarvaezz.shura.core.model.ArtistPage
+import io.github.javiernarvaezz.shura.core.model.ArtistSummary
 import io.github.javiernarvaezz.shura.core.model.BrowseLink
+import io.github.javiernarvaezz.shura.core.model.MusicCatalog
 import io.github.javiernarvaezz.shura.core.model.PlaylistPage
+import io.github.javiernarvaezz.shura.core.model.PlaylistSummary
 import io.github.javiernarvaezz.shura.core.model.Song
 import io.github.javiernarvaezz.shura.core.model.TrackPage
 import io.ktor.client.HttpClient
@@ -33,23 +37,33 @@ import kotlinx.serialization.json.putJsonObject
 class InnerTubeClient(
     private val httpClient: HttpClient,
     private val config: InnerTubeConfig = InnerTubeConfig(),
-) {
+) : MusicCatalog {
     /** Searches album-audio songs. [query] is trimmed and must not be blank. */
-    suspend fun searchSongs(query: String): List<Song> =
+    override suspend fun searchSongs(query: String): List<Song> =
         SearchParser.parseSongs(raw(InnerTubeRequest.Search(query, SearchFilter.Songs)))
 
+    override suspend fun searchAlbums(query: String): List<AlbumSummary> =
+        SearchRows.albums(raw(InnerTubeRequest.Search(query, SearchFilter.Albums)))
+
+    override suspend fun searchArtists(query: String): List<ArtistSummary> =
+        SearchRows.artists(raw(InnerTubeRequest.Search(query, SearchFilter.Artists)))
+
+    /** YouTube Music's featured playlists for [query]. */
+    override suspend fun searchPlaylists(query: String): List<PlaylistSummary> =
+        SearchRows.playlists(raw(InnerTubeRequest.Search(query, SearchFilter.Playlists)))
+
     /** An album page (`MPREb_…`). */
-    suspend fun album(id: String): AlbumPage = AlbumParser.parse(raw(InnerTubeRequest.Browse(id)), id)
+    override suspend fun album(id: String): AlbumPage = AlbumParser.parse(raw(InnerTubeRequest.Browse(id)), id)
 
     /** An artist page (`UC…`). */
-    suspend fun artist(id: String): ArtistPage = ArtistParser.parse(raw(InnerTubeRequest.Browse(id)), id)
+    override suspend fun artist(id: String): ArtistPage = ArtistParser.parse(raw(InnerTubeRequest.Browse(id)), id)
 
     /** A playlist page (`VL…`) with its first tracks; [playlistContinuation] loads the rest. */
-    suspend fun playlist(link: BrowseLink): PlaylistPage =
+    override suspend fun playlist(link: BrowseLink): PlaylistPage =
         PlaylistParser.parse(raw(InnerTubeRequest.Browse(link.id, link.params)), link.id)
 
     /** The next tracks of a playlist, from the token its previous page ended with. */
-    suspend fun playlistContinuation(token: String): TrackPage =
+    override suspend fun playlistContinuation(token: String): TrackPage =
         PlaylistParser.parseContinuation(raw(InnerTubeRequest.Continuation(token)))
 
     /**
