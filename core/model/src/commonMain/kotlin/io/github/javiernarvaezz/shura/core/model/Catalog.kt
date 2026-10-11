@@ -62,12 +62,32 @@ data class BrowseLink(
     }
 }
 
+/** A titled row of a page ("Otras versiones", "Sencillos y EP"…), in YouTube Music's words and order. */
+sealed interface CatalogShelf {
+    val title: String
+}
+
+data class AlbumShelf(
+    override val title: String,
+    val albums: List<AlbumSummary>,
+) : CatalogShelf
+
+data class ArtistShelf(
+    override val title: String,
+    val artists: List<ArtistSummary>,
+) : CatalogShelf
+
+data class PlaylistShelf(
+    override val title: String,
+    val playlists: List<PlaylistSummary>,
+) : CatalogShelf
+
 data class AlbumPage(
     val album: AlbumSummary,
     val tracks: List<Song>,
     val description: String? = null,
-    /** Other releases by the album's artist. */
-    val moreFromArtist: List<AlbumSummary> = emptyList(),
+    /** E.g. other versions of the album and releases like it. */
+    val shelves: List<CatalogShelf> = emptyList(),
 ) {
     /** The sum of the tracks' durations, or null when none is known. */
     val knownDuration: Duration?
@@ -82,9 +102,8 @@ data class ArtistPage(
     val topSongs: List<Song> = emptyList(),
     /** The playlist with all of the artist's songs, when offered. */
     val allSongs: BrowseLink? = null,
-    val albums: List<AlbumSummary> = emptyList(),
-    val singles: List<AlbumSummary> = emptyList(),
-    val similar: List<ArtistSummary> = emptyList(),
+    /** Albums, singles, playlists and similar artists. */
+    val shelves: List<CatalogShelf> = emptyList(),
 )
 
 data class PlaylistPage(

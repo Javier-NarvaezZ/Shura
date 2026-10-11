@@ -1,5 +1,6 @@
 package io.github.javiernarvaezz.shura.core.innertube
 
+import io.github.javiernarvaezz.shura.core.model.AlbumPage
 import io.github.javiernarvaezz.shura.core.model.Song
 import io.ktor.client.HttpClient
 import io.ktor.client.request.header
@@ -32,6 +33,9 @@ class InnerTubeClient(
     /** Searches album-audio songs. [query] is trimmed and must not be blank. */
     suspend fun searchSongs(query: String): List<Song> =
         SearchParser.parseSongs(raw(InnerTubeRequest.Search(query, SearchFilter.Songs)))
+
+    /** An album page (`MPREb_…`). */
+    suspend fun album(id: String): AlbumPage = AlbumParser.parse(raw(InnerTubeRequest.Browse(id)), id)
 
     /**
      * Sends [request] exactly as the typed calls do and returns the raw response. Used by them and by diagnostics

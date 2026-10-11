@@ -143,4 +143,19 @@ class InnerTubeClientTest {
             assertFalse(message.contains("private query"))
             assertFalse(message.contains("youtube.com"))
         }
+
+    @Test
+    fun albumBrowsesItsIdAndParsesThePage() =
+        runTest {
+            val page = client { json(Fixtures.read("album/album_juanes.json")) }.album("MPREb_xDw1x6Hl5Jo")
+
+            assertTrue(
+                requests
+                    .single()
+                    .url.encodedPath
+                    .endsWith("/browse"),
+            )
+            assertEquals("Mi Sangre", page.album.title)
+            assertEquals(12, page.tracks.size)
+        }
 }
