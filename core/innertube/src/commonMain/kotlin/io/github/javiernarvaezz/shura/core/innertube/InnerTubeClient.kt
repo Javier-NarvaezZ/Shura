@@ -15,6 +15,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObjectBuilder
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonObject
@@ -29,28 +30,52 @@ class InnerTubeClient(
     private val config: InnerTubeConfig = InnerTubeConfig(),
 ) {
     /** Searches album-audio songs. [query] is trimmed and must not be blank. */
-    suspend fun searchSongs(query: String): List<Song> {
-        val trimmed = query.trim()
-        require(trimmed.isNotEmpty()) { "Query must not be blank" }
-        val root = post("search", searchBody(trimmed, SearchParams.SONGS))
-        return SearchParser.parseSongs(root)
-    }
+    suspend fun searchSongs(query: String): List<Song> =
+        SearchParser.parseSongs(raw(InnerTubeRequest.Search(query, SearchFilter.Songs)))
 
-    private fun searchBody(
-        query: String,
-        params: String,
-    ) = buildJsonObject {
-        putJsonObject("context") {
-            putJsonObject("client") {
-                put("clientName", CLIENT_NAME)
-                put("clientVersion", config.clientVersion)
-                put("hl", config.hl)
-                put("gl", config.gl)
+    /**
+     * Sends [request] exactly as the typed calls do and returns the raw response. Used by them and by diagnostics
+     * (fixture recording in `:tools:livecheck`).
+     */
+    suspend fun raw(request: InnerTubeRequest): JsonElement =
+        when (request) {
+            is InnerTubeRequest.Search -> {
+                post("search") {
+                    put("query", request.query)
+                    put("params", SearchParams.of(request.filter))
+                }
+            }
+
+            is InnerTubeRequest.Browse -> {
+                post("browse") {
+                    put("browseId", request.browseId)
+                    request.params?.let { put("params", it) }
+                }
+            }
+
+            is InnerTubeRequest.Continuation -> {
+                post("browse") { put("continuation", request.token) }
             }
         }
-        put("query", query)
-        put("params", params)
-    }
+
+    private suspend fun post(
+        endpoint: String,
+        fields: JsonObjectBuilder.() -> Unit,
+    ): JsonElement =
+        post(
+            endpoint,
+            buildJsonObject {
+                putJsonObject("context") {
+                    putJsonObject("client") {
+                        put("clientName", CLIENT_NAME)
+                        put("clientVersion", config.clientVersion)
+                        put("hl", config.hl)
+                        put("gl", config.gl)
+                    }
+                }
+                fields()
+            },
+        )
 
     private suspend fun post(
         endpoint: String,
