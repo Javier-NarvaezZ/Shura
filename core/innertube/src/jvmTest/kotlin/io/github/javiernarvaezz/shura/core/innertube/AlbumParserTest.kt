@@ -99,4 +99,25 @@ class AlbumParserTest {
                 this
             }
         }
+
+    @Test
+    fun headerArtistsLeaveOutJoiningWords() {
+        fun runs(json: String) = runsOf(Json.parseToJsonElement(json))
+        val linked = """{"browseEndpoint":{"browseId":"UC"""
+
+        assertEquals(
+            listOf(Artist("Dani Martin", "UC1"), Artist("Juanes", "UC2")),
+            headerArtists(
+                runs(
+                    """{"runs":[{"text":"Dani Martin","navigationEndpoint":${linked}1"}}},""" +
+                        """{"text":" y "},{"text":"Juanes","navigationEndpoint":${linked}2"}}}]}""",
+                ),
+            ),
+        )
+        assertEquals(
+            listOf(Artist("Varios artistas")),
+            headerArtists(runs("""{"runs":[{"text":"Varios artistas"}]}""")),
+        )
+        assertEquals(emptyList(), headerArtists(runs("""{"runs":[]}""")))
+    }
 }

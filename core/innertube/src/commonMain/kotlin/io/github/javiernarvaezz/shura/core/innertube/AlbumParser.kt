@@ -15,8 +15,7 @@ internal object AlbumParser {
         val header = findAll(root, "musicResponsiveHeaderRenderer").firstOrNull() ?: missing("album header")
         val title = textOf(header["title"]) ?: missing("album title")
         val subtitle = runsOf(header["subtitle"])
-        val artists =
-            runsOf(header["straplineTextOne"]).filterNot { it.isSeparator }.map { Artist(it.text.trim(), it.browseId) }
+        val artists = headerArtists(runsOf(header["straplineTextOne"]))
         val album =
             AlbumSummary(
                 id = id,
@@ -39,6 +38,16 @@ internal object AlbumParser {
             shelves = findAll(root, Carousels.RENDERER).mapNotNull { Carousels.of(it, artists) },
         )
     }
+}
+
+/**
+ * The artists of a header line ("Dani Martin y Juanes"): the linked names, so joining words are left out, or the
+ * whole line as one name when nothing is linked.
+ */
+internal fun headerArtists(runs: List<Run>): List<Artist> {
+    val linked = runs.filter { it.browseId != null && !it.isSeparator }.map { Artist(it.text.trim(), it.browseId) }
+    val plain = runs.joinToString("") { it.text }.trim()
+    return linked.ifEmpty { if (plain.isEmpty()) emptyList() else listOf(Artist(plain)) }
 }
 
 /** A response without a part every page of its kind has: YouTube changed the format or sent something else. */
