@@ -1,0 +1,22 @@
+<resources>
+    <string name="back">Atrás</string>
+    <string name="play">Reproducir</string>
+    <string name="shuffle">Aleatorio</string>
+    <string name="more">Más opciones</string>
+    <string name="play_next">Reproducir a continuación</string>
+    <string name="add_to_queue">Añadir a la cola</string>
+    <string name="go_to_artist">Ir al artista</string>
+    <string name="go_to_album">Ir al álbum</string>
+    <string name="retry">Reintentar</string>
+    <string name="load_failed">No se pudo cargar esta página. Revisa tu conexión e inténtalo de nuevo.</string>
+    <string name="album">Álbum</string>
+    <string name="song_count">%1$d canciones</string>
+    <string name="one_song">1 canción</string>
+    <string name="minutes">%1$d min</string>
+    <string name="hours_minutes">%1$d h %2$d min</string>
+    <string name="popular_songs">Canciones populares</string>
+    <string name="see_all">Ver todas</string>
+    <string name="about">Acerca de</string>
+    <string name="subscribers">%1$s suscriptores</string>
+    <string name="no_tracks">Esta página no tiene canciones disponibles.</string>
+</resources>

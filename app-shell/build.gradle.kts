@@ -10,6 +10,7 @@ kotlin {
             implementation(projects.core.model)
             implementation(projects.core.player)
             implementation(projects.feature.home)
+            implementation(projects.feature.browse)
             implementation(projects.feature.search)
             implementation(projects.feature.player)
             implementation(libs.navigation3.ui)
