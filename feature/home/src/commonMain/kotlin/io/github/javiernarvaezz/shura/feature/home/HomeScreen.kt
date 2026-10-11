@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.javiernarvaezz.shura.core.model.Song
 import io.github.javiernarvaezz.shura.core.ui.artwork.Artwork
+import io.github.javiernarvaezz.shura.core.ui.components.MediaTile
 import io.github.javiernarvaezz.shura.core.ui.components.PlayPauseButton
 import io.github.javiernarvaezz.shura.core.ui.components.shimmer
 import io.github.javiernarvaezz.shura.core.ui.theme.Shura
@@ -183,31 +184,13 @@ private fun RecentlyPlayed(
             horizontalArrangement = Arrangement.spacedBy(Shura.spacing.m),
         ) {
             itemsIndexed(songs, key = { _, song -> song.videoId.value }) { index, song ->
-                // Only the cover is rounded: clipping the whole tile would cut the text in the bottom corner.
-                Column(Modifier.width(TILE_SIZE).clickable { onPlay(index) }) {
-                    Artwork(
-                        song.thumbnailUrl,
-                        TILE_PX,
-                        contentDescription = null,
-                        modifier = Modifier.size(TILE_SIZE),
-                        shape = Shura.shapes.card,
-                    )
-                    Text(
-                        song.title,
-                        style = MaterialTheme.typography.titleSmall,
-                        color = Shura.colors.text,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.padding(top = Shura.spacing.s),
-                    )
-                    Text(
-                        song.artistNames,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Shura.colors.textMuted,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
+                MediaTile(
+                    song.title,
+                    song.artistNames,
+                    song.thumbnailUrl,
+                    onClick = { onPlay(index) },
+                    size = TILE_SIZE,
+                )
             }
         }
     }
@@ -242,5 +225,4 @@ private fun EmptyHome(onSearch: () -> Unit) {
 private val CONTINUE_SIZE = 88.dp
 private const val CONTINUE_PX = 226
 private val TILE_SIZE = 140.dp
-private const val TILE_PX = 300
 private const val LOADING_TILES = 3
