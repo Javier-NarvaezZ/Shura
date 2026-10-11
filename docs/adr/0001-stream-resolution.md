@@ -450,6 +450,37 @@ Same device, method and guard as above. While a track plays, the player resolves
 - Transition GPU time and p90 are back to their pre-tint level.
 - **Known debt:** with the bitmap, close and scroll middle drops sit slightly above the pre-tint range, from only 2 runs. The scroll does not draw the player background, so this is probably run-to-run spread; to be confirmed with more runs.
 
+### Catalog page frame measurements (Phase 2 E6, 2026-10-11)
+
+Same method and target as E5: release build signed with the debug key and compiled with `speed`, music playing, CPU guard, drops from SurfaceFlinger presents and percentiles from `gfxinfo`, 3 runs each. Two corrections to how the frames are picked:
+- the measured window is the longest burst of presents without a gap over 100 ms (the progress line's few redraws per second while music plays are separate, short bursts);
+- the layer name is quoted on the phone's shell (it contains `$`).
+
+Pages: an album (12 tracks and two shelves), an artist (5 songs and five shelves), and that artist's 150-song playlist. Calibration with the system Settings app on the same day.
+
+| | Total | Start | Middle | Tail | p90 |
+|---|---|---|---|---|---|
+| Open an album from search | 9.1–12.0 % | 33–50 % | 5.3–12.5 % | 0–6 % | 29–34 ms |
+| Back to search | 0–7.3 % | 0–33 % | 0–4.5 % | 0–12 % | 25–30 ms |
+| Settings: open a screen | 0–7.3 % | 0–60 % | 0–4.5 % | 0 % | 11–32 ms |
+| Scroll the album | 2.4–9.4 % | 0–50 % | 0–5.4 % | 0–50 % | 23–34 ms |
+| Scroll the artist, first pass | 17.5 % | 33 % | 17.3 % | 0 % | 46 ms |
+| Scroll the artist, later passes | 0–10 % | 0–50 % | 0 % | 0–60 % | 24–32 ms |
+| Scroll the playlist | 1.8–2.6 % | 33–60 % | 0–0.9 % | 0–33 % | 19–32 ms |
+| Settings: scroll | 0–1.6 % | 0–33 % | 0–1.7 % | 0 % | 23–25 ms |
+
+- **Playlist scroll:** at the system's level, inside the target in the middle.
+- **Artist scroll:** at the system's level once its rows have been composed. The first pass composes the rails and decodes their covers while scrolling.
+- **Album scroll:** close to the system. The page is short, so a fling is mostly start and tail.
+- **Opening a page:** worse than the system in the middle. The page composes its hero (cover, tint, title) and list while the transition runs, and its content arrives from the network during or after it. Going back is at the system's level.
+- **Known debt** (same nature as E5: the first frames that compose something new):
+  - opening a page: middle 5–12 % against the system's 0–4.5 %;
+  - the first scroll of an artist page.
+- **Options if it is worth it:**
+  - load the page before starting the transition (show the previous screen until the data is there);
+  - compose the rails' first tiles ahead of the scroll;
+  - lighter hero (no tint until the transition ends).
+
 ## Implementation requirements (accepted 2026-10-04)
 
 These are binding for `:core:stream` and its platform code.
