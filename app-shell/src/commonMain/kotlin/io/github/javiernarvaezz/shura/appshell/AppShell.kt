@@ -74,7 +74,9 @@ import io.github.javiernarvaezz.shura.feature.player.PlayerOverlay
 import io.github.javiernarvaezz.shura.feature.player.PlayerViewModel
 import io.github.javiernarvaezz.shura.feature.player.PreloadUpcomingArtwork
 import io.github.javiernarvaezz.shura.feature.player.rememberPlayerSheetState
+import io.github.javiernarvaezz.shura.feature.search.SearchLinks
 import io.github.javiernarvaezz.shura.feature.search.SearchScreen
+import io.github.javiernarvaezz.shura.feature.search.SearchSources
 import io.github.javiernarvaezz.shura.feature.search.SearchViewModel
 import kotlinx.coroutines.flow.Flow
 import org.jetbrains.compose.resources.stringResource
@@ -151,12 +153,14 @@ fun ShuraAppShell(
 ) {
     val shell = viewModel { ShellViewModel() }
     val home = viewModel { HomeViewModel(deps.player, deps.history, deps.currentHour) }
-    val search = viewModel { SearchViewModel(deps.catalog::searchSongs, deps.player, deps.onPlaybackIntent) }
+    val search = viewModel { SearchViewModel(SearchSources.of(deps.catalog), deps.player, deps.onPlaybackIntent) }
     val player = viewModel { PlayerViewModel(deps.player) }
     val sheet = rememberPlayerSheetState()
     val scope = rememberCoroutineScope()
     val tabs = rememberSaveableStateHolder()
     val navigation = remember(shell) { browseNavigation(shell) }
+    val searchLinks =
+        remember(navigation) { SearchLinks(navigation.onAlbum, navigation.onArtist, navigation.onPlaylist) }
     // Back leaves the queue, then closes the player, before it navigates.
     NavigationBackHandler(
         state = rememberNavigationEventState(NavigationEventInfo.None),
@@ -188,7 +192,7 @@ fun ShuraAppShell(
                             entryProvider =
                                 entryProvider {
                                     entry<Route.Home> { HomeScreen(home.model, onSearch = { shell.tab = Tab.Search }) }
-                                    entry<Route.Search> { SearchScreen(search.controller) }
+                                    entry<Route.Search> { SearchScreen(search.controller, searchLinks) }
                                     pages(deps, navigation)
                                 },
                         )

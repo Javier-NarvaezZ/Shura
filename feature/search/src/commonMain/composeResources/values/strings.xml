@@ -9,6 +9,12 @@
     <string name="more_actions">Más opciones</string>
     <string name="play_next">Reproducir a continuación</string>
     <string name="add_to_queue">Añadir a la cola</string>
+    <string name="go_to_album">Ir al álbum</string>
+    <string name="go_to_artist">Ir al artista</string>
+    <string name="kind_songs">Canciones</string>
+    <string name="kind_albums">Álbumes</string>
+    <string name="kind_artists">Artistas</string>
+    <string name="kind_playlists">Playlists</string>
     <string name="queued_next">Sonará a continuación</string>
     <string name="queued_end">Añadida a la cola</string>
 </resources>

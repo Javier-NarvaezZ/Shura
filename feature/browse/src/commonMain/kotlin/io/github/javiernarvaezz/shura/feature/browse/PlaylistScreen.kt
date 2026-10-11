@@ -45,7 +45,8 @@ fun PlaylistScreen(
         item(key = "hero") {
             CoverHero(
                 title = playlist.title,
-                artworkUrl = playlist.thumbnailUrl,
+                // Some playlists (an artist's songs) have no cover of their own: the first song's stands in.
+                artworkUrl = playlist.thumbnailUrl ?: page.tracks.firstOrNull()?.thumbnailUrl,
                 link = playlist.author?.let { HeroLink(it) },
                 details = page.details,
                 modifier = heroModifier,
