@@ -39,6 +39,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
+import androidx.navigation3.runtime.EntryProviderScope
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.ui.NavDisplay
@@ -48,6 +49,7 @@ import androidx.navigationevent.compose.rememberNavigationEventState
 import io.github.javiernarvaezz.shura.appshell.resources.Res
 import io.github.javiernarvaezz.shura.appshell.resources.tab_home
 import io.github.javiernarvaezz.shura.appshell.resources.tab_search
+import io.github.javiernarvaezz.shura.core.model.BrowseLink
 import io.github.javiernarvaezz.shura.core.model.MusicCatalog
 import io.github.javiernarvaezz.shura.core.model.Song
 import io.github.javiernarvaezz.shura.core.player.AudioPlayer
@@ -63,6 +65,8 @@ import io.github.javiernarvaezz.shura.feature.browse.AlbumViewModel
 import io.github.javiernarvaezz.shura.feature.browse.ArtistScreen
 import io.github.javiernarvaezz.shura.feature.browse.ArtistViewModel
 import io.github.javiernarvaezz.shura.feature.browse.BrowseNavigation
+import io.github.javiernarvaezz.shura.feature.browse.PlaylistScreen
+import io.github.javiernarvaezz.shura.feature.browse.PlaylistViewModel
 import io.github.javiernarvaezz.shura.feature.home.HomeScreen
 import io.github.javiernarvaezz.shura.feature.home.HomeViewModel
 import io.github.javiernarvaezz.shura.feature.player.MiniPlayer
@@ -102,6 +106,11 @@ internal sealed interface Route {
 
     data class Artist(
         val id: String,
+        val entry: Long,
+    ) : Route
+
+    data class Playlist(
+        val link: BrowseLink,
         val entry: Long,
     ) : Route
 }
@@ -180,14 +189,7 @@ fun ShuraAppShell(
                                 entryProvider {
                                     entry<Route.Home> { HomeScreen(home.model, onSearch = { shell.tab = Tab.Search }) }
                                     entry<Route.Search> { SearchScreen(search.controller) }
-                                    entry<Route.Album> { route ->
-                                        val album = viewModel { AlbumViewModel(deps.catalog, deps.player, route.id) }
-                                        AlbumScreen(album.model, navigation)
-                                    }
-                                    entry<Route.Artist> { route ->
-                                        val artist = viewModel { ArtistViewModel(deps.catalog, deps.player, route.id) }
-                                        ArtistScreen(artist.model, navigation)
-                                    }
+                                    pages(deps, navigation)
                                 },
                         )
                     }
@@ -269,5 +271,21 @@ private fun browseNavigation(shell: ShellViewModel) =
         onBack = shell::pop,
         onAlbum = { shell.push(Route.Album(it, shell.nextEntry())) },
         onArtist = { shell.push(Route.Artist(it, shell.nextEntry())) },
-        onPlaylist = {},
+        onPlaylist = { shell.push(Route.Playlist(it, shell.nextEntry())) },
     )
+
+/** The catalog pages, each with its own ViewModel (cleared when the page is popped). */
+private fun EntryProviderScope<Route>.pages(
+    deps: ShellDependencies,
+    navigation: BrowseNavigation,
+) {
+    entry<Route.Album> { route ->
+        AlbumScreen(viewModel { AlbumViewModel(deps.catalog, deps.player, route.id) }.model, navigation)
+    }
+    entry<Route.Artist> { route ->
+        ArtistScreen(viewModel { ArtistViewModel(deps.catalog, deps.player, route.id) }.model, navigation)
+    }
+    entry<Route.Playlist> { route ->
+        PlaylistScreen(viewModel { PlaylistViewModel(deps.catalog, deps.player, route.link) }.model, navigation)
+    }
+}
