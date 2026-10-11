@@ -6,6 +6,7 @@
     <string name="recently_played">Escuchado recientemente</string>
     <string name="now_playing">Sonando</string>
     <string name="paused">En pausa</string>
+    <string name="end_of_queue">Fin de la cola</string>
     <string name="play">Reproducir</string>
     <string name="pause">Pausar</string>
     <string name="empty_title">Aquí aparecerá lo que escuches</string>

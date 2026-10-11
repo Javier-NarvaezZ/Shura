@@ -26,6 +26,8 @@ data class HomeUiState(
     /** "Continue listening": the current (or restored) queue item. */
     val current: Song? = null,
     val isPlaying: Boolean = false,
+    /** The queue played to its end; play starts it again from the first song. */
+    val queueEnded: Boolean = false,
     /** Recently played, most recent first, without the current song. */
     val recent: List<Song> = emptyList(),
     val loading: Boolean = true,
@@ -48,6 +50,7 @@ class HomeModel(
                 dayPart = dayPartOf(hour()),
                 current = current,
                 isPlaying = playback is PlaybackState.Playing || playback is PlaybackState.Loading,
+                queueEnded = playback is PlaybackState.Ended,
                 recent = recent.filter { it.videoId != current?.videoId },
                 loading = false,
             )

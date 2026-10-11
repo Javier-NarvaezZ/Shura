@@ -100,4 +100,23 @@ class HomeModelTest {
 
             assertEquals(listOf("resume", "pause"), player.calls)
         }
+
+    @Test
+    fun aFinishedQueueShowsAsEndedAndPlayStartsItAgain() =
+        runTest {
+            val home = model()
+            player.queue.value = QueueState(items = listOf(a, b), currentIndex = 1)
+            player.state.value = PlaybackState.Ended(b)
+            history.songs.value = emptyList()
+            runCurrent()
+
+            assertTrue(home.state.value.queueEnded)
+            assertFalse(home.state.value.isPlaying)
+            home.togglePlay()
+            assertEquals(listOf("resume"), player.calls)
+
+            player.state.value = PlaybackState.Paused(b)
+            runCurrent()
+            assertFalse(home.state.value.queueEnded)
+        }
 }
