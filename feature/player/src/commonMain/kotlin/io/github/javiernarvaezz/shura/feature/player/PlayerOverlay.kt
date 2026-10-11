@@ -1,6 +1,7 @@
 package io.github.javiernarvaezz.shura.feature.player
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
@@ -99,6 +100,7 @@ fun PlayerOverlay(
     model: PlayerModel,
     sheet: PlayerSheetState,
     modifier: Modifier = Modifier,
+    links: PlayerLinks = PlayerLinks.None,
 ) {
     val state by model.state.collectAsStateWithLifecycle()
     val song = state.song ?: return
@@ -131,6 +133,17 @@ fun PlayerOverlay(
                 model = model,
                 sheet = sheet,
                 onClose = { sheet.close(scope) },
+                links =
+                    PlayerLinks(
+                        onArtist = {
+                            sheet.close(scope)
+                            links.onArtist(it)
+                        },
+                        onAlbum = {
+                            sheet.close(scope)
+                            links.onAlbum(it)
+                        },
+                    ),
                 modifier =
                     Modifier.graphicsLayer {
                         val f = sheet.fraction
@@ -213,6 +226,7 @@ private fun PlayerBody(
     model: PlayerModel,
     sheet: PlayerSheetState,
     onClose: () -> Unit,
+    links: PlayerLinks,
     modifier: Modifier = Modifier,
 ) {
     val state by model.state.collectAsStateWithLifecycle()
@@ -249,7 +263,7 @@ private fun PlayerBody(
                     modifier = Modifier.weight(1f),
                 )
             } else {
-                CoverAndTitle(song, sheet, side.weight(1f))
+                CoverAndTitle(song, sheet, links, side.weight(1f))
             }
             Spacer(Modifier.height(Shura.spacing.l))
             val error = state.error
@@ -303,8 +317,11 @@ private fun TopRow(
 private fun CoverAndTitle(
     song: Song,
     sheet: PlayerSheetState,
+    links: PlayerLinks,
     modifier: Modifier = Modifier,
 ) {
+    val artistId = song.artists.firstNotNullOfOrNull { it.id }
+    val album = song.album
     Column(modifier, verticalArrangement = Arrangement.Center) {
         // The cover slot: the flying cover lands here.
         Spacer(
@@ -321,13 +338,25 @@ private fun CoverAndTitle(
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
+        // The artist and the album open their pages (the first artist when there are several).
         Text(
             song.artistNames,
             style = MaterialTheme.typography.bodyLarge,
             color = Shura.colors.textMuted,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
+            modifier = artistId?.let { id -> Modifier.clickable { links.onArtist(id) } } ?: Modifier,
         )
+        if (album != null) {
+            Text(
+                album.title,
+                style = MaterialTheme.typography.bodyMedium,
+                color = Shura.colors.textMuted,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = album.id?.let { id -> Modifier.clickable { links.onAlbum(id) } } ?: Modifier,
+            )
+        }
     }
 }
 

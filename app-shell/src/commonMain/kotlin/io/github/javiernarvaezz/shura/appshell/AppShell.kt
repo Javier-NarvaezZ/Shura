@@ -70,6 +70,7 @@ import io.github.javiernarvaezz.shura.feature.browse.PlaylistViewModel
 import io.github.javiernarvaezz.shura.feature.home.HomeScreen
 import io.github.javiernarvaezz.shura.feature.home.HomeViewModel
 import io.github.javiernarvaezz.shura.feature.player.MiniPlayer
+import io.github.javiernarvaezz.shura.feature.player.PlayerLinks
 import io.github.javiernarvaezz.shura.feature.player.PlayerOverlay
 import io.github.javiernarvaezz.shura.feature.player.PlayerViewModel
 import io.github.javiernarvaezz.shura.feature.player.PreloadUpcomingArtwork
@@ -201,7 +202,7 @@ fun ShuraAppShell(
                 MiniPlayer(player.model, sheet, Modifier.padding(bottom = Shura.spacing.s))
                 BottomChrome(selected = shell.tab, onSelect = { shell.tab = it })
             }
-            PlayerOverlay(player.model, sheet)
+            PlayerOverlay(player.model, sheet, links = PlayerLinks(navigation.onArtist, navigation.onAlbum))
             PreloadUpcomingArtwork(player.model)
         }
     }
