@@ -21,6 +21,8 @@ kotlin {
 
 dependencies {
     implementation(projects.core.model)
+    implementation(projects.core.innertube)
+    implementation(libs.kotlinx.serialization.json)
     implementation(projects.core.network)
     implementation(projects.core.stream)
 }

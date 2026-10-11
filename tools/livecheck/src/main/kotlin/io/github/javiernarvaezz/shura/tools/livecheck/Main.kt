@@ -21,6 +21,7 @@ import java.util.concurrent.TimeUnit
  * Audio goes to a temp file outside the repository and is deleted after the decode check.
  *
  * Usage: ./gradlew :tools:livecheck:run --args="<number of tracks, default all>"
+ * Fixture recording for `:core:innertube`: --args="fixture …" (see [recordFixture]).
  */
 private val TRACKS =
     listOf(
@@ -49,6 +50,7 @@ private class HostRecorder : Interceptor {
 
 fun main(args: Array<String>) =
     runBlocking {
+        if (args.firstOrNull() == "fixture") return@runBlocking recordFixture(args.drop(1))
         val count = args.firstOrNull()?.toIntOrNull()?.coerceIn(1, TRACKS.size) ?: TRACKS.size
         val recorder = HostRecorder()
         val network = ShuraNetwork(listOf(recorder))
