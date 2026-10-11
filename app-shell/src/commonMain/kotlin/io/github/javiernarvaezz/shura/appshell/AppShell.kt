@@ -60,6 +60,8 @@ import io.github.javiernarvaezz.shura.core.ui.theme.Shura
 import io.github.javiernarvaezz.shura.core.ui.theme.ShuraMotion
 import io.github.javiernarvaezz.shura.feature.browse.AlbumScreen
 import io.github.javiernarvaezz.shura.feature.browse.AlbumViewModel
+import io.github.javiernarvaezz.shura.feature.browse.ArtistScreen
+import io.github.javiernarvaezz.shura.feature.browse.ArtistViewModel
 import io.github.javiernarvaezz.shura.feature.browse.BrowseNavigation
 import io.github.javiernarvaezz.shura.feature.home.HomeScreen
 import io.github.javiernarvaezz.shura.feature.home.HomeViewModel
@@ -94,6 +96,11 @@ internal sealed interface Route {
 
     /** [entry] tells apart two visits to the same page in one back stack (album → artist → same album). */
     data class Album(
+        val id: String,
+        val entry: Long,
+    ) : Route
+
+    data class Artist(
         val id: String,
         val entry: Long,
     ) : Route
@@ -177,6 +184,10 @@ fun ShuraAppShell(
                                         val album = viewModel { AlbumViewModel(deps.catalog, deps.player, route.id) }
                                         AlbumScreen(album.model, navigation)
                                     }
+                                    entry<Route.Artist> { route ->
+                                        val artist = viewModel { ArtistViewModel(deps.catalog, deps.player, route.id) }
+                                        ArtistScreen(artist.model, navigation)
+                                    }
                                 },
                         )
                     }
@@ -257,6 +268,6 @@ private fun browseNavigation(shell: ShellViewModel) =
     BrowseNavigation(
         onBack = shell::pop,
         onAlbum = { shell.push(Route.Album(it, shell.nextEntry())) },
-        onArtist = {},
+        onArtist = { shell.push(Route.Artist(it, shell.nextEntry())) },
         onPlaylist = {},
     )
