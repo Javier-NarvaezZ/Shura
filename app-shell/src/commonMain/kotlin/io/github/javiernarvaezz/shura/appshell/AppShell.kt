@@ -37,6 +37,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.ui.NavDisplay
@@ -136,7 +137,12 @@ fun ShuraAppShell(
                         NavDisplay(
                             backStack = stack,
                             onBack = { if (stack.size > 1) stack.removeAt(stack.lastIndex) },
-                            entryDecorators = listOf(rememberSaveableStateHolderNavEntryDecorator()),
+                            // Each entry (e.g. an album page) gets its own ViewModels, cleared when it is popped.
+                            entryDecorators =
+                                listOf(
+                                    rememberSaveableStateHolderNavEntryDecorator(),
+                                    rememberViewModelStoreNavEntryDecorator(),
+                                ),
                             entryProvider =
                                 entryProvider {
                                     entry<Route.Home> { HomeScreen(home.model, onSearch = { shell.tab = Tab.Search }) }
