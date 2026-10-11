@@ -1,6 +1,7 @@
 package io.github.javiernarvaezz.shura.core.innertube
 
 import io.github.javiernarvaezz.shura.core.model.AlbumPage
+import io.github.javiernarvaezz.shura.core.model.ArtistPage
 import io.github.javiernarvaezz.shura.core.model.Song
 import io.ktor.client.HttpClient
 import io.ktor.client.request.header
@@ -36,6 +37,9 @@ class InnerTubeClient(
 
     /** An album page (`MPREb_…`). */
     suspend fun album(id: String): AlbumPage = AlbumParser.parse(raw(InnerTubeRequest.Browse(id)), id)
+
+    /** An artist page (`UC…`). */
+    suspend fun artist(id: String): ArtistPage = ArtistParser.parse(raw(InnerTubeRequest.Browse(id)), id)
 
     /**
      * Sends [request] exactly as the typed calls do and returns the raw response. Used by them and by diagnostics

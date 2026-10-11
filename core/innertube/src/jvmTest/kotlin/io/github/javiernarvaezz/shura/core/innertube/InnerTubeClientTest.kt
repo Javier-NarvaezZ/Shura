@@ -158,4 +158,19 @@ class InnerTubeClientTest {
             assertEquals("Mi Sangre", page.album.title)
             assertEquals(12, page.tracks.size)
         }
+
+    @Test
+    fun artistBrowsesItsIdAndParsesThePage() =
+        runTest {
+            val page = client { json(Fixtures.read("artist/artist_juanes.json")) }.artist("UCeWBcJf4eNsQmGQO-N98eTg")
+
+            assertTrue(
+                requests
+                    .single()
+                    .url.encodedPath
+                    .endsWith("/browse"),
+            )
+            assertEquals("Juanes", page.artist.name)
+            assertEquals(5, page.topSongs.size)
+        }
 }
