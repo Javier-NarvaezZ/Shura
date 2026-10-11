@@ -1,5 +1,6 @@
 package io.github.javiernarvaezz.shura.core.innertube
 
+import io.github.javiernarvaezz.shura.core.model.BrowseLink
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.MockRequestHandleScope
@@ -172,5 +173,23 @@ class InnerTubeClientTest {
             )
             assertEquals("Juanes", page.artist.name)
             assertEquals(5, page.topSongs.size)
+        }
+
+    @Test
+    fun playlistsBrowseTheirLinkAndContinueWithTheToken() =
+        runTest {
+            val pages =
+                listOf("playlist/playlist_artist_songs.json", "playlist/playlist_artist_songs_continuation.json")
+            var served = 0
+            val client = client { json(Fixtures.read(pages[served++])) }
+
+            val first =
+                client.playlist(BrowseLink("VLOLAK5uy_nhiZ58OtcuzRST9aW5qI1xAxW9XwtG0RE", "ggMCCAI%3D"))
+            val more = client.playlistContinuation(first.continuation!!)
+
+            val bodies = requests.map { Json.parseToJsonElement(it.body.toByteArray().decodeToString()).jsonObject }
+            assertEquals("ggMCCAI%3D", bodies[0]["params"]!!.jsonPrimitive.content)
+            assertEquals(first.continuation, bodies[1]["continuation"]!!.jsonPrimitive.content)
+            assertEquals(150, first.tracks.size + more.tracks.size)
         }
 }

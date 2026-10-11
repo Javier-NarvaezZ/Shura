@@ -2,7 +2,10 @@ package io.github.javiernarvaezz.shura.core.innertube
 
 import io.github.javiernarvaezz.shura.core.model.AlbumPage
 import io.github.javiernarvaezz.shura.core.model.ArtistPage
+import io.github.javiernarvaezz.shura.core.model.BrowseLink
+import io.github.javiernarvaezz.shura.core.model.PlaylistPage
 import io.github.javiernarvaezz.shura.core.model.Song
+import io.github.javiernarvaezz.shura.core.model.TrackPage
 import io.ktor.client.HttpClient
 import io.ktor.client.request.header
 import io.ktor.client.request.post
@@ -40,6 +43,14 @@ class InnerTubeClient(
 
     /** An artist page (`UC…`). */
     suspend fun artist(id: String): ArtistPage = ArtistParser.parse(raw(InnerTubeRequest.Browse(id)), id)
+
+    /** A playlist page (`VL…`) with its first tracks; [playlistContinuation] loads the rest. */
+    suspend fun playlist(link: BrowseLink): PlaylistPage =
+        PlaylistParser.parse(raw(InnerTubeRequest.Browse(link.id, link.params)), link.id)
+
+    /** The next tracks of a playlist, from the token its previous page ended with. */
+    suspend fun playlistContinuation(token: String): TrackPage =
+        PlaylistParser.parseContinuation(raw(InnerTubeRequest.Continuation(token)))
 
     /**
      * Sends [request] exactly as the typed calls do and returns the raw response. Used by them and by diagnostics
