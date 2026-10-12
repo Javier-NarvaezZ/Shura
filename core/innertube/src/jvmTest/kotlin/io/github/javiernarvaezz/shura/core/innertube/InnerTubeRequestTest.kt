@@ -1,5 +1,6 @@
 package io.github.javiernarvaezz.shura.core.innertube
 
+import io.github.javiernarvaezz.shura.core.model.VideoId
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
@@ -110,5 +111,21 @@ class InnerTubeRequestTest {
             assertFailsWith<IllegalArgumentException> { client.raw(InnerTubeRequest.Continuation("tok en")) }
             assertFailsWith<IllegalArgumentException> { client.raw(InnerTubeRequest.Search("  ", SearchFilter.Songs)) }
             assertTrue(requests.isEmpty())
+        }
+
+    @Test
+    fun nextAsksForTheSongsRadio() =
+        runTest {
+            client.raw(InnerTubeRequest.Next(VideoId("7fwUH0oRmkQ")))
+
+            assertTrue(
+                requests
+                    .last()
+                    .url.encodedPath
+                    .endsWith("/next"),
+            )
+            assertEquals("7fwUH0oRmkQ", body()["videoId"]!!.jsonPrimitive.content)
+            assertEquals("RDAMVM7fwUH0oRmkQ", body()["playlistId"]!!.jsonPrimitive.content)
+            assertEquals("true", body()["isAudioOnly"]!!.jsonPrimitive.content)
         }
 }

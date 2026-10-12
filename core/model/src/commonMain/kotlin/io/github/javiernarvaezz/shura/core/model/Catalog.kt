@@ -143,4 +143,7 @@ interface MusicCatalog {
     suspend fun playlist(link: BrowseLink): PlaylistPage
 
     suspend fun playlistContinuation(token: String): TrackPage
+
+    /** The songs YouTube Music would play after [videoId] (its radio), without it. */
+    suspend fun relatedSongs(videoId: VideoId): List<Song>
 }

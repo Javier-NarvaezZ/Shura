@@ -10,6 +10,7 @@ import io.github.javiernarvaezz.shura.core.model.PlaylistPage
 import io.github.javiernarvaezz.shura.core.model.PlaylistSummary
 import io.github.javiernarvaezz.shura.core.model.Song
 import io.github.javiernarvaezz.shura.core.model.TrackPage
+import io.github.javiernarvaezz.shura.core.model.VideoId
 import io.ktor.client.HttpClient
 import io.ktor.client.request.header
 import io.ktor.client.request.post
@@ -66,6 +67,9 @@ class InnerTubeClient(
     override suspend fun playlistContinuation(token: String): TrackPage =
         PlaylistParser.parseContinuation(raw(InnerTubeRequest.Continuation(token)))
 
+    override suspend fun relatedSongs(videoId: VideoId): List<Song> =
+        NextParser.parse(raw(InnerTubeRequest.Next(videoId)), videoId)
+
     /**
      * Sends [request] exactly as the typed calls do and returns the raw response. Used by them and by diagnostics
      * (fixture recording in `:tools:livecheck`).
@@ -83,6 +87,15 @@ class InnerTubeClient(
                 post("browse") {
                     put("browseId", request.browseId)
                     request.params?.let { put("params", it) }
+                }
+            }
+
+            is InnerTubeRequest.Next -> {
+                post("next") {
+                    put("videoId", request.videoId.value)
+                    put("playlistId", RADIO_PREFIX + request.videoId.value)
+                    put("isAudioOnly", true)
+                    put("enablePersistentPlaylistPanel", true)
                 }
             }
 
@@ -153,5 +166,8 @@ class InnerTubeClient(
         const val API_BASE = "$ORIGIN/youtubei/v1"
         const val CLIENT_NAME = "WEB_REMIX"
         const val CLIENT_ID = "67"
+
+        /** A song's radio playlist, as YouTube Music builds it. */
+        const val RADIO_PREFIX = "RDAMVM"
     }
 }
