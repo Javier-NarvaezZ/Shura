@@ -12,6 +12,7 @@ import io.github.javiernarvaezz.shura.core.stream.event
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
 /**
@@ -26,7 +27,7 @@ import kotlinx.coroutines.launch
 internal class QueueAutoplayer(
     private val player: Player,
     private val relatedSongs: suspend (VideoId) -> List<Song>,
-    private val isEnabled: () -> Boolean,
+    private val enabled: StateFlow<Boolean>,
     private val scope: CoroutineScope,
     private val trace: Trace,
 ) : Player.Listener {
@@ -37,6 +38,8 @@ internal class QueueAutoplayer(
 
     fun start() {
         player.addListener(this)
+        // Also when the user turns autoplay on while the last song plays.
+        scope.launch { enabled.collect { if (it) schedule() } }
         schedule()
     }
 
@@ -71,7 +74,7 @@ internal class QueueAutoplayer(
     }
 
     private fun check() {
-        val seed = if (player.isPlaying) QueueAutoplay.seedFor(player.queueState(), isEnabled()) else null
+        val seed = if (player.isPlaying) QueueAutoplay.seedFor(player.queueState(), enabled.value) else null
         if (seed == null || seed.videoId == asked) return
         asked = seed.videoId
         job?.cancel()
@@ -91,7 +94,7 @@ internal class QueueAutoplayer(
             }
         val queue = player.queueState()
         // The queue may have changed while waiting: add only if the seed is still where it was.
-        if (QueueAutoplay.seedFor(queue, isEnabled())?.videoId != seed.videoId) {
+        if (QueueAutoplay.seedFor(queue, enabled.value)?.videoId != seed.videoId) {
             trace.event("autoplay: skipped", mapOf("reason" to "queue changed"))
             return
         }

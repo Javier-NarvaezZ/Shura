@@ -54,6 +54,7 @@ import io.github.javiernarvaezz.shura.core.model.MusicCatalog
 import io.github.javiernarvaezz.shura.core.model.Song
 import io.github.javiernarvaezz.shura.core.player.AudioPlayer
 import io.github.javiernarvaezz.shura.core.player.PlayHistory
+import io.github.javiernarvaezz.shura.core.player.PlaybackSettings
 import io.github.javiernarvaezz.shura.core.ui.artwork.LocalNetworkRegained
 import io.github.javiernarvaezz.shura.core.ui.artwork.NeverRegained
 import io.github.javiernarvaezz.shura.core.ui.components.ChromeSurface
@@ -92,6 +93,8 @@ class ShellDependencies(
     val currentHour: () -> Int,
     /** Emits when the device gets a network again, so covers that failed to load try once more. */
     val networkRegained: Flow<Unit> = NeverRegained,
+    /** The user's playback settings (autoplay); null where there are none yet (desktop). */
+    val settings: PlaybackSettings? = null,
 )
 
 enum class Tab { Home, Search }
@@ -155,7 +158,7 @@ fun ShuraAppShell(
     val shell = viewModel { ShellViewModel() }
     val home = viewModel { HomeViewModel(deps.player, deps.history, deps.currentHour) }
     val search = viewModel { SearchViewModel(SearchSources.of(deps.catalog), deps.player, deps.onPlaybackIntent) }
-    val player = viewModel { PlayerViewModel(deps.player) }
+    val player = viewModel { PlayerViewModel(deps.player, deps.settings) }
     val sheet = rememberPlayerSheetState()
     val scope = rememberCoroutineScope()
     val tabs = rememberSaveableStateHolder()

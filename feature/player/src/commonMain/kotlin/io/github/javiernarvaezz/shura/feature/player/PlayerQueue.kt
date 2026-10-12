@@ -2,28 +2,37 @@ package io.github.javiernarvaezz.shura.feature.player
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.javiernarvaezz.shura.core.ui.components.SongRow
 import io.github.javiernarvaezz.shura.core.ui.icons.ShuraIcons
 import io.github.javiernarvaezz.shura.core.ui.theme.Shura
 import io.github.javiernarvaezz.shura.feature.player.resources.Res
+import io.github.javiernarvaezz.shura.feature.player.resources.autoplay
+import io.github.javiernarvaezz.shura.feature.player.resources.autoplay_hint
 import io.github.javiernarvaezz.shura.feature.player.resources.move_down
 import io.github.javiernarvaezz.shura.feature.player.resources.move_up
 import io.github.javiernarvaezz.shura.feature.player.resources.queue_shuffled_hint
 import io.github.javiernarvaezz.shura.feature.player.resources.remove_from_queue
+import kotlinx.coroutines.flow.StateFlow
 import org.jetbrains.compose.resources.stringResource
 
 /**
@@ -40,6 +49,7 @@ internal fun PlayerQueue(
     val rows by model.queue.queueRows.collectAsStateWithLifecycle()
     val keyed = remember(rows) { withStableKeys(rows) }
     Column(modifier) {
+        model.autoplay?.let { AutoplayRow(it, model::setAutoplay) }
         if (!canReorder) {
             Text(
                 stringResource(Res.string.queue_shuffled_hint),
@@ -106,3 +116,34 @@ private fun withStableKeys(rows: List<QueueRow>): List<Pair<String, QueueRow>> {
 }
 
 private val ACTION_SIZE = 40.dp
+
+/** The autoplay switch at the top of the queue. */
+@Composable
+private fun AutoplayRow(
+    autoplay: StateFlow<Boolean>,
+    onChange: (Boolean) -> Unit,
+) {
+    val enabled by autoplay.collectAsStateWithLifecycle()
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .toggleable(value = enabled, role = Role.Switch, onValueChange = onChange)
+            .padding(horizontal = Shura.spacing.gutter, vertical = Shura.spacing.s),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(
+                stringResource(Res.string.autoplay),
+                style = MaterialTheme.typography.titleSmall,
+                color = Shura.colors.text,
+            )
+            Text(
+                stringResource(Res.string.autoplay_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = Shura.colors.textMuted,
+            )
+        }
+        // The whole row toggles; the switch only shows the state.
+        Switch(checked = enabled, onCheckedChange = null)
+    }
+}

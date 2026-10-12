@@ -6,6 +6,7 @@ import io.github.javiernarvaezz.shura.core.model.VideoId
 import io.github.javiernarvaezz.shura.core.player.AudioPlayer
 import io.github.javiernarvaezz.shura.core.player.PlayHistory
 import io.github.javiernarvaezz.shura.core.player.PlaybackProgress
+import io.github.javiernarvaezz.shura.core.player.PlaybackSettings
 import io.github.javiernarvaezz.shura.core.player.PlaybackState
 import io.github.javiernarvaezz.shura.core.player.QueueState
 import io.github.javiernarvaezz.shura.core.player.RepeatMode
@@ -117,4 +118,15 @@ class FakePlayHistory : PlayHistory {
     val songs = MutableStateFlow<List<Song>?>(null)
 
     override fun recent(limit: Int): Flow<List<Song>> = songs.filterNotNull().map { it.take(limit) }
+}
+
+/** Settings kept in memory; [setAutoplay] changes the value at once. */
+class FakePlaybackSettings(
+    autoplay: Boolean = true,
+) : PlaybackSettings {
+    override val autoplay = MutableStateFlow(autoplay)
+
+    override fun setAutoplay(enabled: Boolean) {
+        this.autoplay.value = enabled
+    }
 }
