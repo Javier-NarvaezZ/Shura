@@ -8,7 +8,7 @@ import kotlin.coroutines.CoroutineContext
 
 /**
  * The app's database (`shura.db`, app-private storage, excluded from backups), migrated to the current schema when
- * opened, behind the queue store and the settings.
+ * opened, behind the queue store, the settings and the lyrics cache.
  */
 class AndroidAppStorage(
     context: Context,
@@ -20,4 +20,6 @@ class AndroidAppStorage(
     val queue = SqlQueueStore(database, ioContext)
 
     val settings = SqlPlaybackSettings(database, scope, ioContext)
+
+    val lyrics = SqlLyricsStore(database, ioContext)
 }

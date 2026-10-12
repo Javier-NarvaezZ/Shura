@@ -1,0 +1,9 @@
+-- Version 2 → 3: the lyrics cache (Phase 3, synced lyrics).
+CREATE TABLE lyrics_cache (
+    video_id TEXT NOT NULL PRIMARY KEY,
+    kind TEXT NOT NULL,
+    body TEXT,
+    fetched_at INTEGER NOT NULL
+);
+
+CREATE INDEX lyrics_cache_fetched_at ON lyrics_cache(fetched_at);
