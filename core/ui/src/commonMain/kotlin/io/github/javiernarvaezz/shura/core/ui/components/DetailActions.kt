@@ -23,7 +23,8 @@ import io.github.javiernarvaezz.shura.core.ui.icons.ShuraIcons
 import io.github.javiernarvaezz.shura.core.ui.theme.Shura
 
 /**
- * A page's playback actions: shuffle in a round button and a wide "play" button. While [loading] (e.g. the rest
+ * A page's playback actions: shuffle in a round button and a wide "play" button on the brand
+ * gradient. While [loading] (e.g. the rest
  * of a playlist), both wait and play shows a spinner instead of its icon.
  */
 @Composable
@@ -55,7 +56,8 @@ fun DetailActions(
                 .weight(1f)
                 .height(BUTTON_HEIGHT)
                 .clip(Shura.shapes.pill)
-                .background(Shura.colors.accent)
+                // The brand gradient (the sun) marks the main action; its text and icon stay dark (AA).
+                .background(Shura.colors.brandGradient)
                 .clickable(enabled = !loading, role = Role.Button, onClick = onPlay),
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically,
