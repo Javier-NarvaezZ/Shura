@@ -70,6 +70,19 @@ class HostPolicyTest {
     }
 
     @Test
+    fun allowsOnlyTheExactLyricsHost() {
+        assertTrue(HostPolicy.isAllowed("lrclib.net"))
+        listOf(
+            "www.lrclib.net",
+            "api.lrclib.net",
+            "evil.lrclib.net",
+            "lrclib.net.evil.com",
+            "evillrclib.net",
+            "lrclib.com",
+        ).forEach { assertFalse(HostPolicy.isAllowed(it), it) }
+    }
+
+    @Test
     fun hostMatchingIsCaseInsensitive() {
         assertTrue(HostPolicy.isAllowed("Music.YouTube.com"))
     }
