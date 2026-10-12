@@ -22,6 +22,15 @@ class LyricsQueryTest {
         assertFailsWith<IllegalArgumentException> { LyricsQuery("Title", "", null, 200.seconds) }
         assertFailsWith<IllegalArgumentException> { LyricsQuery("Title", "Artist", null, Duration.ZERO) }
         assertFailsWith<IllegalArgumentException> { LyricsQuery("Title", "Artist", null, Duration.INFINITE) }
+        assertFailsWith<IllegalArgumentException> { LyricsQuery("Title", "Artist", null, (-3).seconds) }
+    }
+
+    @Test
+    fun userAgentNamesTheAppItsVersionAndHomepage() {
+        assertEquals(
+            "Sunloop v0.0.1 (https://github.com/Javier-NarvaezZ/Shura)",
+            LrcLibClient.userAgent("Sunloop", "0.0.1", "https://github.com/Javier-NarvaezZ/Shura"),
+        )
     }
 
     @Test

@@ -16,6 +16,9 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.seconds
 
 /** Request shape and failure mapping; matching on real LRCLIB responses is in [LrcLibClientTest]. */
@@ -41,6 +44,8 @@ class LrcLibClientErrorsTest {
     private fun assertNoSongData(error: Throwable) {
         val message = error.message.orEmpty()
         listOf("Secret", "lrclib", "http://", "https://").forEach { assertFalse(it in message, message) }
+        // The underlying error is dropped: it could carry the request URL.
+        assertNull(error.cause)
     }
 
     @Test
@@ -115,6 +120,8 @@ class LrcLibClientErrorsTest {
                         .lyrics(query)
                 }
             assertNoSongData(error)
+            assertEquals("IOException", error.causeType)
+            assertFalse("Secret" in error.stackTraceToString())
         }
 
     @Test
@@ -122,6 +129,16 @@ class LrcLibClientErrorsTest {
         runTest {
             val error = assertFailsWith<LyricsException.Format> { client { json("<html>") }.lyrics(query) }
             assertNoSongData(error)
+        }
+
+    @Test
+    fun truncatedJsonKeepsOnlyTheParserErrorType() =
+        runTest {
+            val error =
+                assertFailsWith<LyricsException.Format> { client { json("""{"trackName":"Secret""") }.lyrics(query) }
+            assertNoSongData(error)
+            val causeType = assertNotNull(error.causeType)
+            assertTrue(causeType.endsWith("Exception"), causeType)
         }
 
     @Test

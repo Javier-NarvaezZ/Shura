@@ -124,6 +124,13 @@ class LrcLibClient(
 
         const val DEFAULT_USER_AGENT = "Shura (https://github.com/Javier-NarvaezZ/Shura)"
 
+        /** The User-Agent LRCLIB asks for: the app's name, its version and a link to its homepage. */
+        fun userAgent(
+            app: String,
+            version: String,
+            homepage: String,
+        ): String = "$app v$version ($homepage)"
+
         private const val API_BASE = "https://lrclib.net/api"
         private const val MILLIS_PER_SECOND = 1000.0
     }
