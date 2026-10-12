@@ -1,5 +1,7 @@
 package io.github.javiernarvaezz.shura.core.player
 
+import io.github.javiernarvaezz.shura.core.model.Song
+import io.github.javiernarvaezz.shura.core.model.VideoId
 import io.github.javiernarvaezz.shura.core.stream.AudioQuality
 import io.github.javiernarvaezz.shura.core.stream.StreamResolver
 import io.github.javiernarvaezz.shura.core.stream.Trace
@@ -15,6 +17,10 @@ class PlaybackDependencies(
     val queueStore: QueueStore? = null,
     /** Whether to resolve the next item ahead of playback; checked before each pre-resolution. */
     val prefetchNext: () -> Boolean = { true },
+    /** A song's related songs, to continue a queue about to end; null turns autoplay off. */
+    val relatedSongs: (suspend (VideoId) -> List<Song>)? = null,
+    /** Whether autoplay is on (the user's setting); checked before each request. */
+    val autoplay: () -> Boolean = { false },
 )
 
 /** Implemented by the `Application`, so the service gets its dependencies without a DI framework. */

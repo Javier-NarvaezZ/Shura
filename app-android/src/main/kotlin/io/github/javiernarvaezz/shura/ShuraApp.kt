@@ -88,6 +88,8 @@ class AppGraph(
             trace = trace,
             queueStore = store,
             prefetchNext = ::nextItemPrefetchEnabled,
+            relatedSongs = catalog::relatedSongs,
+            autoplay = { settings.autoplay.value },
         )
 
     val player: AudioPlayer = AndroidAudioPlayer(context, trace)
