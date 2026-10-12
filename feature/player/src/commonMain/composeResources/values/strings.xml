@@ -22,6 +22,8 @@
     <string name="loading">Cargando…</string>
     <string name="retry">Reintentar</string>
     <string name="end_of_queue">Fin de la cola</string>
+    <string name="autoplay">Reproducción automática</string>
+    <string name="autoplay_hint">Al terminar la cola, sigue con canciones parecidas</string>
     <!-- Playback failures (ADR 0001 R4): plain language, full sentences, no technical details. -->
     <string name="error_unplayable">Esta canción no se puede reproducir por ahora.</string>
     <string name="error_age_restricted">Esta canción tiene restricción de edad y necesita una cuenta.</string>

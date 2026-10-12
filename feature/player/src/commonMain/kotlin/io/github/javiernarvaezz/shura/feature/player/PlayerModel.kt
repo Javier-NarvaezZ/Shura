@@ -6,6 +6,7 @@ import io.github.javiernarvaezz.shura.core.model.Song
 import io.github.javiernarvaezz.shura.core.player.AudioPlayer
 import io.github.javiernarvaezz.shura.core.player.PlaybackError
 import io.github.javiernarvaezz.shura.core.player.PlaybackProgress
+import io.github.javiernarvaezz.shura.core.player.PlaybackSettings
 import io.github.javiernarvaezz.shura.core.player.PlaybackState
 import io.github.javiernarvaezz.shura.core.player.QueueState
 import io.github.javiernarvaezz.shura.core.player.RepeatMode
@@ -71,7 +72,15 @@ data class RemovedSong(
 class PlayerModel(
     private val player: AudioPlayer,
     scope: CoroutineScope,
+    private val settings: PlaybackSettings? = null,
 ) {
+    /** Whether a queue about to end continues with related songs; null where there is no setting to change. */
+    val autoplay: StateFlow<Boolean>? = settings?.autoplay
+
+    fun setAutoplay(enabled: Boolean) {
+        settings?.setAutoplay(enabled)
+    }
+
     // Eager: the actions read state.value even when no screen is collecting it.
     val state: StateFlow<PlayerUiState> =
         combine(player.state, player.queue) { playback, queue ->
@@ -177,6 +186,7 @@ class QueueModel(
 
 class PlayerViewModel(
     player: AudioPlayer,
+    settings: PlaybackSettings? = null,
 ) : ViewModel() {
-    val model = PlayerModel(player, viewModelScope)
+    val model = PlayerModel(player, viewModelScope, settings)
 }

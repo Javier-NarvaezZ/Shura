@@ -1,0 +1,11 @@
+-- The user's settings, one row per key; a missing row means the default.
+CREATE TABLE setting (
+    key TEXT NOT NULL PRIMARY KEY,
+    value TEXT NOT NULL
+);
+
+valueOf:
+SELECT value FROM setting WHERE key = ?;
+
+put:
+INSERT OR REPLACE INTO setting(key, value) VALUES (?, ?);

@@ -24,6 +24,8 @@ import com.google.common.util.concurrent.ListenableFuture
 import io.github.javiernarvaezz.shura.core.stream.StreamResolutionException
 import io.github.javiernarvaezz.shura.core.stream.Trace
 import io.github.javiernarvaezz.shura.core.stream.event
+import kotlinx.coroutines.MainScope
+import kotlinx.coroutines.cancel
 import java.io.File
 import java.io.FileDescriptor
 import java.io.PrintWriter
@@ -44,6 +46,8 @@ class PlaybackService : MediaSessionService() {
     private var trace: Trace = Trace.NONE
     private var persistence: QueuePersistence? = null
     private var prefetcher: NextItemPrefetcher? = null
+    private var autoplayer: QueueAutoplayer? = null
+    private val scope = MainScope()
     private var errorJournal: PlaybackErrorJournal? = null
 
     override fun onCreate() {
@@ -73,6 +77,10 @@ class PlaybackService : MediaSessionService() {
         prefetcher =
             NextItemPrefetcher(player, specResolver::prefetch, dependencies.prefetchNext, trace)
                 .also(NextItemPrefetcher::start)
+        autoplayer =
+            dependencies.relatedSongs?.let { related ->
+                QueueAutoplayer(player, related, dependencies.autoplay, scope, trace).also(QueueAutoplayer::start)
+            }
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = session
@@ -90,6 +98,9 @@ class PlaybackService : MediaSessionService() {
         persistence = null
         prefetcher?.stop()
         prefetcher = null
+        autoplayer?.stop()
+        autoplayer = null
+        scope.cancel()
         session?.run {
             player.release()
             release()

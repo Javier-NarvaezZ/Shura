@@ -6,6 +6,7 @@ import io.github.javiernarvaezz.shura.core.player.PlaybackState
 import io.github.javiernarvaezz.shura.core.player.QueueState
 import io.github.javiernarvaezz.shura.core.player.RepeatMode
 import io.github.javiernarvaezz.shura.core.testing.FakeAudioPlayer
+import io.github.javiernarvaezz.shura.core.testing.FakePlaybackSettings
 import io.github.javiernarvaezz.shura.core.testing.testSong
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
@@ -222,5 +223,17 @@ class PlayerModelTest {
             model.queue.moveUp(1)
 
             assertEquals(listOf("move:1>0", "move:1>2"), player.calls)
+        }
+
+    @Test
+    fun theAutoplaySwitchFollowsAndChangesTheSetting() =
+        runTest {
+            val settings = FakePlaybackSettings(autoplay = true)
+            val model = PlayerModel(player, backgroundScope, settings)
+
+            assertEquals(true, model.autoplay?.value)
+            model.setAutoplay(false)
+            assertEquals(false, settings.autoplay.value)
+            assertNull(PlayerModel(player, backgroundScope).autoplay)
         }
 }

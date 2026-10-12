@@ -8,7 +8,7 @@ import coil3.ImageLoader
 import coil3.SingletonImageLoader
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import coil3.serviceLoaderEnabled
-import io.github.javiernarvaezz.shura.core.data.androidQueueStore
+import io.github.javiernarvaezz.shura.core.data.AndroidAppStorage
 import io.github.javiernarvaezz.shura.core.innertube.InnerTubeClient
 import io.github.javiernarvaezz.shura.core.innertube.InnerTubeConfig
 import io.github.javiernarvaezz.shura.core.network.ShuraNetwork
@@ -71,8 +71,14 @@ class AppGraph(
             InnerTubeClient(network.ktor, InnerTubeConfig.forDevice(locale.language, locale.country))
         }
 
-    /** Queue and play history: app-private database (excluded from backups), opened off the main thread. */
-    val store = androidQueueStore(context, Dispatchers.IO)
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    /** Queue, play history and settings: app-private database (excluded from backups), used off the main thread. */
+    private val storage = AndroidAppStorage(context, Dispatchers.IO, scope)
+
+    val store = storage.queue
+
+    val settings = storage.settings
 
     /** Used by `PlaybackService`, where the player lives; media and artwork go through the single client. */
     val playbackDependencies =
@@ -82,6 +88,8 @@ class AppGraph(
             trace = trace,
             queueStore = store,
             prefetchNext = ::nextItemPrefetchEnabled,
+            relatedSongs = catalog::relatedSongs,
+            autoplay = settings.autoplay,
         )
 
     val player: AudioPlayer = AndroidAudioPlayer(context, trace)
@@ -96,8 +104,6 @@ class AppGraph(
             .serviceLoaderEnabled(false)
             .components { add(OkHttpNetworkFetcherFactory(callFactory = { network.okHttp })) }
             .build()
-
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     private val connectivity = context.getSystemService(ConnectivityManager::class.java)
 

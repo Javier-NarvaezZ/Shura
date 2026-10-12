@@ -10,6 +10,7 @@ import io.github.javiernarvaezz.shura.core.model.PlaylistPage
 import io.github.javiernarvaezz.shura.core.model.PlaylistSummary
 import io.github.javiernarvaezz.shura.core.model.Song
 import io.github.javiernarvaezz.shura.core.model.TrackPage
+import io.github.javiernarvaezz.shura.core.model.VideoId
 
 /**
  * A catalog that answers from the maps a test fills, records each call in [calls] and fails with [failure] while
@@ -27,6 +28,7 @@ class FakeMusicCatalog : MusicCatalog {
     val artists = mutableMapOf<String, ArtistPage>()
     val playlists = mutableMapOf<String, PlaylistPage>()
     val continuations = mutableMapOf<String, TrackPage>()
+    val related = mutableMapOf<VideoId, List<Song>>()
 
     override suspend fun searchSongs(query: String) = answer("searchSongs:$query", songs[query])
 
@@ -43,6 +45,8 @@ class FakeMusicCatalog : MusicCatalog {
     override suspend fun playlist(link: BrowseLink) = answer("playlist:${link.id}", playlists[link.id])
 
     override suspend fun playlistContinuation(token: String) = answer("continuation:$token", continuations[token])
+
+    override suspend fun relatedSongs(videoId: VideoId) = answer("related:${videoId.value}", related[videoId])
 
     private fun <T> answer(
         call: String,

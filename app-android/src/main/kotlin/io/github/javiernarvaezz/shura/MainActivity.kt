@@ -28,6 +28,7 @@ class MainActivity : ComponentActivity() {
                             onPlaybackIntent = graph.playbackWarmup::onPlaybackIntent,
                             currentHour = { LocalTime.now().hour },
                             networkRegained = graph.networkRegained,
+                            settings = graph.settings,
                         )
                     },
                 )

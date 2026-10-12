@@ -1,5 +1,7 @@
 package io.github.javiernarvaezz.shura.core.innertube
 
+import io.github.javiernarvaezz.shura.core.model.VideoId
+
 /** What a search returns: each filter is one of YouTube Music's search chips. */
 enum class SearchFilter { Songs, Albums, Artists, Playlists }
 
@@ -30,6 +32,11 @@ sealed interface InnerTubeRequest {
             require(params == null || TOKEN.matches(params)) { "Invalid browse params" }
         }
     }
+
+    /** The songs YouTube Music would play after [videoId] (its radio), as in the "up next" list. */
+    class Next(
+        val videoId: VideoId,
+    ) : InnerTubeRequest
 
     /** The next page of a list, from the token its previous page ended with. */
     class Continuation(

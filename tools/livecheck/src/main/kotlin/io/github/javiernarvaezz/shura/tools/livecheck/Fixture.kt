@@ -4,6 +4,7 @@ import io.github.javiernarvaezz.shura.core.innertube.InnerTubeClient
 import io.github.javiernarvaezz.shura.core.innertube.InnerTubeConfig
 import io.github.javiernarvaezz.shura.core.innertube.InnerTubeRequest
 import io.github.javiernarvaezz.shura.core.innertube.SearchFilter
+import io.github.javiernarvaezz.shura.core.model.VideoId
 import io.github.javiernarvaezz.shura.core.network.ShuraNetwork
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -21,6 +22,7 @@ import java.io.File
  * - `fixture <path> browse <id> [params]`
  * - `fixture <path> search <songs|albums|artists|playlists> <query…>`
  * - `fixture <path> continuation <path of the previous page's fixture>`
+ * - `fixture <path> next <video id>`
  *
  * Output: the written path and its size only.
  */
@@ -33,6 +35,7 @@ internal suspend fun recordFixture(args: List<String>) {
             "browse" -> InnerTubeRequest.Browse(args[2], args.getOrNull(3))
             "search" -> InnerTubeRequest.Search(args.drop(3).joinToString(" "), searchFilter(args[2]))
             "continuation" -> InnerTubeRequest.Continuation(continuationToken(File(root, args[2])))
+            "next" -> InnerTubeRequest.Next(VideoId(args[2]))
             else -> error("Unknown request kind")
         }
     val client = InnerTubeClient(ShuraNetwork(emptyList()).ktor, InnerTubeConfig.forDevice("es", "CO"))
