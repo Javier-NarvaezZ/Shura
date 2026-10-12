@@ -70,6 +70,7 @@ import org.jetbrains.compose.resources.stringResource
 @Composable
 fun SearchScreen(
     controller: SearchController,
+    links: SearchLinks,
     modifier: Modifier = Modifier,
 ) {
     val state by controller.state.collectAsStateWithLifecycle()
@@ -99,10 +100,12 @@ fun SearchScreen(
                     controller.submit()
                 },
             )
+            KindChips(state.kind, controller::selectKind)
             SearchBody(
                 state = state,
                 currentId = queue.current?.videoId?.value,
                 controller = controller,
+                links = links,
                 onQueued = { next ->
                     notify { getString(if (next) Res.string.queued_next else Res.string.queued_end) }
                 },
@@ -131,6 +134,7 @@ private fun SearchBody(
     state: SearchUiState,
     currentId: String?,
     controller: SearchController,
+    links: SearchLinks,
     onQueued: (Boolean) -> Unit,
 ) {
     when (state.status) {
@@ -147,23 +151,40 @@ private fun SearchBody(
         }
 
         SearchStatus.Failed -> {
-            Failed(onRetry = controller::submit)
+            Failed(onRetry = controller::retry)
         }
 
         SearchStatus.Done -> {
-            Results(
-                songs = state.results,
-                currentId = currentId,
-                onPlay = controller::play,
-                onPlayNext = { song ->
-                    controller.playNext(song)
-                    onQueued(true)
-                },
-                onEnqueue = { song ->
-                    controller.enqueue(song)
-                    onQueued(false)
-                },
-            )
+            when (state.kind) {
+                SearchKind.Songs -> {
+                    SongResults(
+                        songs = state.results,
+                        currentId = currentId,
+                        onPlay = controller::play,
+                        onPlayNext = { song ->
+                            controller.playNext(song)
+                            onQueued(true)
+                        },
+                        onEnqueue = { song ->
+                            controller.enqueue(song)
+                            onQueued(false)
+                        },
+                        links = links,
+                    )
+                }
+
+                SearchKind.Albums -> {
+                    AlbumResults(state.albums, links)
+                }
+
+                SearchKind.Artists -> {
+                    ArtistResults(state.artists, links)
+                }
+
+                SearchKind.Playlists -> {
+                    PlaylistResults(state.playlists, links)
+                }
+            }
         }
     }
 }
@@ -199,65 +220,6 @@ private fun SearchField(
         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
         keyboardActions = KeyboardActions(onSearch = { onSubmit() }),
     )
-}
-
-@Composable
-private fun Results(
-    songs: List<Song>,
-    currentId: String?,
-    onPlay: (Song) -> Unit,
-    onPlayNext: (Song) -> Unit,
-    onEnqueue: (Song) -> Unit,
-) {
-    LazyColumn(Modifier.fillMaxSize().padding(top = Shura.spacing.m)) {
-        items(songs, key = { it.videoId.value }) { song ->
-            SongRow(
-                title = song.title,
-                subtitle = song.subtitle(),
-                artworkUrl = song.thumbnailUrl,
-                explicit = song.isExplicit,
-                isCurrent = song.videoId.value == currentId,
-                onClick = { onPlay(song) },
-            ) {
-                RowMenu(onPlayNext = { onPlayNext(song) }, onEnqueue = { onEnqueue(song) })
-            }
-        }
-    }
-}
-
-@Composable
-private fun RowMenu(
-    onPlayNext: () -> Unit,
-    onEnqueue: () -> Unit,
-) {
-    var open by rememberSaveable { mutableStateOf(false) }
-    Box {
-        IconButton(onClick = { open = true }) {
-            Icon(
-                ShuraIcons.More,
-                contentDescription = stringResource(Res.string.more_actions),
-                tint = Shura.colors.textMuted,
-            )
-        }
-        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-            DropdownMenuItem(
-                text = { Text(stringResource(Res.string.play_next)) },
-                leadingIcon = { Icon(ShuraIcons.PlayNext, contentDescription = null) },
-                onClick = {
-                    open = false
-                    onPlayNext()
-                },
-            )
-            DropdownMenuItem(
-                text = { Text(stringResource(Res.string.add_to_queue)) },
-                leadingIcon = { Icon(ShuraIcons.AddToQueue, contentDescription = null) },
-                onClick = {
-                    open = false
-                    onEnqueue()
-                },
-            )
-        }
-    }
 }
 
 @Composable
@@ -297,8 +259,5 @@ private fun LoadingRows() {
         }
     }
 }
-
-private fun Song.subtitle(): String =
-    listOfNotNull(artistNames.ifBlank { null }, album?.title, duration?.toClock()).joinToString(" • ")
 
 private const val LOADING_ROWS = 6

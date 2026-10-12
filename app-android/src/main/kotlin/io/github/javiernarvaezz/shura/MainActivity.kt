@@ -24,7 +24,7 @@ class MainActivity : ComponentActivity() {
                         ShellDependencies(
                             player = graph.player,
                             history = graph.store,
-                            searchSongs = graph.catalog::searchSongs,
+                            catalog = graph.catalog,
                             onPlaybackIntent = graph.playbackWarmup::onPlaybackIntent,
                             currentHour = { LocalTime.now().hour },
                             networkRegained = graph.networkRegained,

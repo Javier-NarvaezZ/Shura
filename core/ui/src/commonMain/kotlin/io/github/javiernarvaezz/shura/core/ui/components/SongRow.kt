@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -22,8 +23,9 @@ import io.github.javiernarvaezz.shura.core.ui.artwork.Artwork
 import io.github.javiernarvaezz.shura.core.ui.theme.Shura
 
 /**
- * One song in a list: cover, title (with the explicit mark), a muted subtitle and optional trailing actions.
- * [isCurrent] highlights the song that is playing.
+ * One song (or album, artist, playlist) in a list: cover, title (with the explicit mark), a muted subtitle and
+ * optional trailing actions. [isCurrent] highlights the song that is playing; [round] crops the cover to a circle
+ * (artists).
  */
 @Composable
 fun SongRow(
@@ -34,6 +36,7 @@ fun SongRow(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     isCurrent: Boolean = false,
+    round: Boolean = false,
     trailing: @Composable RowScope.() -> Unit = {},
 ) {
     Row(
@@ -44,7 +47,13 @@ fun SongRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Shura.spacing.m),
     ) {
-        Artwork(artworkUrl, sizePx = ROW_ARTWORK_PX, contentDescription = null, modifier = Modifier.size(52.dp))
+        Artwork(
+            artworkUrl,
+            sizePx = ROW_ARTWORK_PX,
+            contentDescription = null,
+            modifier = Modifier.size(52.dp),
+            shape = if (round) CircleShape else Shura.shapes.thumbnail,
+        )
         Column(Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(

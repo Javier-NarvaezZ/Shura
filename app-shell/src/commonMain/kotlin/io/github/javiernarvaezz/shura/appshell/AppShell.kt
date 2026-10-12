@@ -22,6 +22,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
@@ -37,6 +38,8 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
+import androidx.navigation3.runtime.EntryProviderScope
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.ui.NavDisplay
@@ -46,6 +49,8 @@ import androidx.navigationevent.compose.rememberNavigationEventState
 import io.github.javiernarvaezz.shura.appshell.resources.Res
 import io.github.javiernarvaezz.shura.appshell.resources.tab_home
 import io.github.javiernarvaezz.shura.appshell.resources.tab_search
+import io.github.javiernarvaezz.shura.core.model.BrowseLink
+import io.github.javiernarvaezz.shura.core.model.MusicCatalog
 import io.github.javiernarvaezz.shura.core.model.Song
 import io.github.javiernarvaezz.shura.core.player.AudioPlayer
 import io.github.javiernarvaezz.shura.core.player.PlayHistory
@@ -55,14 +60,24 @@ import io.github.javiernarvaezz.shura.core.ui.components.ChromeSurface
 import io.github.javiernarvaezz.shura.core.ui.icons.ShuraIcons
 import io.github.javiernarvaezz.shura.core.ui.theme.Shura
 import io.github.javiernarvaezz.shura.core.ui.theme.ShuraMotion
+import io.github.javiernarvaezz.shura.feature.browse.AlbumScreen
+import io.github.javiernarvaezz.shura.feature.browse.AlbumViewModel
+import io.github.javiernarvaezz.shura.feature.browse.ArtistScreen
+import io.github.javiernarvaezz.shura.feature.browse.ArtistViewModel
+import io.github.javiernarvaezz.shura.feature.browse.BrowseNavigation
+import io.github.javiernarvaezz.shura.feature.browse.PlaylistScreen
+import io.github.javiernarvaezz.shura.feature.browse.PlaylistViewModel
 import io.github.javiernarvaezz.shura.feature.home.HomeScreen
 import io.github.javiernarvaezz.shura.feature.home.HomeViewModel
 import io.github.javiernarvaezz.shura.feature.player.MiniPlayer
+import io.github.javiernarvaezz.shura.feature.player.PlayerLinks
 import io.github.javiernarvaezz.shura.feature.player.PlayerOverlay
 import io.github.javiernarvaezz.shura.feature.player.PlayerViewModel
 import io.github.javiernarvaezz.shura.feature.player.PreloadUpcomingArtwork
 import io.github.javiernarvaezz.shura.feature.player.rememberPlayerSheetState
+import io.github.javiernarvaezz.shura.feature.search.SearchLinks
 import io.github.javiernarvaezz.shura.feature.search.SearchScreen
+import io.github.javiernarvaezz.shura.feature.search.SearchSources
 import io.github.javiernarvaezz.shura.feature.search.SearchViewModel
 import kotlinx.coroutines.flow.Flow
 import org.jetbrains.compose.resources.stringResource
@@ -71,7 +86,7 @@ import org.jetbrains.compose.resources.stringResource
 class ShellDependencies(
     val player: AudioPlayer,
     val history: PlayHistory,
-    val searchSongs: suspend (String) -> List<Song>,
+    val catalog: MusicCatalog,
     val onPlaybackIntent: () -> Unit,
     /** The local hour (0..23), for Home's greeting. */
     val currentHour: () -> Int,
@@ -85,9 +100,25 @@ internal sealed interface Route {
     data object Home : Route
 
     data object Search : Route
+
+    /** [entry] tells apart two visits to the same page in one back stack (album → artist → same album). */
+    data class Album(
+        val id: String,
+        val entry: Long,
+    ) : Route
+
+    data class Artist(
+        val id: String,
+        val entry: Long,
+    ) : Route
+
+    data class Playlist(
+        val link: BrowseLink,
+        val entry: Long,
+    ) : Route
 }
 
-/** Navigation state, kept across rotation. Each tab has its own back stack (album and artist pages: E6). */
+/** Navigation state, kept across rotation. Each tab has its own back stack of pages. */
 internal class ShellViewModel : ViewModel() {
     var tab by mutableStateOf(Tab.Home)
 
@@ -96,6 +127,20 @@ internal class ShellViewModel : ViewModel() {
             Tab.Home to mutableStateListOf<Route>(Route.Home),
             Tab.Search to mutableStateListOf<Route>(Route.Search),
         )
+
+    private var entries = 0L
+
+    /** A number for the next page pushed, unique for the life of this ViewModel. */
+    fun nextEntry(): Long = ++entries
+
+    fun push(route: Route) {
+        stacks.getValue(tab).add(route)
+    }
+
+    fun pop() {
+        val stack = stacks.getValue(tab)
+        if (stack.size > 1) stack.removeAt(stack.lastIndex)
+    }
 }
 
 /**
@@ -109,11 +154,14 @@ fun ShuraAppShell(
 ) {
     val shell = viewModel { ShellViewModel() }
     val home = viewModel { HomeViewModel(deps.player, deps.history, deps.currentHour) }
-    val search = viewModel { SearchViewModel(deps.searchSongs, deps.player, deps.onPlaybackIntent) }
+    val search = viewModel { SearchViewModel(SearchSources.of(deps.catalog), deps.player, deps.onPlaybackIntent) }
     val player = viewModel { PlayerViewModel(deps.player) }
     val sheet = rememberPlayerSheetState()
     val scope = rememberCoroutineScope()
     val tabs = rememberSaveableStateHolder()
+    val navigation = remember(shell) { browseNavigation(shell) }
+    val searchLinks =
+        remember(navigation) { SearchLinks(navigation.onAlbum, navigation.onArtist, navigation.onPlaylist) }
     // Back leaves the queue, then closes the player, before it navigates.
     NavigationBackHandler(
         state = rememberNavigationEventState(NavigationEventInfo.None),
@@ -135,12 +183,18 @@ fun ShuraAppShell(
                         val stack = shell.stacks.getValue(shell.tab)
                         NavDisplay(
                             backStack = stack,
-                            onBack = { if (stack.size > 1) stack.removeAt(stack.lastIndex) },
-                            entryDecorators = listOf(rememberSaveableStateHolderNavEntryDecorator()),
+                            onBack = shell::pop,
+                            // Each entry (e.g. an album page) gets its own ViewModels, cleared when it is popped.
+                            entryDecorators =
+                                listOf(
+                                    rememberSaveableStateHolderNavEntryDecorator(),
+                                    rememberViewModelStoreNavEntryDecorator(),
+                                ),
                             entryProvider =
                                 entryProvider {
                                     entry<Route.Home> { HomeScreen(home.model, onSearch = { shell.tab = Tab.Search }) }
-                                    entry<Route.Search> { SearchScreen(search.controller) }
+                                    entry<Route.Search> { SearchScreen(search.controller, searchLinks) }
+                                    pages(deps, navigation)
                                 },
                         )
                     }
@@ -148,7 +202,7 @@ fun ShuraAppShell(
                 MiniPlayer(player.model, sheet, Modifier.padding(bottom = Shura.spacing.s))
                 BottomChrome(selected = shell.tab, onSelect = { shell.tab = it })
             }
-            PlayerOverlay(player.model, sheet)
+            PlayerOverlay(player.model, sheet, links = PlayerLinks(navigation.onArtist, navigation.onAlbum))
             PreloadUpcomingArtwork(player.model)
         }
     }
@@ -215,3 +269,28 @@ private const val PLAYER_TRAVEL = 0.75f
 private val ITEM_WIDTH = 96.dp
 private val INDICATOR_WIDTH = 56.dp
 private val INDICATOR_HEIGHT = 30.dp
+
+/** Links between pages push onto the current tab; back pops it. */
+private fun browseNavigation(shell: ShellViewModel) =
+    BrowseNavigation(
+        onBack = shell::pop,
+        onAlbum = { shell.push(Route.Album(it, shell.nextEntry())) },
+        onArtist = { shell.push(Route.Artist(it, shell.nextEntry())) },
+        onPlaylist = { shell.push(Route.Playlist(it, shell.nextEntry())) },
+    )
+
+/** The catalog pages, each with its own ViewModel (cleared when the page is popped). */
+private fun EntryProviderScope<Route>.pages(
+    deps: ShellDependencies,
+    navigation: BrowseNavigation,
+) {
+    entry<Route.Album> { route ->
+        AlbumScreen(viewModel { AlbumViewModel(deps.catalog, deps.player, route.id) }.model, navigation)
+    }
+    entry<Route.Artist> { route ->
+        ArtistScreen(viewModel { ArtistViewModel(deps.catalog, deps.player, route.id) }.model, navigation)
+    }
+    entry<Route.Playlist> { route ->
+        PlaylistScreen(viewModel { PlaylistViewModel(deps.catalog, deps.player, route.link) }.model, navigation)
+    }
+}

@@ -20,3 +20,16 @@ suspend fun preloadArtwork(
     retryingLoad(networkRegained) { SingletonImageLoader.get(context).execute(request) as? SuccessResult }
     cachedArtworkColors(context, url, networkRegained)
 }
+
+/**
+ * Starts loading [urls] at [sizePx] into the image caches, through the app's single image loader, without waiting
+ * and without retrying: covers about to scroll into view then appear from memory.
+ */
+fun prefetchArtwork(
+    context: PlatformContext,
+    urls: List<String>,
+    sizePx: Int,
+) {
+    val loader = SingletonImageLoader.get(context)
+    urls.forEach { loader.enqueue(ImageRequest.Builder(context).data(artworkUrl(it, sizePx)).build()) }
+}

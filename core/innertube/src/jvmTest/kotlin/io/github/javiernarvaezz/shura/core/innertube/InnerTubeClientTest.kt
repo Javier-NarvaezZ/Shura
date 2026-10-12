@@ -1,5 +1,6 @@
 package io.github.javiernarvaezz.shura.core.innertube
 
+import io.github.javiernarvaezz.shura.core.model.BrowseLink
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.MockRequestHandleScope
@@ -142,5 +143,79 @@ class InnerTubeClientTest {
             val message = error.message.orEmpty()
             assertFalse(message.contains("private query"))
             assertFalse(message.contains("youtube.com"))
+        }
+
+    @Test
+    fun albumBrowsesItsIdAndParsesThePage() =
+        runTest {
+            val page = client { json(Fixtures.read("album/album_juanes.json")) }.album("MPREb_xDw1x6Hl5Jo")
+
+            assertTrue(
+                requests
+                    .single()
+                    .url.encodedPath
+                    .endsWith("/browse"),
+            )
+            assertEquals("Mi Sangre", page.album.title)
+            assertEquals(12, page.tracks.size)
+        }
+
+    @Test
+    fun artistBrowsesItsIdAndParsesThePage() =
+        runTest {
+            val page = client { json(Fixtures.read("artist/artist_juanes.json")) }.artist("UCeWBcJf4eNsQmGQO-N98eTg")
+
+            assertTrue(
+                requests
+                    .single()
+                    .url.encodedPath
+                    .endsWith("/browse"),
+            )
+            assertEquals("Juanes", page.artist.name)
+            assertEquals(5, page.topSongs.size)
+        }
+
+    @Test
+    fun playlistsBrowseTheirLinkAndContinueWithTheToken() =
+        runTest {
+            val pages =
+                listOf("playlist/playlist_artist_songs.json", "playlist/playlist_artist_songs_continuation.json")
+            var served = 0
+            val client = client { json(Fixtures.read(pages[served++])) }
+
+            val first =
+                client.playlist(BrowseLink("VLOLAK5uy_nhiZ58OtcuzRST9aW5qI1xAxW9XwtG0RE", "ggMCCAI%3D"))
+            val more = client.playlistContinuation(first.continuation!!)
+
+            val bodies = requests.map { Json.parseToJsonElement(it.body.toByteArray().decodeToString()).jsonObject }
+            assertEquals("ggMCCAI%3D", bodies[0]["params"]!!.jsonPrimitive.content)
+            assertEquals(first.continuation, bodies[1]["continuation"]!!.jsonPrimitive.content)
+            assertEquals(150, first.tracks.size + more.tracks.size)
+        }
+
+    @Test
+    fun filteredSearchesSendTheirChipAndParseTheirKind() =
+        runTest {
+            val pages =
+                listOf(
+                    "search/search_albums_juanes.json",
+                    "search/search_artists_juanes.json",
+                    "search/search_playlists_juanes.json",
+                )
+            var served = 0
+            val client = client { json(Fixtures.read(pages[served++])) }
+
+            assertEquals(19, client.searchAlbums("juanes").size)
+            assertEquals(8, client.searchArtists("juanes").size)
+            assertEquals(16, client.searchPlaylists("juanes").size)
+            val params =
+                requests.map {
+                    Json
+                        .parseToJsonElement(
+                            it.body.toByteArray().decodeToString(),
+                        ).jsonObject["params"]!!
+                        .jsonPrimitive.content
+                }
+            assertEquals(listOf(SearchParams.ALBUMS, SearchParams.ARTISTS, SearchParams.FEATURED_PLAYLISTS), params)
         }
 }

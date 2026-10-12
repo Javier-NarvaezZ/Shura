@@ -39,6 +39,7 @@ include(
     ":core:ui",
     ":core:testing",
     ":feature:home",
+    ":feature:browse",
     ":feature:search",
     ":feature:player",
     ":feature:library",

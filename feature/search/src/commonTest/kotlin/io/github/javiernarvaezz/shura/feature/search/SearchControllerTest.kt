@@ -1,7 +1,11 @@
 package io.github.javiernarvaezz.shura.feature.search
 
+import io.github.javiernarvaezz.shura.core.model.AlbumSummary
+import io.github.javiernarvaezz.shura.core.model.ArtistSummary
+import io.github.javiernarvaezz.shura.core.model.PlaylistSummary
 import io.github.javiernarvaezz.shura.core.model.Song
 import io.github.javiernarvaezz.shura.core.testing.FakeAudioPlayer
+import io.github.javiernarvaezz.shura.core.testing.FakeMusicCatalog
 import io.github.javiernarvaezz.shura.core.testing.testSong
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.test.TestScope
@@ -15,13 +19,14 @@ class SearchControllerTest {
     private val player = FakeAudioPlayer()
 
     private fun TestScope.controller(search: suspend (String) -> List<Song>) =
-        SearchController(search, player, backgroundScope)
+        SearchController(SearchSources(songs = search), player, backgroundScope)
 
     @Test
     fun typingOrSubmittingAQuerySignalsPlaybackIntent() =
         runTest {
             var intents = 0
-            val controller = SearchController({ emptyList() }, player, backgroundScope) { intents++ }
+            val controller =
+                SearchController(SearchSources(songs = { emptyList() }), player, backgroundScope) { intents++ }
 
             controller.onQueryChange("   ")
             assertEquals(0, intents)
@@ -35,7 +40,8 @@ class SearchControllerTest {
     fun blankQueryDoesNotSignalPlaybackIntent() =
         runTest {
             var intents = 0
-            val controller = SearchController({ emptyList() }, player, backgroundScope) { intents++ }
+            val controller =
+                SearchController(SearchSources(songs = { emptyList() }), player, backgroundScope) { intents++ }
 
             controller.onQueryChange("")
             controller.submit()
@@ -161,5 +167,88 @@ class SearchControllerTest {
             controller.enqueue(song)
 
             assertEquals(listOf("playNext:La Camisa Negra", "enqueue:La Camisa Negra"), player.calls)
+        }
+
+    @Test
+    fun anotherKindIsSearchedOnceWhenChosen() =
+        runTest {
+            val catalog = FakeMusicCatalog()
+            catalog.songs["juanes"] = listOf(song)
+            catalog.albumResults["juanes"] = listOf(AlbumSummary("MPREb_1", "Mi Sangre"))
+            val controller = SearchController(SearchSources.of(catalog), player, backgroundScope)
+
+            controller.onQueryChange("juanes")
+            controller.submit()
+            runCurrent()
+            controller.selectKind(SearchKind.Albums)
+            runCurrent()
+            controller.selectKind(SearchKind.Songs)
+            controller.selectKind(SearchKind.Albums)
+            runCurrent()
+
+            assertEquals(SearchKind.Albums, controller.state.value.kind)
+            assertEquals(SearchStatus.Done, controller.state.value.status)
+            assertEquals(
+                "Mi Sangre",
+                controller.state.value.albums
+                    .single()
+                    .title,
+            )
+            assertEquals(listOf("searchSongs:juanes", "searchAlbums:juanes"), catalog.calls)
+        }
+
+    @Test
+    fun aNewQuerySearchesTheChosenKindAndForgetsTheOthers() =
+        runTest {
+            val catalog = FakeMusicCatalog()
+            catalog.artistResults["juanes"] = listOf(ArtistSummary("UC1", "Juanes"))
+            catalog.artistResults["shakira"] = listOf(ArtistSummary("UC2", "Shakira"))
+            catalog.songs["shakira"] = emptyList()
+            val controller = SearchController(SearchSources.of(catalog), player, backgroundScope)
+            controller.selectKind(SearchKind.Artists)
+
+            controller.onQueryChange("juanes")
+            controller.submit()
+            runCurrent()
+            controller.onQueryChange("shakira")
+            controller.submit()
+            runCurrent()
+            controller.selectKind(SearchKind.Songs)
+            runCurrent()
+
+            assertEquals(SearchStatus.Empty, controller.state.value.status)
+            assertEquals(
+                "Shakira",
+                controller.state.value.artists
+                    .single()
+                    .name,
+            )
+            assertEquals(
+                listOf("searchArtists:juanes", "searchArtists:shakira", "searchSongs:shakira"),
+                catalog.calls,
+            )
+        }
+
+    @Test
+    fun aKindThatFailedIsRetriedAlone() =
+        runTest {
+            val catalog = FakeMusicCatalog()
+            catalog.songs["juanes"] = listOf(song)
+            val controller = SearchController(SearchSources.of(catalog), player, backgroundScope)
+            controller.onQueryChange("juanes")
+            controller.submit()
+            runCurrent()
+
+            controller.selectKind(SearchKind.Playlists) // No answer: fails.
+            runCurrent()
+            assertEquals(SearchStatus.Failed, controller.state.value.status)
+
+            catalog.playlistResults["juanes"] = listOf(PlaylistSummary("VLPL1", "Mix"))
+            controller.retry()
+            runCurrent()
+
+            assertEquals(SearchStatus.Done, controller.state.value.status)
+            assertEquals(listOf(song), controller.state.value.results)
+            assertEquals(3, catalog.calls.size)
         }
 }
