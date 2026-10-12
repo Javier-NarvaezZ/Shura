@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Sunloop background (docs/brand/DESIGN.md): window, splash and launcher icon background. -->
+    <color name="sunloop_background">#FF120D0B</color>
+</resources>
