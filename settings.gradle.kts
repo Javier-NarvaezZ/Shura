@@ -31,6 +31,7 @@ include(
     ":app-shell",
     ":core:model",
     ":core:innertube",
+    ":core:lyrics",
     ":core:stream",
     ":core:network",
     ":core:data",

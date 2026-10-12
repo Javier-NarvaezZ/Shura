@@ -6,7 +6,8 @@ import io.ktor.client.plugins.api.createClientPlugin
 /**
  * Hosts the app may contact over HTTP (ADR 0001): YouTube for catalog, stream resolution and PoToken
  * attestation, googlevideo for media, the two exact hosts that serve the BotGuard interpreter (its path is
- * validated separately) and the exact hosts that serve artwork. Remote solver-config hosts are never allowed (R3).
+ * validated separately), the exact hosts that serve artwork and LRCLIB for lyrics. Remote solver-config hosts are
+ * never allowed (R3).
  *
  * Does not cover the PoToken `WebView`, which has its own network stack and allowlist (R2, R7).
  */
@@ -24,6 +25,8 @@ object HostPolicy {
             "lh3.googleusercontent.com",
             "yt3.ggpht.com",
             "yt3.googleusercontent.com",
+            // Lyrics (`:core:lyrics`).
+            "lrclib.net",
         )
 
     fun isAllowed(host: String): Boolean {
