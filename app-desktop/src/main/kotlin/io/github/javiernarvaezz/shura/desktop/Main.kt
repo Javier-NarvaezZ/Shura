@@ -12,7 +12,7 @@ import io.github.javiernarvaezz.shura.core.ui.theme.ShuraTheme
 // Empty window until desktop playback (Phase 5); the app shell is reused then.
 fun main() =
     application {
-        Window(onCloseRequest = ::exitApplication, title = "Shura") {
+        Window(onCloseRequest = ::exitApplication, title = "Sunloop") {
             ShuraTheme {
                 Box(Modifier.fillMaxSize().background(Shura.colors.background))
             }

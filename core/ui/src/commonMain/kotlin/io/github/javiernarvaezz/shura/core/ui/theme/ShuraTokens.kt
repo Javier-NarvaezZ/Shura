@@ -9,6 +9,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Typography
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.text.TextStyle
@@ -19,8 +20,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 /*
- * Design tokens. Neutral until the brand is chosen (Phase 1B): the brand changes these values, not the screens.
- * Screens read tokens through [Shura] or MaterialTheme, never hard-coded values.
+ * Design tokens: the Sunloop brand (docs/brand/DESIGN.md). Dark only. Screens read tokens through [Shura] or
+ * MaterialTheme, never hard-coded values.
  */
 
 /** Color roles. The cover tints only the mini-player and the player; the rest of the app stays on these. */
@@ -34,39 +35,28 @@ data class ShuraColors(
     val text: Color,
     val textMuted: Color,
     val accent: Color,
+    /** The second color of the brand gradient (gold). */
+    val accentGold: Color,
     val onAccent: Color,
     val error: Color,
-    val isDark: Boolean,
-)
+) {
+    /** The brand gradient, like the sun: coral at the bottom, gold at the top. Text on it uses [onAccent]. */
+    val brandGradient: Brush get() = Brush.verticalGradient(listOf(accentGold, accent))
+}
 
 val ShuraDarkColors =
     ShuraColors(
-        background = Color(0xFF0F0F10),
-        surface1 = Color(0xFF18181A),
-        surface2 = Color(0xFF222225),
-        surface3 = Color(0xFF2D2D31),
-        line = Color(0x1FFFFFFF),
-        text = Color(0xFFF2F2F3),
-        textMuted = Color(0xA8FFFFFF),
-        accent = Color(0xFFE8E8EA),
-        onAccent = Color(0xFF111112),
-        error = Color(0xFFF2726F),
-        isDark = true,
-    )
-
-val ShuraLightColors =
-    ShuraColors(
-        background = Color(0xFFF8F8F9),
-        surface1 = Color(0xFFFFFFFF),
-        surface2 = Color(0xFFEFEFF1),
-        surface3 = Color(0xFFE4E4E7),
-        line = Color(0x1F000000),
-        text = Color(0xFF151517),
-        textMuted = Color(0x99000000),
-        accent = Color(0xFF1C1C1E),
-        onAccent = Color(0xFFFFFFFF),
-        error = Color(0xFFC62828),
-        isDark = false,
+        background = Color(0xFF120D0B),
+        surface1 = Color(0xFF1E1714),
+        surface2 = Color(0xFF2A201C),
+        surface3 = Color(0xFF362A25),
+        line = Color(0x1FFFF4EC),
+        text = Color(0xFFFFF4EC),
+        textMuted = Color(0xA8FFF4EC),
+        accent = Color(0xFFFF5E3A),
+        accentGold = Color(0xFFFFB547),
+        onAccent = Color(0xFF120D0B),
+        error = Color(0xFFFF8FA3),
     )
 
 /** Content colors on cover-tinted chrome (see OnTintTheme): white on a dark tint. */
@@ -80,13 +70,13 @@ val ShuraOnTintColors =
         text = Color.White,
         textMuted = Color(0xB3FFFFFF),
         accent = Color.White,
-        onAccent = Color(0xFF111112),
+        onAccent = Color(0xFF120D0B),
     )
 
 /** Extra line height over the font size, in sp, when a style does not set its own. */
 private const val DEFAULT_LEADING = 6
 
-/** The font is a token too: Phase 1B may bundle a brand font here. */
+/** The body font: the system's. Large titles use the brand's display font (Outfit, see [shuraTypography]). */
 val ShuraFont: FontFamily = FontFamily.Default
 
 private fun style(
@@ -102,6 +92,7 @@ private fun style(
     lineHeight = line.sp,
 )
 
+/** The type scale, all in the body font; [shuraTypography] sets the large titles in the brand's display font. */
 val ShuraTypography =
     Typography(
         displaySmall = style(32, FontWeight.Bold, tracking = -0.5f, line = 38),
@@ -117,6 +108,17 @@ val ShuraTypography =
         labelMedium = style(12, FontWeight.Medium, tracking = 0.3f, line = 16),
         labelSmall = style(11, FontWeight.Medium, tracking = 0.5f, line = 14),
     )
+
+/** [ShuraTypography] with its large titles (album and artist names, headings) set in [display]. */
+fun shuraTypography(display: FontFamily): Typography =
+    with(ShuraTypography) {
+        copy(
+            displaySmall = displaySmall.copy(fontFamily = display),
+            headlineMedium = headlineMedium.copy(fontFamily = display),
+            headlineSmall = headlineSmall.copy(fontFamily = display),
+            titleLarge = titleLarge.copy(fontFamily = display),
+        )
+    }
 
 @Immutable
 data class ShuraShapes(

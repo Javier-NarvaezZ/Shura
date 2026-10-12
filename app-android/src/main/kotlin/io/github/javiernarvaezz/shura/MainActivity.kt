@@ -1,7 +1,9 @@
 package io.github.javiernarvaezz.shura
 
+import android.graphics.Color
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.remember
@@ -14,7 +16,11 @@ class MainActivity : ComponentActivity() {
     private val graph get() = (application as ShuraApp).graph
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        enableEdgeToEdge()
+        // Dark only: light status and navigation bar icons whatever the system theme.
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
+            navigationBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
+        )
         super.onCreate(savedInstanceState)
         applyDebugLaunchOptions(intent) // Debug builds only; before the graph is first used.
         setContent {
