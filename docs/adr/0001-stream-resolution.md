@@ -473,13 +473,31 @@ Pages: an album (12 tracks and two shelves), an artist (5 songs and five shelves
 - **Artist scroll:** at the system's level once its rows have been composed. The first pass composes the rails and decodes their covers while scrolling.
 - **Album scroll:** close to the system. The page is short, so a fling is mostly start and tail.
 - **Opening a page:** worse than the system in the middle. The page composes its hero (cover, tint, title) and list while the transition runs, and its content arrives from the network during or after it. Going back is at the system's level.
-- **Known debt** (same nature as E5: the first frames that compose something new):
-  - opening a page: middle 5–12 % against the system's 0–4.5 %;
-  - the first scroll of an artist page.
-- **Options if it is worth it:**
-  - load the page before starting the transition (show the previous screen until the data is there);
-  - compose the rails' first tiles ahead of the scroll;
-  - lighter hero (no tint until the transition ends).
+**One round of fixes (2026-10-11):**
+- Pages open at once on plain blocks in the shape of their hero, with no shimmer redrawing during the transition, and fill in when the data arrives. The transition never waits for the network.
+- Album and artist pages start loading the first four covers of each shelf as soon as the page is there, through the app's single image loader.
+
+Measured before (11f42f7) and after (9eda684), versions alternated, 3 rounds after a warm-up round. Each round cold-starts the app (empty memory caches; the disk cache is warm for both), searches, opens the first artist, scrolls it once, goes back and opens the first album.
+
+| | Total | Start | Middle | p90 |
+|---|---|---|---|---|
+| Open an artist, before | 3.3–16.0 % | 0 % | 4.5–15.0 % | 44–61 ms |
+| Open an artist, after | 10.0–10.7 % | 0 % | 13.6 % | 46–65 ms |
+| First scroll of the artist, before | 9.1–20.0 % | 50–71 % | 0–5.6 % | 32–46 ms |
+| First scroll of the artist, after | 9.5–13.0 % | 50 % | 0–5.9 % | 34–38 ms |
+| Open an album, before | 5.4–13.5 % | 0–33 % | 4.5–9.1 % | 26–28 ms |
+| Open an album, after | 4.0–8.2 % | 0–33 % | 4.5–9.5 % | 25–27 ms |
+
+- **First scroll of an artist:** better. Total drops 9–20 % → 9.5–13 %, the start 50–71 % → 50 %, p90 32–46 ms → 34–38 ms. The covers are in memory before the rails come into view.
+- **Opening a page:** no clear change; the differences are within the spread between runs. Opening an artist costs more than an album: its hero is an edge-to-edge image.
+- **Known debt** (accepted pending the owner's review; same nature as E5, the first frames that compose something new):
+  - opening an artist: middle about 13.6 % and p90 46–65 ms;
+  - opening an album: middle 4.5–9.5 %, against the system's 0–4.5 % for opening a screen;
+  - the start of an artist's first scroll (50 %), where the rails compose for the first time.
+- **Options left:**
+  - a lighter artist hero during the transition (the image drawn only once the transition ends);
+  - compose the first tiles of the rails ahead of the scroll (prefetching layout, not only images);
+  - delay filling in the content until the transition ends, so the two never overlap.
 
 ## Implementation requirements (accepted 2026-10-04)
 
