@@ -34,7 +34,8 @@ fun AlbumScreen(
     val playLabel = stringResource(Res.string.play)
     val shuffleLabel = stringResource(Res.string.shuffle)
     val details = (state as? PageState.Loaded)?.page?.let { albumDetails(it) }
-    DetailPage(state, { it.album.title }, navigation, model::retry) { page, heroModifier ->
+    (state as? PageState.Loaded)?.page?.let { PrefetchShelfCovers(it.shelves) }
+    DetailPage(state, { it.album.title }, navigation, model::retry, Skeleton.Cover) { page, heroModifier ->
         val album = page.album
         val artistId = album.artists.firstNotNullOfOrNull { it.id }
         item(key = "hero") {

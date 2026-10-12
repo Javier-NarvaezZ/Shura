@@ -40,7 +40,7 @@ fun PlaylistScreen(
     val playLabel = stringResource(Res.string.play)
     val shuffleLabel = stringResource(Res.string.shuffle)
     val retryLabel = stringResource(Res.string.retry)
-    DetailPage(state, { it.playlist.title }, navigation, model::retry) { page, heroModifier ->
+    DetailPage(state, { it.playlist.title }, navigation, model::retry, Skeleton.Cover) { page, heroModifier ->
         val playlist = page.playlist
         item(key = "hero") {
             CoverHero(

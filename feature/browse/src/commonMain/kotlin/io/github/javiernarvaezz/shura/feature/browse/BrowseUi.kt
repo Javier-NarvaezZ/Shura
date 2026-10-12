@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -19,6 +20,7 @@ import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
@@ -29,6 +31,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import coil3.compose.LocalPlatformContext
 import io.github.javiernarvaezz.shura.core.model.AlbumShelf
 import io.github.javiernarvaezz.shura.core.model.AlbumSummary
 import io.github.javiernarvaezz.shura.core.model.ArtistShelf
@@ -36,15 +39,16 @@ import io.github.javiernarvaezz.shura.core.model.BrowseLink
 import io.github.javiernarvaezz.shura.core.model.CatalogShelf
 import io.github.javiernarvaezz.shura.core.model.PlaylistShelf
 import io.github.javiernarvaezz.shura.core.model.Song
+import io.github.javiernarvaezz.shura.core.ui.artwork.prefetchArtwork
 import io.github.javiernarvaezz.shura.core.ui.components.DetailTopBar
 import io.github.javiernarvaezz.shura.core.ui.components.MediaRail
 import io.github.javiernarvaezz.shura.core.ui.components.MediaTile
 import io.github.javiernarvaezz.shura.core.ui.components.SongMenu
 import io.github.javiernarvaezz.shura.core.ui.components.SongMenuLabels
+import io.github.javiernarvaezz.shura.core.ui.components.TILE_ARTWORK_PX
 import io.github.javiernarvaezz.shura.core.ui.components.TOP_BAR_SPACE
 import io.github.javiernarvaezz.shura.core.ui.components.TrackRow
 import io.github.javiernarvaezz.shura.core.ui.components.heroScrolled
-import io.github.javiernarvaezz.shura.core.ui.components.shimmer
 import io.github.javiernarvaezz.shura.core.ui.text.toClock
 import io.github.javiernarvaezz.shura.core.ui.theme.Shura
 import io.github.javiernarvaezz.shura.feature.browse.resources.Res
@@ -68,6 +72,7 @@ internal fun <T> DetailPage(
     title: (T) -> String,
     navigation: BrowseNavigation,
     onRetry: () -> Unit,
+    skeleton: Skeleton,
     content: LazyListScope.(page: T, heroModifier: Modifier) -> Unit,
 ) {
     val list = rememberLazyListState()
@@ -77,7 +82,7 @@ internal fun <T> DetailPage(
     Box(Modifier.fillMaxSize().background(Shura.colors.background)) {
         when (state) {
             is PageState.Loading -> {
-                LoadingPage()
+                LoadingPage(skeleton)
             }
 
             is PageState.Failed -> {
@@ -101,15 +106,39 @@ internal fun <T> DetailPage(
     }
 }
 
+/** The shape of a page's hero while it loads. */
+internal enum class Skeleton { Cover, Image }
+
+/**
+ * Plain blocks in the shape of the page, drawn once: the opening transition runs on them at once and the
+ * content replaces them when it arrives. No shimmer, so nothing redraws during the transition.
+ */
 @Composable
-private fun LoadingPage() {
+private fun LoadingPage(skeleton: Skeleton) {
+    val block = Shura.colors.surface2
     Column(
-        Modifier.fillMaxWidth().statusBarsPadding().padding(top = TOP_BAR_SPACE),
+        Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(Shura.spacing.m),
     ) {
-        Box(Modifier.size(LOADING_COVER).clip(Shura.shapes.artwork).shimmer())
-        Box(Modifier.size(LOADING_LINE_WIDTH, LOADING_LINE).clip(Shura.shapes.thumbnail).shimmer())
+        when (skeleton) {
+            Skeleton.Cover -> {
+                Box(
+                    Modifier
+                        .statusBarsPadding()
+                        .padding(
+                            top = TOP_BAR_SPACE,
+                        ).size(LOADING_COVER)
+                        .clip(Shura.shapes.artwork)
+                        .background(block),
+                )
+                Box(Modifier.size(LOADING_LINE_WIDTH, LOADING_LINE).clip(Shura.shapes.thumbnail).background(block))
+            }
+
+            Skeleton.Image -> {
+                Box(Modifier.fillMaxWidth().aspectRatio(IMAGE_RATIO).background(block))
+            }
+        }
         repeat(LOADING_ROWS) {
             Box(
                 Modifier
@@ -117,9 +146,26 @@ private fun LoadingPage() {
                     .padding(horizontal = Shura.spacing.gutter)
                     .height(LOADING_ROW)
                     .clip(Shura.shapes.thumbnail)
-                    .shimmer(),
+                    .background(block),
             )
         }
+    }
+}
+
+/** Starts loading the first covers of each shelf as soon as the page is there, before they scroll into view. */
+@Composable
+internal fun PrefetchShelfCovers(shelves: List<CatalogShelf>) {
+    val context = LocalPlatformContext.current
+    LaunchedEffect(shelves) {
+        val urls =
+            shelves.flatMap { shelf ->
+                when (shelf) {
+                    is AlbumShelf -> shelf.albums.map { it.thumbnailUrl }
+                    is ArtistShelf -> shelf.artists.map { it.thumbnailUrl }
+                    is PlaylistShelf -> shelf.playlists.map { it.thumbnailUrl }
+                }.filterNotNull().take(PREFETCH_PER_SHELF)
+            }
+        prefetchArtwork(context, urls, TILE_ARTWORK_PX)
     }
 }
 
@@ -240,3 +286,7 @@ private val LOADING_LINE_WIDTH = 180.dp
 private val LOADING_LINE = 24.dp
 private val LOADING_ROW = 48.dp
 private const val LOADING_ROWS = 5
+private const val IMAGE_RATIO = 1.1f
+
+// About what a phone shows of a rail before scrolling sideways.
+private const val PREFETCH_PER_SHELF = 4

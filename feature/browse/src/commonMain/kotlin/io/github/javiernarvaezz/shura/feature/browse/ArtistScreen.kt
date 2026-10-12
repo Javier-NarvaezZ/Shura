@@ -36,7 +36,8 @@ fun ArtistScreen(
     val about = stringResource(Res.string.about)
     val loaded = (state as? PageState.Loaded)?.page
     val details = loaded?.monthlyListeners ?: loaded?.subscribers?.let { stringResource(Res.string.subscribers, it) }
-    DetailPage(state, { it.artist.name }, navigation, model::retry) { page, heroModifier ->
+    loaded?.let { PrefetchShelfCovers(it.shelves) }
+    DetailPage(state, { it.artist.name }, navigation, model::retry, Skeleton.Image) { page, heroModifier ->
         item(key = "hero") { ImageHero(page.artist.name, page.artist.thumbnailUrl, details, heroModifier) }
         if (page.topSongs.isNotEmpty()) {
             item(key = "actions") {

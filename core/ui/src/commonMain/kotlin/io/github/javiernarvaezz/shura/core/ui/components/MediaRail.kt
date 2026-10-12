@@ -69,7 +69,7 @@ fun MediaTile(
     ) {
         Artwork(
             artworkUrl,
-            sizePx = TILE_PX,
+            sizePx = TILE_ARTWORK_PX,
             contentDescription = null,
             modifier = Modifier.size(size),
             shape = if (round) CircleShape else Shura.shapes.card,
@@ -116,6 +116,8 @@ fun <T : Any> MediaRail(
     }
 }
 
-/** The tiles' default side, and the pixel size their covers are requested at. */
+/** The tiles' default side. */
 val TILE_SIZE = 150.dp
-private const val TILE_PX = 300
+
+/** The pixel size tile covers are requested at (also for prefetching them). */
+const val TILE_ARTWORK_PX = 300
