@@ -98,6 +98,46 @@ class LrcLibClientErrorsTest {
         }
 
     @Test
+    fun aBusyExactMatchFallsBackToSearch() =
+        runTest {
+            val found =
+                """[{"duration":201.0,"instrumental":false,"plainLyrics":"words",""" +
+                    """"syncedLyrics":"[00:01.00] words"}]"""
+            listOf(HttpStatusCode.ServiceUnavailable, HttpStatusCode.TooManyRequests).forEach { busy ->
+                requests.clear()
+                val client =
+                    client { request ->
+                        if (request.url.encodedPath == "/api/get") json(OVERLOADED, busy) else json(found)
+                    }
+                assertEquals(
+                    Lyrics.Synced(listOf(LyricLine(1.seconds, "words"))),
+                    client.lyrics(query),
+                )
+                assertEquals(listOf("/api/get", "/api/search"), requests.map { it.url.encodedPath })
+            }
+        }
+
+    @Test
+    fun aBusyExactMatchAndABusySearchFail() =
+        runTest {
+            val error =
+                assertFailsWith<LyricsException.Http> {
+                    client { json(OVERLOADED, HttpStatusCode.ServiceUnavailable) }.lyrics(query)
+                }
+            assertEquals(503, error.status)
+            assertEquals(2, requests.size)
+        }
+
+    @Test
+    fun otherExactMatchErrorsDoNotFallBack() =
+        runTest {
+            assertFailsWith<LyricsException.Http> {
+                client { json("", HttpStatusCode.BadRequest) }.lyrics(query)
+            }
+            assertEquals(listOf("/api/get"), requests.map { it.url.encodedPath })
+        }
+
+    @Test
     fun rateLimitIsTypedAsHttp() =
         runTest {
             val client =
@@ -149,4 +189,10 @@ class LrcLibClientErrorsTest {
             val searchOnly = LyricsQuery("Secret Title", "Secret Artist", null, 200.seconds)
             assertFailsWith<LyricsException.Format> { client { json("{}") }.lyrics(searchOnly) }
         }
+
+    private companion object {
+        const val OVERLOADED =
+            """{"message":"The server is busy, please retry in a moment",""" +
+                """"name":"ServerOverloaded","statusCode":503}"""
+    }
 }

@@ -47,7 +47,10 @@ class LrcLibClient(
         }
     }
 
-    /** `null` when LRCLIB has no record with this exact signature, or the record has no lyrics. */
+    /**
+     * `null` when LRCLIB has no record with this exact signature, the record has no lyrics, or the server is busy
+     * (LRCLIB's exact match answers 503 or 429 at times while search still works).
+     */
     private suspend fun exactMatch(
         query: LyricsQuery,
         album: String,
@@ -59,8 +62,11 @@ class LrcLibClient(
                 parameter("album_name", album)
                 parameter("duration", query.duration.inWholeSecondsRounded())
             }
-        if (response.status == HttpStatusCode.NotFound) return null
-        return LrcLibRecord.from(body(response)).lyrics()
+        return if (response.status == HttpStatusCode.NotFound || response.status in BUSY) {
+            null
+        } else {
+            LrcLibRecord.from(body(response)).lyrics()
+        }
     }
 
     private suspend fun searchMatch(query: LyricsQuery): Lyrics? {
@@ -132,6 +138,9 @@ class LrcLibClient(
         ): String = "$app v$version ($homepage)"
 
         private const val API_BASE = "https://lrclib.net/api"
+
+        /** Answers that mean "try again later": the exact match then falls back to search. */
+        private val BUSY = setOf(HttpStatusCode.ServiceUnavailable, HttpStatusCode.TooManyRequests)
         private const val MILLIS_PER_SECOND = 1000.0
     }
 }
