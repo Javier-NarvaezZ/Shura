@@ -129,7 +129,7 @@ private fun SyncedLyrics(
                     )
                 }
             }
-            item { Attribution() }
+            item { Attribution(Modifier.padding(horizontal = Shura.spacing.xl)) }
         }
     }
 }
@@ -168,7 +168,7 @@ private fun PlainLyrics(text: String) {
         )
         Spacer(Modifier.height(Shura.spacing.l))
         Text(text, style = MaterialTheme.typography.titleMedium, color = Shura.colors.text)
-        Attribution(Modifier.padding(top = Shura.spacing.xl))
+        Attribution(Modifier.padding(top = Shura.spacing.l))
     }
 }
 
@@ -178,7 +178,7 @@ private fun Attribution(modifier: Modifier = Modifier) {
         stringResource(Res.string.lyrics_attribution),
         style = MaterialTheme.typography.labelMedium,
         color = Shura.colors.textMuted,
-        modifier = modifier.padding(horizontal = Shura.spacing.xl, vertical = Shura.spacing.l),
+        modifier = modifier.padding(vertical = Shura.spacing.l),
     )
 }
 
