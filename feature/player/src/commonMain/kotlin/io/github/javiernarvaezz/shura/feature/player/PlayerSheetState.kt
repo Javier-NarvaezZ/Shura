@@ -17,6 +17,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
+/** What the open player shows in place of the cover. */
+enum class PlayerMode { Cover, Queue, Lyrics }
+
 /**
  * Where the player is between the mini-player (0) and full screen (1). One value drives opening, dragging and
  * closing: a drag writes it directly and only the release animates, so the player can be caught mid-flight.
@@ -35,8 +38,13 @@ class PlayerSheetState(
     /** The player's cover slot, in root coordinates: where the flying cover lands. */
     var playerCover by mutableStateOf(Rect.Zero)
 
-    /** The queue replaces the cover while the player is open; it is reset whenever the player closes. */
-    var showsQueue by mutableStateOf(false)
+    /** The queue or the lyrics replace the cover while the player is open; back to the cover whenever it closes. */
+    var mode by mutableStateOf(PlayerMode.Cover)
+
+    /** Shows [target], or the cover again if it is already shown. */
+    fun toggle(target: PlayerMode) {
+        mode = if (mode == target) PlayerMode.Cover else target
+    }
 
     /** Drag distance, in pixels, for a full open or close. */
     var travelPx by mutableFloatStateOf(1f)
@@ -60,7 +68,7 @@ class PlayerSheetState(
 
     private fun moveTo(value: Float) {
         fraction = value
-        if (value == 0f) showsQueue = false
+        if (value == 0f) mode = PlayerMode.Cover
     }
 
     /** Settles after a drag: a fling, or past halfway, commits; otherwise it springs back. */

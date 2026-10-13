@@ -11,6 +11,8 @@ import coil3.serviceLoaderEnabled
 import io.github.javiernarvaezz.shura.core.data.AndroidAppStorage
 import io.github.javiernarvaezz.shura.core.innertube.InnerTubeClient
 import io.github.javiernarvaezz.shura.core.innertube.InnerTubeConfig
+import io.github.javiernarvaezz.shura.core.lyrics.LrcLibClient
+import io.github.javiernarvaezz.shura.core.lyrics.LyricsRepository
 import io.github.javiernarvaezz.shura.core.network.ShuraNetwork
 import io.github.javiernarvaezz.shura.core.player.AndroidAudioPlayer
 import io.github.javiernarvaezz.shura.core.player.AudioPlayer
@@ -80,6 +82,20 @@ class AppGraph(
 
     val settings = storage.settings
 
+    /**
+     * Lyrics from LRCLIB through the single client (`lrclib.net` is on the allowlist), cached in the app database.
+     * LRCLIB asks clients to name themselves: app name, version and homepage.
+     */
+    val lyrics =
+        LyricsRepository(
+            fetch =
+                LrcLibClient(
+                    network.ktor,
+                    LrcLibClient.userAgent(APP_NAME, versionName(context), HOMEPAGE),
+                )::lyrics,
+            store = storage.lyrics,
+        )
+
     /** Used by `PlaybackService`, where the player lives; media and artwork go through the single client. */
     val playbackDependencies =
         PlaybackDependencies(
@@ -131,3 +147,10 @@ class AppGraph(
         debugMaybePrewarm(streamResolver, trace)
     }
 }
+
+private const val APP_NAME = "Sunloop"
+private const val HOMEPAGE = "https://github.com/Javier-NarvaezZ/Shura"
+
+/** The installed version name (from the manifest), so it never drifts from the build. */
+private fun versionName(context: Context): String =
+    context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "unknown"

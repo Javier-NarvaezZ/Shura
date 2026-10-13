@@ -46,6 +46,7 @@ import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -68,6 +69,7 @@ import io.github.javiernarvaezz.shura.core.ui.theme.Shura
 import io.github.javiernarvaezz.shura.feature.player.resources.Res
 import io.github.javiernarvaezz.shura.feature.player.resources.close_player
 import io.github.javiernarvaezz.shura.feature.player.resources.end_of_queue
+import io.github.javiernarvaezz.shura.feature.player.resources.hide_lyrics
 import io.github.javiernarvaezz.shura.feature.player.resources.hide_queue
 import io.github.javiernarvaezz.shura.feature.player.resources.next
 import io.github.javiernarvaezz.shura.feature.player.resources.pause
@@ -78,12 +80,14 @@ import io.github.javiernarvaezz.shura.feature.player.resources.repeat_all
 import io.github.javiernarvaezz.shura.feature.player.resources.repeat_off
 import io.github.javiernarvaezz.shura.feature.player.resources.repeat_one
 import io.github.javiernarvaezz.shura.feature.player.resources.retry
+import io.github.javiernarvaezz.shura.feature.player.resources.show_lyrics
 import io.github.javiernarvaezz.shura.feature.player.resources.show_queue
 import io.github.javiernarvaezz.shura.feature.player.resources.shuffle_off
 import io.github.javiernarvaezz.shura.feature.player.resources.shuffle_on
 import io.github.javiernarvaezz.shura.feature.player.resources.undo
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 import kotlin.math.roundToInt
 
@@ -101,6 +105,7 @@ fun PlayerOverlay(
     sheet: PlayerSheetState,
     modifier: Modifier = Modifier,
     links: PlayerLinks = PlayerLinks.None,
+    lyrics: (@Composable (Modifier) -> Unit)? = null,
 ) {
     val state by model.state.collectAsStateWithLifecycle()
     val song = state.song ?: return
@@ -132,6 +137,7 @@ fun PlayerOverlay(
                 song = song,
                 model = model,
                 sheet = sheet,
+                lyrics = lyrics,
                 onClose = { sheet.close(scope) },
                 links =
                     PlayerLinks(
@@ -205,7 +211,7 @@ private fun FlyingCover(
                         lerp(thumbRadius / scale.coerceAtLeast(MIN_SCALE), artworkRadius, f),
                     )
                 clip = true
-                alpha = if (sheet.showsQueue) 0f else 1f
+                alpha = if (sheet.mode == PlayerMode.Cover) 1f else 0f
                 // Only at rest: a shadow that changes every frame of the flight is costly to render.
                 shadowElevation = if (f >= 1f) elevation else 0f
             },
@@ -225,15 +231,14 @@ private fun PlayerBody(
     song: Song,
     model: PlayerModel,
     sheet: PlayerSheetState,
+    lyrics: (@Composable (Modifier) -> Unit)?,
     onClose: () -> Unit,
     links: PlayerLinks,
     modifier: Modifier = Modifier,
 ) {
     val state by model.state.collectAsStateWithLifecycle()
     val snackbars = remember { SnackbarHostState() }
-    val scope = rememberCoroutineScope()
-    val removedLabel = stringResource(Res.string.removed_from_queue)
-    val undoLabel = stringResource(Res.string.undo)
+    val onRemoved = rememberUndoRemove(snackbars, model)
     Box(modifier.fillMaxSize()) {
         Column(
             Modifier
@@ -243,27 +248,20 @@ private fun PlayerBody(
         ) {
             // Side padding per section: the queue's rows bring their own.
             val side = Modifier.padding(horizontal = Shura.spacing.xl)
-            TopRow(sheet, onClose, side)
-            if (sheet.showsQueue) {
-                PlayerQueue(
-                    model = model,
-                    canReorder = state.canReorder,
-                    onRemoved = { removed ->
-                        scope.launch {
-                            snackbars.currentSnackbarData?.dismiss()
-                            val result =
-                                snackbars.showSnackbar(
-                                    removedLabel,
-                                    undoLabel,
-                                    duration = SnackbarDuration.Short,
-                                )
-                            if (result == SnackbarResult.ActionPerformed) model.queue.undoRemove(removed)
-                        }
-                    },
-                    modifier = Modifier.weight(1f),
-                )
-            } else {
-                CoverAndTitle(song, sheet, links, side.weight(1f))
+            TopRow(sheet, hasLyrics = lyrics != null, onClose, side)
+            // Lyrics mode is only reachable through its button, which shows only when there are lyrics.
+            when (sheet.mode) {
+                PlayerMode.Queue -> {
+                    PlayerQueue(model, state.canReorder, onRemoved, Modifier.weight(1f))
+                }
+
+                PlayerMode.Lyrics -> {
+                    lyrics?.invoke(Modifier.weight(1f))
+                }
+
+                PlayerMode.Cover -> {
+                    CoverAndTitle(song, sheet, links, side.weight(1f))
+                }
             }
             Spacer(Modifier.height(Shura.spacing.l))
             val error = state.error
@@ -287,14 +285,33 @@ private fun PlayerBody(
             }
             Spacer(Modifier.height(Shura.spacing.l))
         }
-        // At the top, under the close and queue buttons: at the bottom it would cover the playback controls.
+        // At the top, under the close, lyrics and queue buttons: at the bottom it would cover the playback controls.
         SnackbarHost(snackbars, Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = SNACKBAR_TOP))
+    }
+}
+
+/** Removing a song from the queue shows "Deshacer" for a moment; one message at a time. */
+@Composable
+private fun rememberUndoRemove(
+    snackbars: SnackbarHostState,
+    model: PlayerModel,
+): (RemovedSong) -> Unit {
+    val scope = rememberCoroutineScope()
+    val removedLabel = stringResource(Res.string.removed_from_queue)
+    val undoLabel = stringResource(Res.string.undo)
+    return { removed ->
+        scope.launch {
+            snackbars.currentSnackbarData?.dismiss()
+            val result = snackbars.showSnackbar(removedLabel, undoLabel, duration = SnackbarDuration.Short)
+            if (result == SnackbarResult.ActionPerformed) model.queue.undoRemove(removed)
+        }
     }
 }
 
 @Composable
 private fun TopRow(
     sheet: PlayerSheetState,
+    hasLyrics: Boolean,
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -303,13 +320,29 @@ private fun TopRow(
             Icon(ShuraIcons.Collapse, stringResource(Res.string.close_player), tint = Shura.colors.text)
         }
         Spacer(Modifier.weight(1f))
-        IconButton(onClick = { sheet.showsQueue = !sheet.showsQueue }) {
-            Icon(
-                ShuraIcons.Queue,
-                stringResource(if (sheet.showsQueue) Res.string.hide_queue else Res.string.show_queue),
-                tint = if (sheet.showsQueue) Shura.colors.text else Shura.colors.textMuted,
-            )
+        if (hasLyrics) {
+            ModeButton(sheet, PlayerMode.Lyrics, ShuraIcons.Lyrics, Res.string.show_lyrics, Res.string.hide_lyrics)
         }
+        ModeButton(sheet, PlayerMode.Queue, ShuraIcons.Queue, Res.string.show_queue, Res.string.hide_queue)
+    }
+}
+
+/** Shows [target] in place of the cover, or the cover again; bright while [target] is shown. */
+@Composable
+private fun ModeButton(
+    sheet: PlayerSheetState,
+    target: PlayerMode,
+    icon: ImageVector,
+    showLabel: StringResource,
+    hideLabel: StringResource,
+) {
+    val shown = sheet.mode == target
+    IconButton(onClick = { sheet.toggle(target) }) {
+        Icon(
+            icon,
+            stringResource(if (shown) hideLabel else showLabel),
+            tint = if (shown) Shura.colors.text else Shura.colors.textMuted,
+        )
     }
 }
 

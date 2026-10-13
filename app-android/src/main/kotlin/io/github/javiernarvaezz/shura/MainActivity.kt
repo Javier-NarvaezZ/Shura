@@ -35,6 +35,7 @@ class MainActivity : ComponentActivity() {
                             currentHour = { LocalTime.now().hour },
                             networkRegained = graph.networkRegained,
                             settings = graph.settings,
+                            lyrics = graph.lyrics,
                         )
                     },
                 )

@@ -13,6 +13,8 @@
     <string name="queue">Cola</string>
     <string name="show_queue">Mostrar la cola</string>
     <string name="hide_queue">Volver a la portada</string>
+    <string name="show_lyrics">Mostrar la letra</string>
+    <string name="hide_lyrics">Volver a la portada</string>
     <string name="queue_shuffled_hint">Con aleatorio, el orden lo decide el aleatorio.</string>
     <string name="move_up">Subir</string>
     <string name="move_down">Bajar</string>
