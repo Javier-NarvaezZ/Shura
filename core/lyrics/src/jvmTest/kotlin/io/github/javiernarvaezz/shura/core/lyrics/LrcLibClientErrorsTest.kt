@@ -118,6 +118,23 @@ class LrcLibClientErrorsTest {
         }
 
     @Test
+    fun plainLyricsFromTheExactMatchSurviveABusySearch() =
+        runTest {
+            val plain =
+                """{"duration":201.0,"instrumental":false,"plainLyrics":"words","syncedLyrics":null}"""
+            val client =
+                client { request ->
+                    if (request.url.encodedPath == "/api/get") {
+                        json(plain)
+                    } else {
+                        json(OVERLOADED, HttpStatusCode.ServiceUnavailable)
+                    }
+                }
+            assertEquals(Lyrics.Plain("words"), client.lyrics(query))
+            assertEquals(listOf("/api/get", "/api/search"), requests.map { it.url.encodedPath })
+        }
+
+    @Test
     fun aBusyExactMatchAndABusySearchFail() =
         runTest {
             val error =

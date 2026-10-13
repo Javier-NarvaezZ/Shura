@@ -38,7 +38,8 @@ class LrcLibClient(
     suspend fun lyrics(query: LyricsQuery): Lyrics {
         val exact = query.album?.let { album -> exactMatch(query, album) }
         if (exact != null && exact !is Lyrics.Plain) return exact
-        val searched = searchMatch(query)
+        // Search only looks for synced lyrics to beat plain ones; if it fails, the plain ones still count.
+        val searched = if (exact == null) searchMatch(query) else searchOrNull(query)
         return when {
             searched is Lyrics.Synced -> searched
             exact != null -> exact
@@ -68,6 +69,14 @@ class LrcLibClient(
             LrcLibRecord.from(body(response)).lyrics()
         }
     }
+
+    @Suppress("SwallowedException") // The caller already has lyrics to show instead.
+    private suspend fun searchOrNull(query: LyricsQuery): Lyrics? =
+        try {
+            searchMatch(query)
+        } catch (e: LyricsException) {
+            null
+        }
 
     private suspend fun searchMatch(query: LyricsQuery): Lyrics? {
         val response =
