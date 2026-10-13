@@ -8,11 +8,13 @@ import io.github.javiernarvaezz.shura.core.model.AlbumRef
 import io.github.javiernarvaezz.shura.core.model.Artist
 import io.github.javiernarvaezz.shura.core.model.Song
 import io.github.javiernarvaezz.shura.core.player.PlaybackProgress
+import io.github.javiernarvaezz.shura.core.player.PlaybackState
 import io.github.javiernarvaezz.shura.core.player.QueueState
 import io.github.javiernarvaezz.shura.core.testing.FakeAudioPlayer
 import io.github.javiernarvaezz.shura.core.testing.testSong
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -101,6 +103,22 @@ class LyricsModelTest {
         }
 
     @Test
+    fun theLookupWaitsForThePlayersDurationWhenItArrivesLater() =
+        runTest {
+            play(song(1, duration = null))
+            val model = model()
+            model.setVisible(true)
+            runCurrent()
+            assertEquals(LyricsUiState.Loading, model.state.value)
+
+            advanceTimeBy(1.seconds)
+            player.progress = PlaybackProgress(Duration.ZERO, 181.seconds, Duration.ZERO)
+            advanceTimeBy(1.seconds)
+            assertEquals(181.seconds, requests.single().second.duration)
+            assertEquals(LyricsUiState.Synced(synced), model.state.value)
+        }
+
+    @Test
     fun aSongWithoutArtistOrDurationEndsInNotFoundWithoutAsking() =
         runTest {
             val model = model()
@@ -110,12 +128,41 @@ class LyricsModelTest {
             runCurrent()
             assertEquals(LyricsUiState.NotFound, model.state.value)
 
-            // No duration of its own, and the player does not know it either.
+            // No duration of its own, and the player does not learn it either.
             play(song(3, duration = null))
+            // Past the wait for the player's duration; advanceUntilIdle would skip the model's backgroundScope.
+            advanceTimeBy(6.seconds)
             runCurrent()
             assertEquals(LyricsUiState.NotFound, model.state.value)
 
             assertTrue(requests.isEmpty())
+        }
+
+    @Test
+    fun aSongNotFoundForLackOfDurationIsLookedUpOnceItPlays() =
+        runTest {
+            play(song(1, duration = null))
+            val model = model()
+            model.setVisible(true)
+            // Past the wait for the player's duration; advanceUntilIdle would skip the model's backgroundScope.
+            advanceTimeBy(6.seconds)
+            runCurrent()
+            assertEquals(LyricsUiState.NotFound, model.state.value)
+
+            player.progress = PlaybackProgress(Duration.ZERO, 181.seconds, Duration.ZERO)
+            player.state.value = PlaybackState.Playing(song(1, duration = null))
+            runCurrent()
+            assertEquals(LyricsUiState.Synced(synced), model.state.value)
+            assertEquals(181.seconds, requests.single().second.duration)
+
+            // Lyrics that were truly not found are not asked again on play.
+            answer = { null }
+            play(song(2))
+            runCurrent()
+            player.state.value = PlaybackState.Paused(song(2))
+            player.state.value = PlaybackState.Playing(song(2))
+            runCurrent()
+            assertEquals(2, requests.size)
         }
 
     @Test
