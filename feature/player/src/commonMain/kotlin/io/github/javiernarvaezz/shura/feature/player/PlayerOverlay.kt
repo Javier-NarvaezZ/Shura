@@ -27,7 +27,6 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -62,6 +61,7 @@ import io.github.javiernarvaezz.shura.core.ui.artwork.Artwork
 import io.github.javiernarvaezz.shura.core.ui.artwork.rememberArtworkTint
 import io.github.javiernarvaezz.shura.core.ui.components.PlayPauseButton
 import io.github.javiernarvaezz.shura.core.ui.components.Scrubber
+import io.github.javiernarvaezz.shura.core.ui.components.TintActionButton
 import io.github.javiernarvaezz.shura.core.ui.icons.ShuraIcons
 import io.github.javiernarvaezz.shura.core.ui.text.toClock
 import io.github.javiernarvaezz.shura.core.ui.theme.OnTintTheme
@@ -432,7 +432,8 @@ private fun ErrorRow(
 ) {
     Column {
         Text(message, style = MaterialTheme.typography.bodyMedium, color = Shura.colors.error)
-        TextButton(onClick = onRetry) { Text(stringResource(Res.string.retry)) }
+        Spacer(Modifier.height(Shura.spacing.s))
+        TintActionButton(stringResource(Res.string.retry), onRetry)
     }
 }
 

@@ -18,7 +18,6 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -38,6 +37,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.javiernarvaezz.shura.core.lyrics.Lyrics
+import io.github.javiernarvaezz.shura.core.ui.components.TintActionButton
 import io.github.javiernarvaezz.shura.core.ui.theme.Shura
 import io.github.javiernarvaezz.shura.feature.lyrics.resources.Res
 import io.github.javiernarvaezz.shura.feature.lyrics.resources.lyrics_attribution
@@ -46,6 +46,7 @@ import io.github.javiernarvaezz.shura.feature.lyrics.resources.lyrics_instrument
 import io.github.javiernarvaezz.shura.feature.lyrics.resources.lyrics_not_found
 import io.github.javiernarvaezz.shura.feature.lyrics.resources.lyrics_not_synced
 import io.github.javiernarvaezz.shura.feature.lyrics.resources.retry
+import io.github.javiernarvaezz.shura.feature.lyrics.resources.search_again
 import kotlinx.coroutines.delay
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
@@ -62,12 +63,29 @@ fun PlayerLyrics(
     val state by model.state.collectAsStateWithLifecycle()
     Box(modifier.fillMaxSize()) {
         when (val shown = state) {
-            LyricsUiState.Idle, LyricsUiState.Loading -> LoadingLines()
-            is LyricsUiState.Synced -> SyncedLyrics(shown.lyrics, model)
-            is LyricsUiState.Plain -> PlainLyrics(shown.text)
-            LyricsUiState.Instrumental -> Message(Res.string.lyrics_instrumental)
-            LyricsUiState.NotFound -> Message(Res.string.lyrics_not_found)
-            is LyricsUiState.Failed -> Failed(model::retry)
+            LyricsUiState.Idle, LyricsUiState.Loading -> {
+                LoadingLines()
+            }
+
+            is LyricsUiState.Synced -> {
+                SyncedLyrics(shown.lyrics, model)
+            }
+
+            is LyricsUiState.Plain -> {
+                PlainLyrics(shown.text)
+            }
+
+            LyricsUiState.Instrumental -> {
+                Message(Res.string.lyrics_instrumental)
+            }
+
+            LyricsUiState.NotFound -> {
+                MessageWithAction(Res.string.lyrics_not_found, Res.string.search_again, model::searchAgain)
+            }
+
+            is LyricsUiState.Failed -> {
+                MessageWithAction(Res.string.lyrics_failed, Res.string.retry, model::retry)
+            }
         }
     }
 }
@@ -194,19 +212,23 @@ private fun Message(text: StringResource) {
 }
 
 @Composable
-private fun Failed(onRetry: () -> Unit) {
+private fun MessageWithAction(
+    text: StringResource,
+    action: StringResource,
+    onAction: () -> Unit,
+) {
     Column(
         Modifier.fillMaxWidth().padding(horizontal = Shura.spacing.xl, vertical = Shura.spacing.xxl),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(Shura.spacing.l),
     ) {
         Text(
-            stringResource(Res.string.lyrics_failed),
+            stringResource(text),
             style = MaterialTheme.typography.bodyLarge,
             color = Shura.colors.textMuted,
             textAlign = TextAlign.Center,
         )
-        FilledTonalButton(onClick = onRetry) { Text(stringResource(Res.string.retry)) }
+        TintActionButton(stringResource(action), onAction)
     }
 }
 

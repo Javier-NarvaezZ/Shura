@@ -5,4 +5,5 @@
     <string name="lyrics_not_found">No encontramos la letra de esta canción.</string>
     <string name="lyrics_failed">No se pudo cargar la letra. Revisa tu conexión e inténtalo de nuevo.</string>
     <string name="retry">Reintentar</string>
+    <string name="search_again">Buscar de nuevo</string>
 </resources>
