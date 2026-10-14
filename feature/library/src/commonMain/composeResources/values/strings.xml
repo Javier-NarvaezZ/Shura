@@ -1,0 +1,22 @@
+<resources>
+    <string name="library_title">Biblioteca</string>
+    <string name="liked_songs">Me gusta</string>
+    <string name="liked_count">%1$d canciones</string>
+    <string name="liked_one">1 canción</string>
+    <string name="liked_none">Toca el corazón para guardar canciones aquí.</string>
+    <string name="playlists">Playlists</string>
+    <string name="albums">Álbumes</string>
+    <string name="artists">Artistas</string>
+    <string name="empty_library">Tu biblioteca está vacía. Toca el corazón en una canción o guarda un álbum para verlo aquí.</string>
+    <string name="liked_empty">Todavía no tienes canciones con Me gusta.</string>
+    <string name="play">Reproducir</string>
+    <string name="shuffle">Aleatorio</string>
+    <string name="back">Atrás</string>
+    <string name="more">Más opciones</string>
+    <string name="play_next">Reproducir a continuación</string>
+    <string name="add_to_queue">Añadir a la cola</string>
+    <string name="go_to_album">Ir al álbum</string>
+    <string name="go_to_artist">Ir al artista</string>
+    <string name="like">Me gusta</string>
+    <string name="unlike">Quitar de Me gusta</string>
+</resources>

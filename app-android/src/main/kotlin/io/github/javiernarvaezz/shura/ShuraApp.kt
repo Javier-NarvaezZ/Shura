@@ -85,6 +85,9 @@ class AppGraph(
 
     val settings = storage.settings
 
+    /** Liked songs, saved albums and playlists, followed artists: the local library, in the app database. */
+    val library = storage.library
+
     /**
      * Lyrics from LRCLIB through the single client (`lrclib.net` is on the allowlist), cached in the app database.
      * LRCLIB asks clients to name themselves: app name, version and homepage.

@@ -1,4 +1,5 @@
 <resources>
     <string name="tab_home">Inicio</string>
     <string name="tab_search">Buscar</string>
+    <string name="tab_library">Biblioteca</string>
 </resources>
