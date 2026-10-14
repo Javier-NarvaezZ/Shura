@@ -58,7 +58,7 @@ sealed interface LyricsUiState {
  */
 class LyricsModel(
     private val player: AudioPlayer,
-    private val lyrics: suspend (key: String, query: LyricsQuery) -> Lyrics?,
+    private val lyrics: suspend (key: String, query: LyricsQuery, refresh: Boolean) -> Lyrics?,
     private val scope: CoroutineScope,
 ) {
     private val mutableState = MutableStateFlow<LyricsUiState>(LyricsUiState.Idle)
@@ -104,6 +104,12 @@ class LyricsModel(
         if (mutableState.value is LyricsUiState.Failed) load(song)
     }
 
+    /** Asks LRCLIB again for a song with no lyrics found, ignoring the memory of that answer. */
+    fun searchAgain() {
+        val song = player.queue.value.current ?: return
+        if (mutableState.value == LyricsUiState.NotFound) load(song, refresh = true)
+    }
+
     /** Where the song is now; read on demand while synced lyrics are shown. */
     fun position(): Duration = player.progress().position
 
@@ -121,7 +127,10 @@ class LyricsModel(
      * a duration of its own, the player's is awaited for a moment; if it does not come, NotFound for now.
      */
     @Suppress("TooGenericExceptionCaught") // Any failure must become a visible, retryable state.
-    private fun load(song: Song) {
+    private fun load(
+        song: Song,
+        refresh: Boolean = false,
+    ) {
         job?.cancel()
         loaded = song.videoId
         missedDuration = false
@@ -141,7 +150,7 @@ class LyricsModel(
                             LyricsUiState.NotFound
                         } else {
                             val query = LyricsQuery(song.title, artist, song.album?.title, duration)
-                            lyrics(song.videoId.value, query).toUiState()
+                            lyrics(song.videoId.value, query, refresh).toUiState()
                         }
                     } catch (e: CancellationException) {
                         throw e
@@ -184,7 +193,7 @@ private val DURATION_POLL = 250.milliseconds
 
 class LyricsViewModel(
     player: AudioPlayer,
-    lyrics: suspend (key: String, query: LyricsQuery) -> Lyrics?,
+    lyrics: suspend (key: String, query: LyricsQuery, refresh: Boolean) -> Lyrics?,
 ) : ViewModel() {
     val model = LyricsModel(player, lyrics, viewModelScope)
 }

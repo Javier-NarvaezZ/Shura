@@ -23,7 +23,8 @@ class LyricsRepository(
     private val memory = LinkedHashMap<String, CachedLyrics>()
 
     /**
-     * The lyrics of the song with [key], looked up with [query]; null when it has none.
+     * The lyrics of the song with [key], looked up with [query]; null when it has none. [refresh] asks LRCLIB again
+     * whatever is remembered (the user's "search again").
      *
      * @throws LyricsException when the lookup fails (other than finding nothing).
      */
@@ -31,9 +32,12 @@ class LyricsRepository(
     suspend fun lyrics(
         key: String,
         query: LyricsQuery,
+        refresh: Boolean = false,
     ): Lyrics? {
-        val cached = remembered(key) ?: stored(key)?.also { remember(key, it) }
-        if (cached != null && cached.isFresh()) return cached.lyrics
+        if (!refresh) {
+            val cached = remembered(key) ?: stored(key)?.also { remember(key, it) }
+            if (cached != null && cached.isFresh()) return cached.lyrics
+        }
         val found =
             try {
                 fetch(query)

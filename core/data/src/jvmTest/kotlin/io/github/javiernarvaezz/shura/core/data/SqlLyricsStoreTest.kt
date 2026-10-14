@@ -83,4 +83,17 @@ class SqlLyricsStoreTest {
             assertEquals(CachedLyrics(null, Instant.fromEpochMilliseconds(2)), store.get("v2"))
             assertEquals(1_000L, database.lyricsQueries.count().executeAsOne())
         }
+
+    @Test
+    fun theMigrationTo4ForgetsOnlySongsWithoutLyrics() =
+        runTest {
+            database.lyricsQueries.put("none", "none", null, 1)
+            database.lyricsQueries.put("plain", "plain", "words", 1)
+            database.lyricsQueries.put("instrumental", "instrumental", null, 1)
+            ShuraDatabase.Schema.migrate(driver, oldVersion = 3, newVersion = 4)
+            val store = store()
+            assertNull(store.get("none"))
+            assertEquals(CachedLyrics(Lyrics.Plain("words"), Instant.fromEpochMilliseconds(1)), store.get("plain"))
+            assertEquals(CachedLyrics(Lyrics.Instrumental, Instant.fromEpochMilliseconds(1)), store.get("instrumental"))
+        }
 }

@@ -78,6 +78,34 @@ class LyricsRepositoryTest {
         }
 
     @Test
+    fun aRefreshAsksAgainDespiteARememberedNotFound() =
+        runTest {
+            answer = { throw LyricsException.NotFound() }
+            val repository = repository()
+            assertNull(repository.lyrics("v1", query))
+
+            answer = { synced }
+            assertEquals(synced, repository.lyrics("v1", query, refresh = true))
+            assertEquals(2, calls)
+            assertEquals(CachedLyrics(synced, now), store.entries["v1"])
+            // Remembered afterwards like any other answer.
+            assertEquals(synced, repository.lyrics("v1", query))
+            assertEquals(2, calls)
+        }
+
+    @Test
+    fun aRefreshThatFailsKeepsWhatWasRemembered() =
+        runTest {
+            answer = { throw LyricsException.NotFound() }
+            val repository = repository()
+            repository.lyrics("v1", query)
+
+            answer = { throw LyricsException.Http(503) }
+            assertFailsWith<LyricsException.Http> { repository.lyrics("v1", query, refresh = true) }
+            assertEquals(CachedLyrics(null, now), store.entries["v1"])
+        }
+
+    @Test
     fun anExpiredNotFoundInTheStoreIsFetchedAgain() =
         runTest {
             store.entries["v1"] = CachedLyrics(null, now - 8.days)

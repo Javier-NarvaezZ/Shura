@@ -27,6 +27,7 @@ class LyricsModelTest {
     private val player = FakeAudioPlayer()
     private val synced = Lyrics.Synced(listOf(LyricLine(1.seconds, "one"), LyricLine(42.seconds, "two")))
     private val requests = mutableListOf<Pair<String, LyricsQuery>>()
+    private val refreshes = mutableListOf<Boolean>()
     private var answer: suspend (LyricsQuery) -> Lyrics? = { synced }
 
     private fun song(
@@ -44,8 +45,9 @@ class LyricsModelTest {
         val model =
             LyricsModel(
                 player,
-                lyrics = { key, query ->
+                lyrics = { key, query, refresh ->
                     requests += key to query
+                    refreshes += refresh
                     answer(query)
                 },
                 scope = backgroundScope,
@@ -247,6 +249,35 @@ class LyricsModelTest {
             runCurrent()
             assertEquals(LyricsUiState.Idle, model.state.value)
             assertEquals(1, requests.size)
+        }
+
+    @Test
+    fun searchingAgainAsksPastTheMemoryOfNoLyrics() =
+        runTest {
+            answer = { null }
+            play(song(1))
+            val model = model()
+            model.setVisible(true)
+            runCurrent()
+            assertEquals(LyricsUiState.NotFound, model.state.value)
+
+            answer = { synced }
+            model.searchAgain()
+            runCurrent()
+            assertEquals(LyricsUiState.Synced(synced), model.state.value)
+            assertEquals(listOf(false, true), refreshes)
+        }
+
+    @Test
+    fun searchingAgainOnlyActsOnNotFound() =
+        runTest {
+            play(song(1))
+            val model = model()
+            model.setVisible(true)
+            runCurrent()
+            model.searchAgain()
+            runCurrent()
+            assertEquals(listOf(false), refreshes)
         }
 
     @Test
