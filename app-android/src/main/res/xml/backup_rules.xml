@@ -1,9 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Android 11 and lower: exclude everything from Auto Backup (backup is also disabled via allowBackup). -->
+<!--
+  Android 11 and lower: only the app database, and only to an end-to-end encrypted backup (Android 9+; the flag is
+  ignored on 8.x). Everything else (WebView data, files, shared preferences, session store) stays on the device.
+-->
 <full-backup-content>
-    <exclude domain="root" />
-    <exclude domain="file" />
-    <exclude domain="database" />
-    <exclude domain="sharedpref" />
-    <exclude domain="external" />
+    <include domain="database" path="shura.db" requireFlags="clientSideEncryption" />
 </full-backup-content>
