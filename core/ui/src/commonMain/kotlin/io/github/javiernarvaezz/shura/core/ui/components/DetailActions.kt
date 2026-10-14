@@ -17,15 +17,17 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import io.github.javiernarvaezz.shura.core.ui.icons.ShuraIcons
 import io.github.javiernarvaezz.shura.core.ui.theme.Shura
 
 /**
- * A page's playback actions: shuffle in a round button and a wide "play" button on the brand
- * gradient. While [loading] (e.g. the rest
- * of a playlist), both wait and play shows a spinner instead of its icon.
+ * A page's actions: an optional [toggle] (save, follow) and shuffle in round buttons, and a wide "play" button on
+ * the brand gradient. While [loading] (e.g. the rest of a playlist), playback waits and play shows a spinner
+ * instead of its icon.
  */
 @Composable
 fun DetailActions(
@@ -35,22 +37,15 @@ fun DetailActions(
     onShuffle: () -> Unit,
     modifier: Modifier = Modifier,
     loading: Boolean = false,
+    toggle: DetailToggle? = null,
 ) {
     Row(
         modifier.fillMaxWidth().padding(horizontal = Shura.spacing.gutter),
         horizontalArrangement = Arrangement.spacedBy(Shura.spacing.m),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(
-            Modifier
-                .size(BUTTON_HEIGHT)
-                .clip(Shura.shapes.pill)
-                .background(Shura.colors.surface2)
-                .clickable(enabled = !loading, role = Role.Button, onClick = onShuffle),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(ShuraIcons.Shuffle, contentDescription = shuffleLabel, tint = Shura.colors.text)
-        }
+        toggle?.let { DetailToggleButton(it) }
+        RoundButton(ShuraIcons.Shuffle, shuffleLabel, Shura.colors.text, enabled = !loading, onClick = onShuffle)
         Row(
             Modifier
                 .weight(1f)
@@ -74,6 +69,40 @@ fun DetailActions(
                 modifier = Modifier.padding(start = Shura.spacing.s),
             )
         }
+    }
+}
+
+/** [toggle] on its own, for a page without playback actions (an artist with no songs listed). */
+@Composable
+fun DetailToggleButton(
+    toggle: DetailToggle,
+    modifier: Modifier = Modifier,
+) = RoundButton(
+    icon = if (toggle.active) toggle.activeIcon else toggle.icon,
+    label = if (toggle.active) toggle.activeLabel else toggle.label,
+    tint = if (toggle.active) Shura.colors.accent else Shura.colors.text,
+    onClick = toggle.onToggle,
+    modifier = modifier,
+)
+
+@Composable
+private fun RoundButton(
+    icon: ImageVector,
+    label: String,
+    tint: Color,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+) {
+    Box(
+        modifier
+            .size(BUTTON_HEIGHT)
+            .clip(Shura.shapes.pill)
+            .background(Shura.colors.surface2)
+            .clickable(enabled = enabled, role = Role.Button, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(icon, contentDescription = label, tint = tint)
     }
 }
 
