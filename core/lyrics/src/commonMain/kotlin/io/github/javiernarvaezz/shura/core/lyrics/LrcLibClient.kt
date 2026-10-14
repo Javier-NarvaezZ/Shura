@@ -31,7 +31,9 @@ class LrcLibClient(
      * The best lyrics for [query]: synced lyrics when any match, otherwise plain ones.
      *
      * With an album, LRCLIB's exact match (title, artist, album and duration) is tried first. Search results count
-     * only when their duration is within [DURATION_TOLERANCE] of the song's.
+     * when their duration is within [TEXT_TOLERANCE] of the song's, and keep their timing only within
+     * [DURATION_TOLERANCE]: further off, every line could be late or early, so only the words are shown. When the
+     * title and artist as they are match nothing, they are searched once more without upload tags ([LyricsTitle]).
      *
      * @throws LyricsException.NotFound when nothing matches.
      */
@@ -39,7 +41,7 @@ class LrcLibClient(
         val exact = query.album?.let { album -> exactMatch(query, album) }
         if (exact != null && exact !is Lyrics.Plain) return exact
         // Search only looks for synced lyrics to beat plain ones; if it fails, the plain ones still count.
-        val searched = if (exact == null) searchMatch(query) else searchOrNull(query)
+        val searched = if (exact == null) searchWithCleanedTitle(query) else searchOrNull(query)
         return when {
             searched is Lyrics.Synced -> searched
             exact != null -> exact
@@ -73,22 +75,36 @@ class LrcLibClient(
     @Suppress("SwallowedException") // The caller already has lyrics to show instead.
     private suspend fun searchOrNull(query: LyricsQuery): Lyrics? =
         try {
-            searchMatch(query)
+            searchWithCleanedTitle(query)
         } catch (e: LyricsException) {
             null
         }
 
-    private suspend fun searchMatch(query: LyricsQuery): Lyrics? {
+    /** Search as the song is named; if nothing matches, once more without upload tags, when that changes anything. */
+    private suspend fun searchWithCleanedTitle(query: LyricsQuery): Lyrics? {
+        searchMatch(query.title, query.artist, query.duration)?.let { return it }
+        val title = LyricsTitle.clean(query.title)
+        val artist = LyricsTitle.cleanArtist(query.artist)
+        return if (title != query.title || artist != query.artist) searchMatch(title, artist, query.duration) else null
+    }
+
+    private suspend fun searchMatch(
+        title: String,
+        artist: String,
+        duration: Duration,
+    ): Lyrics? {
         val response =
             get("search") {
-                parameter("track_name", query.title)
-                parameter("artist_name", query.artist)
+                parameter("track_name", title)
+                parameter("artist_name", artist)
             }
         return LrcLibRecord
             .listFrom(body(response))
-            .filter { (it.duration - query.duration).absoluteValue <= DURATION_TOLERANCE }
-            .mapNotNull { record -> record.lyrics()?.let { it to (record.duration - query.duration).absoluteValue } }
-            .minWithOrNull(compareBy<Pair<Lyrics, Duration>> { rank(it.first) }.thenBy { it.second })
+            .mapNotNull { record ->
+                val off = (record.duration - duration).absoluteValue
+                val lyrics = if (off <= DURATION_TOLERANCE) record.lyrics() else record.text()
+                lyrics?.takeIf { off <= TEXT_TOLERANCE }?.let { it to off }
+            }.minWithOrNull(compareBy<Pair<Lyrics, Duration>> { rank(it.first) }.thenBy { it.second })
             ?.first
     }
 
@@ -136,6 +152,9 @@ class LrcLibClient(
     companion object {
         /** LRCLIB's own tolerance when it matches a duration. */
         val DURATION_TOLERANCE: Duration = 2.seconds
+
+        /** How far off a duration may be for a record's words (without timing) to count: edits and video cuts. */
+        val TEXT_TOLERANCE: Duration = 6.seconds
 
         const val DEFAULT_USER_AGENT = "Shura (https://github.com/Javier-NarvaezZ/Shura)"
 

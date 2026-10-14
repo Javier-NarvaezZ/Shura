@@ -27,6 +27,25 @@ internal class LrcLibRecord(
         }
     }
 
+    /**
+     * The words without timing, for a record whose duration is too far off for its timing to fit: plain lyrics,
+     * else the synced lines' text, else [Lyrics.Instrumental] if flagged so, else `null`.
+     */
+    fun text(): Lyrics? {
+        val fromSynced =
+            syncedLyrics
+                ?.let(LrcParser::parse)
+                ?.map { it.text }
+                ?.filter { it.isNotBlank() }
+                ?.joinToString("\n")
+        return when {
+            !plainLyrics.isNullOrBlank() -> Lyrics.Plain(plainLyrics.trimEnd())
+            !fromSynced.isNullOrBlank() -> Lyrics.Plain(fromSynced)
+            instrumental -> Lyrics.Instrumental
+            else -> null
+        }
+    }
+
     companion object {
         /** A single record, as `/api/get` returns it. */
         fun from(json: JsonElement): LrcLibRecord =
