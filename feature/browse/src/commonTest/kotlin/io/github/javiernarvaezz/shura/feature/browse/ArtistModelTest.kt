@@ -3,6 +3,7 @@ package io.github.javiernarvaezz.shura.feature.browse
 import io.github.javiernarvaezz.shura.core.model.ArtistPage
 import io.github.javiernarvaezz.shura.core.model.ArtistSummary
 import io.github.javiernarvaezz.shura.core.testing.FakeAudioPlayer
+import io.github.javiernarvaezz.shura.core.testing.FakeLibrary
 import io.github.javiernarvaezz.shura.core.testing.FakeMusicCatalog
 import io.github.javiernarvaezz.shura.core.testing.testSong
 import kotlinx.coroutines.test.TestScope
@@ -11,7 +12,9 @@ import kotlinx.coroutines.test.runTest
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertTrue
 
 class ArtistModelTest {
     private val catalog = FakeMusicCatalog()
@@ -65,4 +68,23 @@ class ArtistModelTest {
     private companion object {
         const val SEED = 7
     }
+
+    @Test
+    fun theArtistIsFollowedAndUnfollowed() =
+        runTest {
+            catalog.artists["UC1"] = page
+            val library = FakeLibrary()
+            val model = ArtistModel(catalog, player, "UC1", backgroundScope, Random(SEED), library)
+            runCurrent()
+            assertTrue(model.canFollow)
+
+            model.toggleFollowed()
+            runCurrent()
+            assertTrue(model.followed.value)
+            assertEquals(listOf(page.artist), library.artists.value)
+
+            model.toggleFollowed()
+            runCurrent()
+            assertFalse(model.followed.value)
+        }
 }

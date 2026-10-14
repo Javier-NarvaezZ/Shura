@@ -3,6 +3,7 @@ package io.github.javiernarvaezz.shura.feature.browse
 import io.github.javiernarvaezz.shura.core.model.AlbumPage
 import io.github.javiernarvaezz.shura.core.model.AlbumSummary
 import io.github.javiernarvaezz.shura.core.testing.FakeAudioPlayer
+import io.github.javiernarvaezz.shura.core.testing.FakeLibrary
 import io.github.javiernarvaezz.shura.core.testing.FakeMusicCatalog
 import io.github.javiernarvaezz.shura.core.testing.testSong
 import kotlinx.coroutines.test.TestScope
@@ -11,7 +12,9 @@ import kotlinx.coroutines.test.runTest
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertTrue
 
 class AlbumModelTest {
     private val catalog = FakeMusicCatalog()
@@ -96,4 +99,44 @@ class AlbumModelTest {
     private companion object {
         const val SEED = 42
     }
+
+    @Test
+    fun theAlbumIsSavedAndRemovedFromTheLibrary() =
+        runTest {
+            catalog.albums["MPREb_1"] = page
+            val library = FakeLibrary()
+            val model = AlbumModel(catalog, player, "MPREb_1", backgroundScope, Random(SEED), library)
+            runCurrent()
+            assertTrue(model.canSave)
+            assertFalse(model.saved.value)
+
+            model.toggleSaved()
+            runCurrent()
+            assertEquals(listOf(page.album), library.albums.value)
+            assertTrue(model.saved.value)
+
+            model.toggleSaved()
+            runCurrent()
+            assertFalse(model.saved.value)
+            assertEquals(emptyList(), library.albums.value)
+        }
+
+    @Test
+    fun withoutALibraryThereIsNoSaving() =
+        runTest {
+            catalog.albums["MPREb_1"] = page
+            assertFalse(model().canSave)
+        }
+
+    @Test
+    fun aTrackIsLikedFromThePage() =
+        runTest {
+            catalog.albums["MPREb_1"] = page
+            val library = FakeLibrary()
+            val model = AlbumModel(catalog, player, "MPREb_1", backgroundScope, Random(SEED), library)
+            runCurrent()
+            model.likes.toggle(tracks[2])
+            runCurrent()
+            assertEquals(setOf(tracks[2].videoId), model.likes.likedIds.value)
+        }
 }

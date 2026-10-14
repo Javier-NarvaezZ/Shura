@@ -6,6 +6,7 @@ import io.github.javiernarvaezz.shura.core.player.PlaybackState
 import io.github.javiernarvaezz.shura.core.player.QueueState
 import io.github.javiernarvaezz.shura.core.player.RepeatMode
 import io.github.javiernarvaezz.shura.core.testing.FakeAudioPlayer
+import io.github.javiernarvaezz.shura.core.testing.FakeLibrary
 import io.github.javiernarvaezz.shura.core.testing.FakePlaybackSettings
 import io.github.javiernarvaezz.shura.core.testing.testSong
 import kotlinx.coroutines.test.TestScope
@@ -235,5 +236,29 @@ class PlayerModelTest {
             model.setAutoplay(false)
             assertEquals(false, settings.autoplay.value)
             assertNull(PlayerModel(player, backgroundScope).autoplay)
+        }
+
+    @Test
+    fun theHeartLikesAndUnlikesTheCurrentSong() =
+        runTest {
+            val library = FakeLibrary()
+            val model = PlayerModel(player, backgroundScope, library = library)
+            playing(PlaybackState.Playing(a))
+            assertTrue(model.likes.isAvailable)
+
+            model.toggleLike()
+            runCurrent()
+            assertEquals(listOf(a), library.likedSongs.value)
+            assertTrue(a.videoId in model.likes.likedIds.value)
+
+            model.toggleLike()
+            runCurrent()
+            assertEquals(emptyList(), library.likedSongs.value)
+        }
+
+    @Test
+    fun withoutALibraryThereIsNoHeart() =
+        runTest {
+            assertFalse(model().likes.isAvailable)
         }
 }

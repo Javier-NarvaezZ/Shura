@@ -59,6 +59,7 @@ import io.github.javiernarvaezz.shura.core.model.Song
 import io.github.javiernarvaezz.shura.core.player.RepeatMode
 import io.github.javiernarvaezz.shura.core.ui.artwork.Artwork
 import io.github.javiernarvaezz.shura.core.ui.artwork.rememberArtworkTint
+import io.github.javiernarvaezz.shura.core.ui.components.LikeAction
 import io.github.javiernarvaezz.shura.core.ui.components.PlayPauseButton
 import io.github.javiernarvaezz.shura.core.ui.components.Scrubber
 import io.github.javiernarvaezz.shura.core.ui.components.TintActionButton
@@ -71,6 +72,7 @@ import io.github.javiernarvaezz.shura.feature.player.resources.close_player
 import io.github.javiernarvaezz.shura.feature.player.resources.end_of_queue
 import io.github.javiernarvaezz.shura.feature.player.resources.hide_lyrics
 import io.github.javiernarvaezz.shura.feature.player.resources.hide_queue
+import io.github.javiernarvaezz.shura.feature.player.resources.like
 import io.github.javiernarvaezz.shura.feature.player.resources.next
 import io.github.javiernarvaezz.shura.feature.player.resources.pause
 import io.github.javiernarvaezz.shura.feature.player.resources.play
@@ -85,6 +87,7 @@ import io.github.javiernarvaezz.shura.feature.player.resources.show_queue
 import io.github.javiernarvaezz.shura.feature.player.resources.shuffle_off
 import io.github.javiernarvaezz.shura.feature.player.resources.shuffle_on
 import io.github.javiernarvaezz.shura.feature.player.resources.undo
+import io.github.javiernarvaezz.shura.feature.player.resources.unlike
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.StringResource
@@ -260,7 +263,7 @@ private fun PlayerBody(
                 }
 
                 PlayerMode.Cover -> {
-                    CoverAndTitle(song, sheet, links, side.weight(1f))
+                    CoverAndTitle(song, sheet, links, rememberLike(model, song), side.weight(1f))
                 }
             }
             Spacer(Modifier.height(Shura.spacing.l))
@@ -343,53 +346,6 @@ private fun ModeButton(
             stringResource(if (shown) hideLabel else showLabel),
             tint = if (shown) Shura.colors.text else Shura.colors.textMuted,
         )
-    }
-}
-
-@Composable
-private fun CoverAndTitle(
-    song: Song,
-    sheet: PlayerSheetState,
-    links: PlayerLinks,
-    modifier: Modifier = Modifier,
-) {
-    val artistId = song.artists.firstNotNullOfOrNull { it.id }
-    val album = song.album
-    Column(modifier, verticalArrangement = Arrangement.Center) {
-        // The cover slot: the flying cover lands here.
-        Spacer(
-            Modifier
-                .fillMaxWidth()
-                .aspectRatio(1f)
-                .onGloballyPositioned { sheet.playerCover = it.boundsInRoot() },
-        )
-        Spacer(Modifier.height(Shura.spacing.xl))
-        Text(
-            song.title,
-            style = MaterialTheme.typography.headlineMedium,
-            color = Shura.colors.text,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-        )
-        // The artist and the album open their pages (the first artist when there are several).
-        Text(
-            song.artistNames,
-            style = MaterialTheme.typography.bodyLarge,
-            color = Shura.colors.textMuted,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = artistId?.let { id -> Modifier.clickable { links.onArtist(id) } } ?: Modifier,
-        )
-        if (album != null) {
-            Text(
-                album.title,
-                style = MaterialTheme.typography.bodyMedium,
-                color = Shura.colors.textMuted,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = album.id?.let { id -> Modifier.clickable { links.onAlbum(id) } } ?: Modifier,
-            )
-        }
     }
 }
 

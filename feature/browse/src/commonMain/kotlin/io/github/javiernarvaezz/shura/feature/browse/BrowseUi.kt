@@ -31,6 +31,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.LocalPlatformContext
 import io.github.javiernarvaezz.shura.core.model.AlbumShelf
 import io.github.javiernarvaezz.shura.core.model.AlbumSummary
@@ -39,8 +40,11 @@ import io.github.javiernarvaezz.shura.core.model.BrowseLink
 import io.github.javiernarvaezz.shura.core.model.CatalogShelf
 import io.github.javiernarvaezz.shura.core.model.PlaylistShelf
 import io.github.javiernarvaezz.shura.core.model.Song
+import io.github.javiernarvaezz.shura.core.player.SongLikes
 import io.github.javiernarvaezz.shura.core.ui.artwork.prefetchArtwork
+import io.github.javiernarvaezz.shura.core.ui.components.DetailToggle
 import io.github.javiernarvaezz.shura.core.ui.components.DetailTopBar
+import io.github.javiernarvaezz.shura.core.ui.components.LikeAction
 import io.github.javiernarvaezz.shura.core.ui.components.MediaRail
 import io.github.javiernarvaezz.shura.core.ui.components.MediaTile
 import io.github.javiernarvaezz.shura.core.ui.components.SongMenu
@@ -49,17 +53,25 @@ import io.github.javiernarvaezz.shura.core.ui.components.TILE_ARTWORK_PX
 import io.github.javiernarvaezz.shura.core.ui.components.TOP_BAR_SPACE
 import io.github.javiernarvaezz.shura.core.ui.components.TrackRow
 import io.github.javiernarvaezz.shura.core.ui.components.heroScrolled
+import io.github.javiernarvaezz.shura.core.ui.icons.ShuraIcons
 import io.github.javiernarvaezz.shura.core.ui.text.toClock
 import io.github.javiernarvaezz.shura.core.ui.theme.Shura
 import io.github.javiernarvaezz.shura.feature.browse.resources.Res
 import io.github.javiernarvaezz.shura.feature.browse.resources.add_to_queue
 import io.github.javiernarvaezz.shura.feature.browse.resources.back
+import io.github.javiernarvaezz.shura.feature.browse.resources.follow
 import io.github.javiernarvaezz.shura.feature.browse.resources.go_to_album
 import io.github.javiernarvaezz.shura.feature.browse.resources.go_to_artist
+import io.github.javiernarvaezz.shura.feature.browse.resources.like
 import io.github.javiernarvaezz.shura.feature.browse.resources.load_failed
 import io.github.javiernarvaezz.shura.feature.browse.resources.more
 import io.github.javiernarvaezz.shura.feature.browse.resources.play_next
+import io.github.javiernarvaezz.shura.feature.browse.resources.remove_from_library
 import io.github.javiernarvaezz.shura.feature.browse.resources.retry
+import io.github.javiernarvaezz.shura.feature.browse.resources.save_to_library
+import io.github.javiernarvaezz.shura.feature.browse.resources.unfollow
+import io.github.javiernarvaezz.shura.feature.browse.resources.unlike
+import kotlinx.coroutines.flow.StateFlow
 import org.jetbrains.compose.resources.stringResource
 
 /**
@@ -198,6 +210,8 @@ internal fun songMenuLabels() =
         addToQueue = stringResource(Res.string.add_to_queue),
         goToAlbum = stringResource(Res.string.go_to_album),
         goToArtist = stringResource(Res.string.go_to_artist),
+        like = stringResource(Res.string.like),
+        unlike = stringResource(Res.string.unlike),
     )
 
 /**
@@ -217,6 +231,7 @@ internal fun PageTrack(
     number: Int? = null,
     pageAlbumId: String? = null,
     pageArtistId: String? = null,
+    like: LikeAction? = null,
 ) {
     val albumId = song.album?.id?.takeIf { it != pageAlbumId }
     val artistId = song.artists.firstNotNullOfOrNull { it.id }?.takeIf { it != pageArtistId }
@@ -236,6 +251,7 @@ internal fun PageTrack(
             onEnqueue = onEnqueue,
             onGoToAlbum = albumId?.let { id -> { navigation.onAlbum(id) } },
             onGoToArtist = artistId?.let { id -> { navigation.onArtist(id) } },
+            like = like,
         )
     }
 }

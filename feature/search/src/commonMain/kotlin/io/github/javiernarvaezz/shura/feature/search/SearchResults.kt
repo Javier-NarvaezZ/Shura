@@ -18,6 +18,7 @@ import io.github.javiernarvaezz.shura.core.model.ArtistSummary
 import io.github.javiernarvaezz.shura.core.model.BrowseLink
 import io.github.javiernarvaezz.shura.core.model.PlaylistSummary
 import io.github.javiernarvaezz.shura.core.model.Song
+import io.github.javiernarvaezz.shura.core.ui.components.LikeAction
 import io.github.javiernarvaezz.shura.core.ui.components.SongMenu
 import io.github.javiernarvaezz.shura.core.ui.components.SongMenuLabels
 import io.github.javiernarvaezz.shura.core.ui.components.SongRow
@@ -31,8 +32,10 @@ import io.github.javiernarvaezz.shura.feature.search.resources.kind_albums
 import io.github.javiernarvaezz.shura.feature.search.resources.kind_artists
 import io.github.javiernarvaezz.shura.feature.search.resources.kind_playlists
 import io.github.javiernarvaezz.shura.feature.search.resources.kind_songs
+import io.github.javiernarvaezz.shura.feature.search.resources.like
 import io.github.javiernarvaezz.shura.feature.search.resources.more_actions
 import io.github.javiernarvaezz.shura.feature.search.resources.play_next
+import io.github.javiernarvaezz.shura.feature.search.resources.unlike
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 
@@ -82,6 +85,7 @@ internal fun SongResults(
     onPlayNext: (Song) -> Unit,
     onEnqueue: (Song) -> Unit,
     links: SearchLinks,
+    likeOf: ((Song) -> LikeAction)? = null,
 ) {
     val labels =
         SongMenuLabels(
@@ -90,6 +94,8 @@ internal fun SongResults(
             addToQueue = stringResource(Res.string.add_to_queue),
             goToAlbum = stringResource(Res.string.go_to_album),
             goToArtist = stringResource(Res.string.go_to_artist),
+            like = stringResource(Res.string.like),
+            unlike = stringResource(Res.string.unlike),
         )
     ResultList(songs, key = { it.videoId.value }) { song ->
         val albumId = song.album?.id
@@ -108,6 +114,7 @@ internal fun SongResults(
                 onEnqueue = { onEnqueue(song) },
                 onGoToAlbum = albumId?.let { id -> { links.onAlbum(id) } },
                 onGoToArtist = artistId?.let { id -> { links.onArtist(id) } },
+                like = likeOf?.invoke(song),
             )
         }
     }

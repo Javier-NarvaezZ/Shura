@@ -31,6 +31,8 @@ fun AlbumScreen(
     val state by model.state.collectAsStateWithLifecycle()
     val queue by model.queue.collectAsStateWithLifecycle()
     val labels = songMenuLabels()
+    val likeOf = rememberLikeActions(model.likes)
+    val save = rememberSaveToggle(model.canSave, model.saved, model::toggleSaved)
     val playLabel = stringResource(Res.string.play)
     val shuffleLabel = stringResource(Res.string.shuffle)
     val details = (state as? PageState.Loaded)?.page?.let { albumDetails(it) }
@@ -57,6 +59,7 @@ fun AlbumScreen(
                 onPlay = model::play,
                 onShuffle = model::shuffle,
                 modifier = Modifier.padding(vertical = Shura.spacing.l),
+                toggle = save,
             )
         }
         page.description?.let {
@@ -75,6 +78,7 @@ fun AlbumScreen(
                 onEnqueue = { model.enqueue(song) },
                 navigation = navigation,
                 labels = labels,
+                like = likeOf?.invoke(song),
                 number = index + 1,
                 pageAlbumId = album.id,
             )
