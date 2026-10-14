@@ -1,0 +1,23 @@
+-- Lyrics looked up for each song (or that it has none), so they show again without the network; capped by the store.
+-- kind: synced, plain, instrumental or none. body: for synced, a JSON array of [time_ms, text] pairs; for plain,
+-- the text; otherwise null.
+CREATE TABLE lyrics_cache (
+    video_id TEXT NOT NULL PRIMARY KEY,
+    kind TEXT NOT NULL,
+    body TEXT,
+    fetched_at INTEGER NOT NULL
+);
+
+CREATE INDEX lyrics_cache_fetched_at ON lyrics_cache(fetched_at);
+
+entry:
+SELECT kind, body, fetched_at FROM lyrics_cache WHERE video_id = ?;
+
+put:
+INSERT OR REPLACE INTO lyrics_cache(video_id, kind, body, fetched_at) VALUES (?, ?, ?, ?);
+
+prune:
+DELETE FROM lyrics_cache WHERE video_id NOT IN (SELECT video_id FROM lyrics_cache ORDER BY fetched_at DESC LIMIT :keep);
+
+count:
+SELECT count(*) FROM lyrics_cache;

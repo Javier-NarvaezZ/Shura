@@ -22,6 +22,7 @@ kotlin {
         commonMain.dependencies {
             api(projects.core.model)
             api(projects.core.player)
+            api(projects.core.lyrics)
             implementation(libs.sqldelight.runtime)
             implementation(libs.sqldelight.coroutines)
             implementation(libs.kotlinx.serialization.json)

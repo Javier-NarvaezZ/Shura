@@ -13,6 +13,8 @@ kotlin {
             implementation(projects.feature.browse)
             implementation(projects.feature.search)
             implementation(projects.feature.player)
+            implementation(projects.feature.lyrics)
+            implementation(projects.core.lyrics)
             implementation(libs.navigation3.ui)
             implementation(libs.lifecycle.viewmodel.compose)
             implementation(libs.lifecycle.viewmodel.navigation3)

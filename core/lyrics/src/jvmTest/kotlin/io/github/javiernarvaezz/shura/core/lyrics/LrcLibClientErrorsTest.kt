@@ -16,6 +16,9 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.seconds
 
 /** Request shape and failure mapping; matching on real LRCLIB responses is in [LrcLibClientTest]. */
@@ -41,6 +44,8 @@ class LrcLibClientErrorsTest {
     private fun assertNoSongData(error: Throwable) {
         val message = error.message.orEmpty()
         listOf("Secret", "lrclib", "http://", "https://").forEach { assertFalse(it in message, message) }
+        // The underlying error is dropped: it could carry the request URL.
+        assertNull(error.cause)
     }
 
     @Test
@@ -93,6 +98,63 @@ class LrcLibClientErrorsTest {
         }
 
     @Test
+    fun aBusyExactMatchFallsBackToSearch() =
+        runTest {
+            val found =
+                """[{"duration":201.0,"instrumental":false,"plainLyrics":"words",""" +
+                    """"syncedLyrics":"[00:01.00] words"}]"""
+            listOf(HttpStatusCode.ServiceUnavailable, HttpStatusCode.TooManyRequests).forEach { busy ->
+                requests.clear()
+                val client =
+                    client { request ->
+                        if (request.url.encodedPath == "/api/get") json(OVERLOADED, busy) else json(found)
+                    }
+                assertEquals(
+                    Lyrics.Synced(listOf(LyricLine(1.seconds, "words"))),
+                    client.lyrics(query),
+                )
+                assertEquals(listOf("/api/get", "/api/search"), requests.map { it.url.encodedPath })
+            }
+        }
+
+    @Test
+    fun plainLyricsFromTheExactMatchSurviveABusySearch() =
+        runTest {
+            val plain =
+                """{"duration":201.0,"instrumental":false,"plainLyrics":"words","syncedLyrics":null}"""
+            val client =
+                client { request ->
+                    if (request.url.encodedPath == "/api/get") {
+                        json(plain)
+                    } else {
+                        json(OVERLOADED, HttpStatusCode.ServiceUnavailable)
+                    }
+                }
+            assertEquals(Lyrics.Plain("words"), client.lyrics(query))
+            assertEquals(listOf("/api/get", "/api/search"), requests.map { it.url.encodedPath })
+        }
+
+    @Test
+    fun aBusyExactMatchAndABusySearchFail() =
+        runTest {
+            val error =
+                assertFailsWith<LyricsException.Http> {
+                    client { json(OVERLOADED, HttpStatusCode.ServiceUnavailable) }.lyrics(query)
+                }
+            assertEquals(503, error.status)
+            assertEquals(2, requests.size)
+        }
+
+    @Test
+    fun otherExactMatchErrorsDoNotFallBack() =
+        runTest {
+            assertFailsWith<LyricsException.Http> {
+                client { json("", HttpStatusCode.BadRequest) }.lyrics(query)
+            }
+            assertEquals(listOf("/api/get"), requests.map { it.url.encodedPath })
+        }
+
+    @Test
     fun rateLimitIsTypedAsHttp() =
         runTest {
             val client =
@@ -115,6 +177,8 @@ class LrcLibClientErrorsTest {
                         .lyrics(query)
                 }
             assertNoSongData(error)
+            assertEquals("IOException", error.causeType)
+            assertFalse("Secret" in error.stackTraceToString())
         }
 
     @Test
@@ -125,6 +189,16 @@ class LrcLibClientErrorsTest {
         }
 
     @Test
+    fun truncatedJsonKeepsOnlyTheParserErrorType() =
+        runTest {
+            val error =
+                assertFailsWith<LyricsException.Format> { client { json("""{"trackName":"Secret""") }.lyrics(query) }
+            assertNoSongData(error)
+            val causeType = assertNotNull(error.causeType)
+            assertTrue(causeType.endsWith("Exception"), causeType)
+        }
+
+    @Test
     fun wrongJsonShapeIsTypedAsFormat() =
         runTest {
             assertFailsWith<LyricsException.Format> { client { json("[]") }.lyrics(query) }
@@ -132,4 +206,10 @@ class LrcLibClientErrorsTest {
             val searchOnly = LyricsQuery("Secret Title", "Secret Artist", null, 200.seconds)
             assertFailsWith<LyricsException.Format> { client { json("{}") }.lyrics(searchOnly) }
         }
+
+    private companion object {
+        const val OVERLOADED =
+            """{"message":"The server is busy, please retry in a moment",""" +
+                """"name":"ServerOverloaded","statusCode":503}"""
+    }
 }

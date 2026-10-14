@@ -38,7 +38,8 @@ class LrcLibClient(
     suspend fun lyrics(query: LyricsQuery): Lyrics {
         val exact = query.album?.let { album -> exactMatch(query, album) }
         if (exact != null && exact !is Lyrics.Plain) return exact
-        val searched = searchMatch(query)
+        // Search only looks for synced lyrics to beat plain ones; if it fails, the plain ones still count.
+        val searched = if (exact == null) searchMatch(query) else searchOrNull(query)
         return when {
             searched is Lyrics.Synced -> searched
             exact != null -> exact
@@ -47,7 +48,10 @@ class LrcLibClient(
         }
     }
 
-    /** `null` when LRCLIB has no record with this exact signature, or the record has no lyrics. */
+    /**
+     * `null` when LRCLIB has no record with this exact signature, the record has no lyrics, or the server is busy
+     * (LRCLIB's exact match answers 503 or 429 at times while search still works).
+     */
     private suspend fun exactMatch(
         query: LyricsQuery,
         album: String,
@@ -59,9 +63,20 @@ class LrcLibClient(
                 parameter("album_name", album)
                 parameter("duration", query.duration.inWholeSecondsRounded())
             }
-        if (response.status == HttpStatusCode.NotFound) return null
-        return LrcLibRecord.from(body(response)).lyrics()
+        return if (response.status == HttpStatusCode.NotFound || response.status in BUSY) {
+            null
+        } else {
+            LrcLibRecord.from(body(response)).lyrics()
+        }
     }
+
+    @Suppress("SwallowedException") // The caller already has lyrics to show instead.
+    private suspend fun searchOrNull(query: LyricsQuery): Lyrics? =
+        try {
+            searchMatch(query)
+        } catch (e: LyricsException) {
+            null
+        }
 
     private suspend fun searchMatch(query: LyricsQuery): Lyrics? {
         val response =
@@ -124,7 +139,17 @@ class LrcLibClient(
 
         const val DEFAULT_USER_AGENT = "Shura (https://github.com/Javier-NarvaezZ/Shura)"
 
+        /** The User-Agent LRCLIB asks for: the app's name, its version and a link to its homepage. */
+        fun userAgent(
+            app: String,
+            version: String,
+            homepage: String,
+        ): String = "$app v$version ($homepage)"
+
         private const val API_BASE = "https://lrclib.net/api"
+
+        /** Answers that mean "try again later": the exact match then falls back to search. */
+        private val BUSY = setOf(HttpStatusCode.ServiceUnavailable, HttpStatusCode.TooManyRequests)
         private const val MILLIS_PER_SECOND = 1000.0
     }
 }

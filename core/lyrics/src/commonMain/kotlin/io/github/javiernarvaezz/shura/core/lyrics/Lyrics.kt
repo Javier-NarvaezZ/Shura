@@ -25,7 +25,22 @@ sealed interface Lyrics {
     /** Time-stamped lines in display order. Blank lines mark where sung text pauses. */
     data class Synced(
         val lines: List<LyricLine>,
-    ) : Lyrics
+    ) : Lyrics {
+        /**
+         * The index of the line shown at [position]: the last one started by then, or -1 before the first (and
+         * always with no lines). [lines] are sorted by time, as [LrcParser] returns them.
+         */
+        fun lineAt(position: Duration): Int {
+            // Binary search for the first line that starts after the position; the line before it is shown.
+            var low = 0
+            var high = lines.size
+            while (low < high) {
+                val mid = (low + high) ushr 1
+                if (lines[mid].time <= position) low = mid + 1 else high = mid
+            }
+            return low - 1
+        }
+    }
 
     data class Plain(
         val text: String,

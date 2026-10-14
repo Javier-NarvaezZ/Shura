@@ -51,6 +51,7 @@ dependencies {
     implementation(projects.core.stream)
     implementation(projects.core.player)
     implementation(projects.core.data)
+    implementation(projects.core.lyrics)
     implementation(projects.feature.search)
     implementation(libs.compose.runtime)
     implementation(libs.androidx.activity.compose)

@@ -19,6 +19,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -49,6 +50,7 @@ import androidx.navigationevent.compose.rememberNavigationEventState
 import io.github.javiernarvaezz.shura.appshell.resources.Res
 import io.github.javiernarvaezz.shura.appshell.resources.tab_home
 import io.github.javiernarvaezz.shura.appshell.resources.tab_search
+import io.github.javiernarvaezz.shura.core.lyrics.LyricsRepository
 import io.github.javiernarvaezz.shura.core.model.BrowseLink
 import io.github.javiernarvaezz.shura.core.model.MusicCatalog
 import io.github.javiernarvaezz.shura.core.model.Song
@@ -70,9 +72,14 @@ import io.github.javiernarvaezz.shura.feature.browse.PlaylistScreen
 import io.github.javiernarvaezz.shura.feature.browse.PlaylistViewModel
 import io.github.javiernarvaezz.shura.feature.home.HomeScreen
 import io.github.javiernarvaezz.shura.feature.home.HomeViewModel
+import io.github.javiernarvaezz.shura.feature.lyrics.LyricsModel
+import io.github.javiernarvaezz.shura.feature.lyrics.LyricsViewModel
+import io.github.javiernarvaezz.shura.feature.lyrics.PlayerLyrics
 import io.github.javiernarvaezz.shura.feature.player.MiniPlayer
 import io.github.javiernarvaezz.shura.feature.player.PlayerLinks
+import io.github.javiernarvaezz.shura.feature.player.PlayerMode
 import io.github.javiernarvaezz.shura.feature.player.PlayerOverlay
+import io.github.javiernarvaezz.shura.feature.player.PlayerSheetState
 import io.github.javiernarvaezz.shura.feature.player.PlayerViewModel
 import io.github.javiernarvaezz.shura.feature.player.PreloadUpcomingArtwork
 import io.github.javiernarvaezz.shura.feature.player.rememberPlayerSheetState
@@ -95,6 +102,8 @@ class ShellDependencies(
     val networkRegained: Flow<Unit> = NeverRegained,
     /** The user's playback settings (autoplay); null where there are none yet (desktop). */
     val settings: PlaybackSettings? = null,
+    /** Lyrics for a song (cached); null hides the lyrics (desktop, until it has a database). */
+    val lyrics: LyricsRepository? = null,
 )
 
 enum class Tab { Home, Search }
@@ -159,18 +168,14 @@ fun ShuraAppShell(
     val home = viewModel { HomeViewModel(deps.player, deps.history, deps.currentHour) }
     val search = viewModel { SearchViewModel(SearchSources.of(deps.catalog), deps.player, deps.onPlaybackIntent) }
     val player = viewModel { PlayerViewModel(deps.player, deps.settings) }
+    // At shell level, so the lyrics survive closing and opening the player.
+    val lyrics = deps.lyrics?.let { repository -> viewModel { LyricsViewModel(deps.player, repository::lyrics) } }
     val sheet = rememberPlayerSheetState()
-    val scope = rememberCoroutineScope()
     val tabs = rememberSaveableStateHolder()
     val navigation = remember(shell) { browseNavigation(shell) }
     val searchLinks =
         remember(navigation) { SearchLinks(navigation.onAlbum, navigation.onArtist, navigation.onPlaylist) }
-    // Back leaves the queue, then closes the player, before it navigates.
-    NavigationBackHandler(
-        state = rememberNavigationEventState(NavigationEventInfo.None),
-        isBackEnabled = sheet.isShown,
-        onBackCompleted = { if (sheet.showsQueue) sheet.showsQueue = false else sheet.close(scope) },
-    )
+    PlayerModes(sheet, lyrics?.model)
     CompositionLocalProvider(LocalNetworkRegained provides deps.networkRegained) {
         Box(
             modifier
@@ -205,9 +210,35 @@ fun ShuraAppShell(
                 MiniPlayer(player.model, sheet, Modifier.padding(bottom = Shura.spacing.s))
                 BottomChrome(selected = shell.tab, onSelect = { shell.tab = it })
             }
-            PlayerOverlay(player.model, sheet, links = PlayerLinks(navigation.onArtist, navigation.onAlbum))
+            PlayerOverlay(
+                player.model,
+                sheet,
+                links = PlayerLinks(navigation.onArtist, navigation.onAlbum),
+                lyrics = lyrics?.let { { modifier -> PlayerLyrics(it.model, modifier) } },
+            )
             PreloadUpcomingArtwork(player.model)
         }
+    }
+}
+
+/**
+ * Back leaves the queue or the lyrics, then closes the player, before it navigates. Lyrics are looked up only
+ * while they are on screen.
+ */
+@Composable
+private fun PlayerModes(
+    sheet: PlayerSheetState,
+    lyrics: LyricsModel?,
+) {
+    val scope = rememberCoroutineScope()
+    NavigationBackHandler(
+        state = rememberNavigationEventState(NavigationEventInfo.None),
+        isBackEnabled = sheet.isShown,
+        onBackCompleted = { if (sheet.mode != PlayerMode.Cover) sheet.mode = PlayerMode.Cover else sheet.close(scope) },
+    )
+    if (lyrics != null) {
+        val showsLyrics = sheet.isShown && sheet.mode == PlayerMode.Lyrics
+        LaunchedEffect(showsLyrics) { lyrics.setVisible(showsLyrics) }
     }
 }
 

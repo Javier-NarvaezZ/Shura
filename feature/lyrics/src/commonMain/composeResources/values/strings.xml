@@ -1,0 +1,8 @@
+<resources>
+    <string name="lyrics_attribution">Letras: LRCLIB</string>
+    <string name="lyrics_not_synced">Esta letra no está sincronizada.</string>
+    <string name="lyrics_instrumental">Instrumental</string>
+    <string name="lyrics_not_found">No encontramos la letra de esta canción.</string>
+    <string name="lyrics_failed">No se pudo cargar la letra. Revisa tu conexión e inténtalo de nuevo.</string>
+    <string name="retry">Reintentar</string>
+</resources>

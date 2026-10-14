@@ -31,6 +31,22 @@ class LrcParserTest {
     }
 
     @Test
+    fun aLineWithSeveralTimestampsBecomesOneLinePerTimestamp() {
+        val lines = LrcParser.parse("[00:12][00:45]texto")
+        assertEquals(listOf(line(12_000, "texto"), line(45_000, "texto")), lines)
+    }
+
+    @Test
+    fun linesOutOfOrderInTheFileComeBackSortedByTime() {
+        val lines = LrcParser.parse("[01:00.00] d\n[00:05.00] a\n[00:40.00][00:15.00] b\n[00:30.00] c")
+        assertEquals(
+            listOf(line(5_000, "a"), line(15_000, "b"), line(30_000, "c"), line(40_000, "b"), line(60_000, "d")),
+            lines,
+        )
+        assertEquals(lines.sortedBy { it.time }, lines)
+    }
+
+    @Test
     fun keepsBlankTimedLinesAsPauses() {
         val lines = LrcParser.parse("[00:05.00] Sung\n[00:09.00]\n[00:12.00] Again")
         assertEquals(line(9_000, ""), lines[1])
