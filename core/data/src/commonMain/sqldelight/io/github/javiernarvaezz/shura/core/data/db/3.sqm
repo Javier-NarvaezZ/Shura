@@ -1,0 +1,3 @@
+-- Version 3 → 4: lyrics matching improved (cleaned titles, text-only within 6 s), so songs remembered as having no
+-- lyrics are looked up again. Data only; the schema does not change.
+DELETE FROM lyrics_cache WHERE kind = 'none';
