@@ -47,9 +47,11 @@ class PlaylistModel(
 
     val canSave: Boolean get() = library != null
 
+    /** Saves the playlist with the cover the page shows: its own, or the first song's when it has none. */
     fun toggleSaved() {
-        val playlist = loader.page?.playlist ?: return
-        library?.setSaved(playlist, !saved.value)
+        val page = loader.page ?: return
+        val cover = page.playlist.thumbnailUrl ?: page.tracks.firstOrNull()?.thumbnailUrl
+        library?.setSaved(page.playlist.copy(thumbnailUrl = cover), !saved.value)
     }
 
     val queue: StateFlow<QueueState> = player.queue

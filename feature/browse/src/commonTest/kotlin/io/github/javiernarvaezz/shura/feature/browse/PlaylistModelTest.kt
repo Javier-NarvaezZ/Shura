@@ -142,4 +142,26 @@ class PlaylistModelTest {
             assertTrue(model.saved.value)
             assertEquals(listOf(PlaylistSummary("VLPL1", "Mix")), library.playlists.value)
         }
+
+    @Test
+    fun aPlaylistWithoutACoverIsSavedWithItsFirstSongs() =
+        runTest {
+            val withCovers =
+                PlaylistPage(
+                    PlaylistSummary("VLPL1", "Mix"),
+                    songs(0, 2).map { it.copy(thumbnailUrl = "https://lh3.googleusercontent.com/${it.title}") },
+                )
+            catalog.playlists["VLPL1"] = withCovers
+            val library = FakeLibrary()
+            val model = PlaylistModel(catalog, player, link, backgroundScope, Random(1), library)
+            runCurrent()
+            model.toggleSaved()
+            runCurrent()
+            assertEquals(
+                "https://lh3.googleusercontent.com/S0",
+                library.playlists.value
+                    .single()
+                    .thumbnailUrl,
+            )
+        }
 }
