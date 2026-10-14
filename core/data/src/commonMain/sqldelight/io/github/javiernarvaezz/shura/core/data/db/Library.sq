@@ -1,0 +1,79 @@
+-- The user's library on this device (no account): liked songs, saved albums and playlists, followed artists.
+-- Lists are newest first; saving again replaces the row and moves it to the top.
+CREATE TABLE liked_song (
+    video_id TEXT NOT NULL PRIMARY KEY,
+    title TEXT NOT NULL,
+    artist_names TEXT NOT NULL,
+    artist_ids TEXT NOT NULL,
+    album_title TEXT,
+    album_id TEXT,
+    duration_ms INTEGER,
+    thumbnail_url TEXT,
+    explicit INTEGER NOT NULL,
+    liked_at INTEGER NOT NULL
+);
+
+CREATE TABLE saved_album (
+    id TEXT NOT NULL PRIMARY KEY,
+    title TEXT NOT NULL,
+    artist_names TEXT NOT NULL,
+    artist_ids TEXT NOT NULL,
+    year INTEGER,
+    type_label TEXT,
+    thumbnail_url TEXT,
+    explicit INTEGER NOT NULL,
+    saved_at INTEGER NOT NULL
+);
+
+CREATE TABLE saved_playlist (
+    id TEXT NOT NULL PRIMARY KEY,
+    title TEXT NOT NULL,
+    author TEXT,
+    thumbnail_url TEXT,
+    saved_at INTEGER NOT NULL
+);
+
+CREATE TABLE followed_artist (
+    id TEXT NOT NULL PRIMARY KEY,
+    name TEXT NOT NULL,
+    thumbnail_url TEXT,
+    followed_at INTEGER NOT NULL
+);
+
+likedSongs:
+SELECT * FROM liked_song ORDER BY liked_at DESC, rowid DESC;
+
+like:
+INSERT OR REPLACE INTO liked_song(video_id, title, artist_names, artist_ids, album_title, album_id, duration_ms, thumbnail_url, explicit, liked_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+unlike:
+DELETE FROM liked_song WHERE video_id = ?;
+
+albums:
+SELECT * FROM saved_album ORDER BY saved_at DESC, rowid DESC;
+
+saveAlbum:
+INSERT OR REPLACE INTO saved_album(id, title, artist_names, artist_ids, year, type_label, thumbnail_url, explicit, saved_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+removeAlbum:
+DELETE FROM saved_album WHERE id = ?;
+
+playlists:
+SELECT * FROM saved_playlist ORDER BY saved_at DESC, rowid DESC;
+
+savePlaylist:
+INSERT OR REPLACE INTO saved_playlist(id, title, author, thumbnail_url, saved_at) VALUES (?, ?, ?, ?, ?);
+
+removePlaylist:
+DELETE FROM saved_playlist WHERE id = ?;
+
+artists:
+SELECT * FROM followed_artist ORDER BY followed_at DESC, rowid DESC;
+
+follow:
+INSERT OR REPLACE INTO followed_artist(id, name, thumbnail_url, followed_at) VALUES (?, ?, ?, ?);
+
+unfollow:
+DELETE FROM followed_artist WHERE id = ?;
