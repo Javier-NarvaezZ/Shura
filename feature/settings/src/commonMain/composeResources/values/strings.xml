@@ -1,0 +1,18 @@
+<resources>
+    <string name="settings_title">Ajustes</string>
+    <string name="back">Atrás</string>
+    <string name="account_section">Cuenta de YouTube Music</string>
+    <string name="signed_out_hint">Inicia sesión para usar tu biblioteca de YouTube Music.</string>
+    <string name="sign_in">Iniciar sesión con Google</string>
+    <string name="signed_in_as">Sesión iniciada como %1$s</string>
+    <string name="signed_in">Sesión iniciada</string>
+    <string name="session_expired">Tu sesión caducó. Vuelve a iniciar sesión.</string>
+    <string name="session_unreadable">No se pudo leer tu sesión guardada. Vuelve a iniciar sesión.</string>
+    <string name="sign_out">Cerrar sesión</string>
+    <string name="sign_out_title">¿Cerrar sesión?</string>
+    <string name="sign_out_body">Se cerrará también en Google y se borrará de este dispositivo.</string>
+    <string name="cancel">Cancelar</string>
+    <string name="playback_section">Reproducción</string>
+    <string name="autoplay">Reproducción automática</string>
+    <string name="autoplay_hint">Al terminar la cola, sigue con canciones parecidas</string>
+</resources>
