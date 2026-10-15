@@ -5,6 +5,7 @@ import io.github.javiernarvaezz.shura.core.model.PlaylistPage
 import io.github.javiernarvaezz.shura.core.model.PlaylistSummary
 import io.github.javiernarvaezz.shura.core.model.TrackPage
 import io.github.javiernarvaezz.shura.core.testing.FakeAudioPlayer
+import io.github.javiernarvaezz.shura.core.testing.FakeLibrary
 import io.github.javiernarvaezz.shura.core.testing.FakeMusicCatalog
 import io.github.javiernarvaezz.shura.core.testing.testSong
 import kotlinx.coroutines.test.TestScope
@@ -124,6 +125,43 @@ class PlaylistModelTest {
                     .substringBefore("@")
                     .split(",")
                     .size,
+            )
+        }
+
+    @Test
+    fun thePlaylistIsSavedOnceLoaded() =
+        runTest {
+            catalog.playlists["VLPL1"] = page(3)
+            val library = FakeLibrary()
+            val model = PlaylistModel(catalog, player, link, backgroundScope, Random(1), library)
+            runCurrent()
+            assertFalse(model.saved.value)
+
+            model.toggleSaved()
+            runCurrent()
+            assertTrue(model.saved.value)
+            assertEquals(listOf(PlaylistSummary("VLPL1", "Mix")), library.playlists.value)
+        }
+
+    @Test
+    fun aPlaylistWithoutACoverIsSavedWithItsFirstSongs() =
+        runTest {
+            val withCovers =
+                PlaylistPage(
+                    PlaylistSummary("VLPL1", "Mix"),
+                    songs(0, 2).map { it.copy(thumbnailUrl = "https://lh3.googleusercontent.com/${it.title}") },
+                )
+            catalog.playlists["VLPL1"] = withCovers
+            val library = FakeLibrary()
+            val model = PlaylistModel(catalog, player, link, backgroundScope, Random(1), library)
+            runCurrent()
+            model.toggleSaved()
+            runCurrent()
+            assertEquals(
+                "https://lh3.googleusercontent.com/S0",
+                library.playlists.value
+                    .single()
+                    .thumbnailUrl,
             )
         }
 }

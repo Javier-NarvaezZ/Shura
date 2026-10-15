@@ -7,7 +7,10 @@ import io.github.javiernarvaezz.shura.core.model.MusicCatalog
 import io.github.javiernarvaezz.shura.core.model.PlaylistPage
 import io.github.javiernarvaezz.shura.core.model.Song
 import io.github.javiernarvaezz.shura.core.player.AudioPlayer
+import io.github.javiernarvaezz.shura.core.player.Library
 import io.github.javiernarvaezz.shura.core.player.QueueState
+import io.github.javiernarvaezz.shura.core.player.SongLikes
+import io.github.javiernarvaezz.shura.core.player.TrackPlayback
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -27,6 +30,7 @@ class PlaylistModel(
     link: BrowseLink,
     private val scope: CoroutineScope,
     random: Random = Random.Default,
+    private val library: Library? = null,
 ) {
     private val loader = PageLoader(scope) { catalog.playlist(link) }
     private val playback = TrackPlayback(player, random)
@@ -35,6 +39,20 @@ class PlaylistModel(
     private var moreJob: Job? = null
 
     val state: StateFlow<PageState<PlaylistPage>> = loader.state
+
+    val likes = SongLikes(library, scope)
+
+    /** Whether the playlist is saved in the library; there is no save action without a library. */
+    val saved: StateFlow<Boolean> = savedInLibrary(scope, state, library?.playlists, { it.playlist.id }, { it.id })
+
+    val canSave: Boolean get() = library != null
+
+    /** Saves the playlist with the cover the page shows: its own, or the first song's when it has none. */
+    fun toggleSaved() {
+        val page = loader.page ?: return
+        val cover = page.playlist.thumbnailUrl ?: page.tracks.firstOrNull()?.thumbnailUrl
+        library?.setSaved(page.playlist.copy(thumbnailUrl = cover), !saved.value)
+    }
 
     val queue: StateFlow<QueueState> = player.queue
 
@@ -108,6 +126,7 @@ class PlaylistViewModel(
     catalog: MusicCatalog,
     player: AudioPlayer,
     link: BrowseLink,
+    library: Library? = null,
 ) : ViewModel() {
-    val model = PlaylistModel(catalog, player, link, viewModelScope)
+    val model = PlaylistModel(catalog, player, link, viewModelScope, library = library)
 }

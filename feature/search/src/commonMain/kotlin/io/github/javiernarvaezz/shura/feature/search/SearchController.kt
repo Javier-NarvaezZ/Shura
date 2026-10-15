@@ -6,7 +6,9 @@ import io.github.javiernarvaezz.shura.core.model.MusicCatalog
 import io.github.javiernarvaezz.shura.core.model.PlaylistSummary
 import io.github.javiernarvaezz.shura.core.model.Song
 import io.github.javiernarvaezz.shura.core.player.AudioPlayer
+import io.github.javiernarvaezz.shura.core.player.Library
 import io.github.javiernarvaezz.shura.core.player.QueueState
+import io.github.javiernarvaezz.shura.core.player.SongLikes
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -63,8 +65,12 @@ class SearchController(
     private val sources: SearchSources,
     private val player: AudioPlayer,
     private val scope: CoroutineScope,
+    library: Library? = null,
     private val onPlaybackIntent: () -> Unit = {},
 ) {
+    /** "Me gusta" for the results; without a library the menus offer none. */
+    val likes = SongLikes(library, scope)
+
     private val mutableState = MutableStateFlow(SearchUiState())
     private val jobs = mutableMapOf<SearchKind, Job>()
     private var submitted = ""

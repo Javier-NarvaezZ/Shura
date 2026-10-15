@@ -17,4 +17,6 @@
     <string name="kind_playlists">Playlists</string>
     <string name="queued_next">Sonará a continuación</string>
     <string name="queued_end">Añadida a la cola</string>
+    <string name="like">Me gusta</string>
+    <string name="unlike">Quitar de Me gusta</string>
 </resources>

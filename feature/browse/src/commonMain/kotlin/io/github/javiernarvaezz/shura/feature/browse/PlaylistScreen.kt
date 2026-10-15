@@ -35,8 +35,9 @@ fun PlaylistScreen(
     val state by model.state.collectAsStateWithLifecycle()
     val queue by model.queue.collectAsStateWithLifecycle()
     val preparing by model.preparing.collectAsStateWithLifecycle()
-    val moreFailed by model.moreFailed.collectAsStateWithLifecycle()
     val labels = songMenuLabels()
+    val likeOf = rememberLikeActions(model.likes)
+    val save = rememberSaveToggle(model.canSave, model.saved, model::toggleSaved)
     val playLabel = stringResource(Res.string.play)
     val shuffleLabel = stringResource(Res.string.shuffle)
     val retryLabel = stringResource(Res.string.retry)
@@ -59,6 +60,7 @@ fun PlaylistScreen(
                 onPlay = model::play,
                 onShuffle = model::shuffle,
                 modifier = Modifier.padding(vertical = Shura.spacing.l),
+                toggle = save,
                 loading = preparing,
             )
         }
@@ -75,20 +77,28 @@ fun PlaylistScreen(
                 onEnqueue = { model.enqueue(song) },
                 navigation = navigation,
                 labels = labels,
+                like = likeOf?.invoke(song),
             )
         }
-        if (page.hasMore) {
-            // Composed only when the list nears its end: that is when the next tracks are needed.
-            item(key = "more") {
-                Box(Modifier.fillMaxWidth().padding(Shura.spacing.l), contentAlignment = Alignment.Center) {
-                    if (moreFailed) {
-                        TextButton(onClick = model::loadMore) { Text(retryLabel) }
-                    } else {
-                        LaunchedEffect(page.tracks.size) { model.loadMore() }
-                        CircularProgressIndicator(Modifier.size(SPINNER), strokeWidth = 2.dp)
-                    }
-                }
-            }
+        // Composed only when the list nears its end: that is when the next tracks are needed.
+        if (page.hasMore) item(key = "more") { MoreTracks(model, page.tracks.size, retryLabel) }
+    }
+}
+
+/** The end of the loaded tracks: loads the next ones, or offers to retry after a failure. */
+@Composable
+private fun MoreTracks(
+    model: PlaylistModel,
+    loaded: Int,
+    retryLabel: String,
+) {
+    val moreFailed by model.moreFailed.collectAsStateWithLifecycle()
+    Box(Modifier.fillMaxWidth().padding(Shura.spacing.l), contentAlignment = Alignment.Center) {
+        if (moreFailed) {
+            TextButton(onClick = model::loadMore) { Text(retryLabel) }
+        } else {
+            LaunchedEffect(loaded) { model.loadMore() }
+            CircularProgressIndicator(Modifier.size(SPINNER), strokeWidth = 2.dp)
         }
     }
 }

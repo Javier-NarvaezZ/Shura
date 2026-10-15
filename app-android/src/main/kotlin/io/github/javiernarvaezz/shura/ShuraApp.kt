@@ -75,12 +75,18 @@ class AppGraph(
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
-    /** Queue, play history and settings: app-private database (excluded from backups), used off the main thread. */
+    /**
+     * Queue, play history, settings, lyrics and library: the app-private database, used off the main thread. It is the
+     * only data in Android backups and device transfers (`res/xml/data_extraction_rules.xml`).
+     */
     private val storage = AndroidAppStorage(context, Dispatchers.IO, scope)
 
     val store = storage.queue
 
     val settings = storage.settings
+
+    /** Liked songs, saved albums and playlists, followed artists: the local library, in the app database. */
+    val library = storage.library
 
     /**
      * Lyrics from LRCLIB through the single client (`lrclib.net` is on the allowlist), cached in the app database.

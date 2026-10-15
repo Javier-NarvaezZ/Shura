@@ -19,4 +19,10 @@
     <string name="about">Acerca de</string>
     <string name="subscribers">%1$s suscriptores</string>
     <string name="no_tracks">Esta página no tiene canciones disponibles.</string>
+    <string name="like">Me gusta</string>
+    <string name="unlike">Quitar de Me gusta</string>
+    <string name="save_to_library">Guardar en la biblioteca</string>
+    <string name="remove_from_library">Quitar de la biblioteca</string>
+    <string name="follow">Seguir</string>
+    <string name="unfollow">Dejar de seguir</string>
 </resources>

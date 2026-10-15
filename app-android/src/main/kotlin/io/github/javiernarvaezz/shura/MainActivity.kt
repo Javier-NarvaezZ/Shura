@@ -36,6 +36,7 @@ class MainActivity : ComponentActivity() {
                             networkRegained = graph.networkRegained,
                             settings = graph.settings,
                             lyrics = graph.lyrics,
+                            library = graph.library,
                         )
                     },
                 )

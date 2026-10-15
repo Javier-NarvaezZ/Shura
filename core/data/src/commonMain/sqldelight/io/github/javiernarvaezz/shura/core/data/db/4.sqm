@@ -1,0 +1,40 @@
+-- Version 4 → 5: the local library (Phase 3, E2).
+CREATE TABLE liked_song (
+    video_id TEXT NOT NULL PRIMARY KEY,
+    title TEXT NOT NULL,
+    artist_names TEXT NOT NULL,
+    artist_ids TEXT NOT NULL,
+    album_title TEXT,
+    album_id TEXT,
+    duration_ms INTEGER,
+    thumbnail_url TEXT,
+    explicit INTEGER NOT NULL,
+    liked_at INTEGER NOT NULL
+);
+
+CREATE TABLE saved_album (
+    id TEXT NOT NULL PRIMARY KEY,
+    title TEXT NOT NULL,
+    artist_names TEXT NOT NULL,
+    artist_ids TEXT NOT NULL,
+    year INTEGER,
+    type_label TEXT,
+    thumbnail_url TEXT,
+    explicit INTEGER NOT NULL,
+    saved_at INTEGER NOT NULL
+);
+
+CREATE TABLE saved_playlist (
+    id TEXT NOT NULL PRIMARY KEY,
+    title TEXT NOT NULL,
+    author TEXT,
+    thumbnail_url TEXT,
+    saved_at INTEGER NOT NULL
+);
+
+CREATE TABLE followed_artist (
+    id TEXT NOT NULL PRIMARY KEY,
+    name TEXT NOT NULL,
+    thumbnail_url TEXT,
+    followed_at INTEGER NOT NULL
+);

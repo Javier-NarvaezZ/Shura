@@ -43,6 +43,8 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.javiernarvaezz.shura.core.model.Song
+import io.github.javiernarvaezz.shura.core.player.SongLikes
+import io.github.javiernarvaezz.shura.core.ui.components.LikeAction
 import io.github.javiernarvaezz.shura.core.ui.components.SongRow
 import io.github.javiernarvaezz.shura.core.ui.components.rememberHideKeyboard
 import io.github.javiernarvaezz.shura.core.ui.components.shimmer
@@ -137,6 +139,7 @@ private fun SearchBody(
     links: SearchLinks,
     onQueued: (Boolean) -> Unit,
 ) {
+    val likeOf = rememberLikeActions(controller.likes)
     when (state.status) {
         SearchStatus.Idle -> {
             Message(stringResource(Res.string.idle_hint))
@@ -170,6 +173,7 @@ private fun SearchBody(
                             onQueued(false)
                         },
                         links = links,
+                        likeOf = likeOf,
                     )
                 }
 
@@ -261,3 +265,11 @@ private fun LoadingRows() {
 }
 
 private const val LOADING_ROWS = 6
+
+/** Each song's "Me gusta" action, from one read of the liked set; null where there is no library. */
+@Composable
+private fun rememberLikeActions(likes: SongLikes): ((Song) -> LikeAction)? {
+    if (!likes.isAvailable) return null
+    val liked by likes.likedIds.collectAsStateWithLifecycle()
+    return { song -> LikeAction(song.videoId in liked) { likes.toggle(song) } }
+}

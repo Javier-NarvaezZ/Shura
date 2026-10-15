@@ -119,16 +119,7 @@ class SqlQueueStore(
         /** Play history entries kept; older ones are pruned. */
         const val MAX_HISTORY = 500
 
-        private fun Boolean.toLong(): Long = if (this) 1L else 0L
-
-        private fun encodeStrings(values: List<String>): String = JsonArray(values.map(::JsonPrimitive)).toString()
-
         private fun encodeInts(values: List<Int>): String = JsonArray(values.map(::JsonPrimitive)).toString()
-
-        private fun decodeStrings(json: String): List<String> =
-            Json.parseToJsonElement(json).jsonArray.map {
-                it.jsonPrimitive.content
-            }
 
         private fun decodeInts(json: String): List<Int> =
             Json.parseToJsonElement(json).jsonArray.map { it.jsonPrimitive.int }

@@ -1,9 +1,13 @@
 package io.github.javiernarvaezz.shura.core.testing
 
+import io.github.javiernarvaezz.shura.core.model.AlbumSummary
 import io.github.javiernarvaezz.shura.core.model.Artist
+import io.github.javiernarvaezz.shura.core.model.ArtistSummary
+import io.github.javiernarvaezz.shura.core.model.PlaylistSummary
 import io.github.javiernarvaezz.shura.core.model.Song
 import io.github.javiernarvaezz.shura.core.model.VideoId
 import io.github.javiernarvaezz.shura.core.player.AudioPlayer
+import io.github.javiernarvaezz.shura.core.player.Library
 import io.github.javiernarvaezz.shura.core.player.PlayHistory
 import io.github.javiernarvaezz.shura.core.player.PlaybackProgress
 import io.github.javiernarvaezz.shura.core.player.PlaybackSettings
@@ -128,5 +132,42 @@ class FakePlaybackSettings(
 
     override fun setAutoplay(enabled: Boolean) {
         this.autoplay.value = enabled
+    }
+}
+
+/** A library in memory; changes show at once, newest first. */
+class FakeLibrary : Library {
+    override val likedSongs = MutableStateFlow<List<Song>>(emptyList())
+    override val albums = MutableStateFlow<List<AlbumSummary>>(emptyList())
+    override val playlists = MutableStateFlow<List<PlaylistSummary>>(emptyList())
+    override val artists = MutableStateFlow<List<ArtistSummary>>(emptyList())
+
+    override fun setLiked(
+        song: Song,
+        liked: Boolean,
+    ) = likedSongs.toggle(song, liked) { it.videoId }
+
+    override fun setSaved(
+        album: AlbumSummary,
+        saved: Boolean,
+    ) = albums.toggle(album, saved) { it.id }
+
+    override fun setSaved(
+        playlist: PlaylistSummary,
+        saved: Boolean,
+    ) = playlists.toggle(playlist, saved) { it.id }
+
+    override fun setFollowed(
+        artist: ArtistSummary,
+        followed: Boolean,
+    ) = artists.toggle(artist, followed) { it.id }
+
+    private fun <T> MutableStateFlow<List<T>>.toggle(
+        item: T,
+        present: Boolean,
+        id: (T) -> Any,
+    ) {
+        val others = value.filter { id(it) != id(item) }
+        value = if (present) listOf(item) + others else others
     }
 }

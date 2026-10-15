@@ -15,7 +15,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import io.github.javiernarvaezz.shura.core.ui.icons.ShuraIcons
 import io.github.javiernarvaezz.shura.core.ui.theme.Shura
 
-/** A song's "more" button and its menu; the "go to" entries show only when given an action. */
+/** A song's "more" button and its menu; the like and "go to" entries show only when given an action. */
 @Composable
 fun SongMenu(
     labels: SongMenuLabels,
@@ -23,6 +23,7 @@ fun SongMenu(
     onEnqueue: () -> Unit,
     onGoToAlbum: (() -> Unit)? = null,
     onGoToArtist: (() -> Unit)? = null,
+    like: LikeAction? = null,
 ) {
     var open by rememberSaveable { mutableStateOf(false) }
     Box {
@@ -45,6 +46,13 @@ fun SongMenu(
             )
             entry(labels.playNext, ShuraIcons.PlayNext, onPlayNext)
             entry(labels.addToQueue, ShuraIcons.AddToQueue, onEnqueue)
+            like?.let {
+                if (it.liked) {
+                    entry(labels.unlike, ShuraIcons.FavoriteFilled, it.onToggle)
+                } else {
+                    entry(labels.like, ShuraIcons.Favorite, it.onToggle)
+                }
+            }
             onGoToAlbum?.let { entry(labels.goToAlbum, ShuraIcons.Album, it) }
             onGoToArtist?.let { entry(labels.goToArtist, ShuraIcons.Person, it) }
         }

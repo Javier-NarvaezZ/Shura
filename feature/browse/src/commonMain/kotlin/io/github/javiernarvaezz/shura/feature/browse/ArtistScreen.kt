@@ -7,6 +7,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.javiernarvaezz.shura.core.ui.components.DetailActions
+import io.github.javiernarvaezz.shura.core.ui.components.DetailToggleButton
 import io.github.javiernarvaezz.shura.core.ui.components.ExpandableText
 import io.github.javiernarvaezz.shura.core.ui.components.ImageHero
 import io.github.javiernarvaezz.shura.core.ui.components.SectionHeader
@@ -29,6 +30,8 @@ fun ArtistScreen(
     val state by model.state.collectAsStateWithLifecycle()
     val queue by model.queue.collectAsStateWithLifecycle()
     val labels = songMenuLabels()
+    val likeOf = rememberLikeActions(model.likes)
+    val save = rememberFollowToggle(model.canFollow, model.followed, model::toggleFollowed)
     val playLabel = stringResource(Res.string.play)
     val shuffleLabel = stringResource(Res.string.shuffle)
     val popular = stringResource(Res.string.popular_songs)
@@ -47,12 +50,16 @@ fun ArtistScreen(
                     onPlay = model::play,
                     onShuffle = model::shuffle,
                     modifier = Modifier.padding(vertical = Shura.spacing.l),
+                    toggle = save,
                 )
             }
             item(key = "popular") {
                 val all = page.allSongs
                 SectionHeader(popular, action = all?.let { seeAll }, onAction = { all?.let(navigation.onPlaylist) })
             }
+        } else if (save != null) {
+            // Nothing to play, but the artist can still be followed.
+            item(key = "actions") { DetailToggleButton(save, Modifier.padding(Shura.spacing.gutter)) }
         }
         itemsIndexed(page.topSongs, key = { index, song -> "top:$index:${song.videoId.value}" }) { index, song ->
             PageTrack(
@@ -64,6 +71,7 @@ fun ArtistScreen(
                 onEnqueue = { model.enqueue(song) },
                 navigation = navigation,
                 labels = labels,
+                like = likeOf?.invoke(song),
                 pageArtistId = page.artist.id,
             )
         }

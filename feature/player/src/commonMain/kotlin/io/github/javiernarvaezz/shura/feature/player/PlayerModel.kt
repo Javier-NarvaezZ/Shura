@@ -4,12 +4,14 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.javiernarvaezz.shura.core.model.Song
 import io.github.javiernarvaezz.shura.core.player.AudioPlayer
+import io.github.javiernarvaezz.shura.core.player.Library
 import io.github.javiernarvaezz.shura.core.player.PlaybackError
 import io.github.javiernarvaezz.shura.core.player.PlaybackProgress
 import io.github.javiernarvaezz.shura.core.player.PlaybackSettings
 import io.github.javiernarvaezz.shura.core.player.PlaybackState
 import io.github.javiernarvaezz.shura.core.player.QueueState
 import io.github.javiernarvaezz.shura.core.player.RepeatMode
+import io.github.javiernarvaezz.shura.core.player.SongLikes
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -73,7 +75,15 @@ class PlayerModel(
     private val player: AudioPlayer,
     scope: CoroutineScope,
     private val settings: PlaybackSettings? = null,
+    library: Library? = null,
 ) {
+    /** "Me gusta" for the current song; without a library the player shows no heart. */
+    val likes = SongLikes(library, scope)
+
+    fun toggleLike() {
+        state.value.song?.let(likes::toggle)
+    }
+
     /** Whether a queue about to end continues with related songs; null where there is no setting to change. */
     val autoplay: StateFlow<Boolean>? = settings?.autoplay
 
@@ -187,6 +197,7 @@ class QueueModel(
 class PlayerViewModel(
     player: AudioPlayer,
     settings: PlaybackSettings? = null,
+    library: Library? = null,
 ) : ViewModel() {
-    val model = PlayerModel(player, viewModelScope, settings)
+    val model = PlayerModel(player, viewModelScope, settings, library)
 }

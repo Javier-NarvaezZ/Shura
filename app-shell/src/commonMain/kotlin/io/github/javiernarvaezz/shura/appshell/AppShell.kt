@@ -49,12 +49,14 @@ import androidx.navigationevent.compose.NavigationBackHandler
 import androidx.navigationevent.compose.rememberNavigationEventState
 import io.github.javiernarvaezz.shura.appshell.resources.Res
 import io.github.javiernarvaezz.shura.appshell.resources.tab_home
+import io.github.javiernarvaezz.shura.appshell.resources.tab_library
 import io.github.javiernarvaezz.shura.appshell.resources.tab_search
 import io.github.javiernarvaezz.shura.core.lyrics.LyricsRepository
 import io.github.javiernarvaezz.shura.core.model.BrowseLink
 import io.github.javiernarvaezz.shura.core.model.MusicCatalog
 import io.github.javiernarvaezz.shura.core.model.Song
 import io.github.javiernarvaezz.shura.core.player.AudioPlayer
+import io.github.javiernarvaezz.shura.core.player.Library
 import io.github.javiernarvaezz.shura.core.player.PlayHistory
 import io.github.javiernarvaezz.shura.core.player.PlaybackSettings
 import io.github.javiernarvaezz.shura.core.ui.artwork.LocalNetworkRegained
@@ -72,6 +74,11 @@ import io.github.javiernarvaezz.shura.feature.browse.PlaylistScreen
 import io.github.javiernarvaezz.shura.feature.browse.PlaylistViewModel
 import io.github.javiernarvaezz.shura.feature.home.HomeScreen
 import io.github.javiernarvaezz.shura.feature.home.HomeViewModel
+import io.github.javiernarvaezz.shura.feature.library.LibraryLinks
+import io.github.javiernarvaezz.shura.feature.library.LibraryScreen
+import io.github.javiernarvaezz.shura.feature.library.LibraryViewModel
+import io.github.javiernarvaezz.shura.feature.library.LikedSongsScreen
+import io.github.javiernarvaezz.shura.feature.library.LikedSongsViewModel
 import io.github.javiernarvaezz.shura.feature.lyrics.LyricsModel
 import io.github.javiernarvaezz.shura.feature.lyrics.LyricsViewModel
 import io.github.javiernarvaezz.shura.feature.lyrics.PlayerLyrics
@@ -104,14 +111,20 @@ class ShellDependencies(
     val settings: PlaybackSettings? = null,
     /** Lyrics for a song (cached); null hides the lyrics (desktop, until it has a database). */
     val lyrics: LyricsRepository? = null,
+    /** The user's library on this device; null hides the Library tab and the like and save actions (desktop). */
+    val library: Library? = null,
 )
 
-enum class Tab { Home, Search }
+enum class Tab { Home, Search, Library }
 
 internal sealed interface Route {
     data object Home : Route
 
     data object Search : Route
+
+    data object Library : Route
+
+    data object LikedSongs : Route
 
     /** [entry] tells apart two visits to the same page in one back stack (album → artist → same album). */
     data class Album(
@@ -138,6 +151,7 @@ internal class ShellViewModel : ViewModel() {
         mapOf(
             Tab.Home to mutableStateListOf<Route>(Route.Home),
             Tab.Search to mutableStateListOf<Route>(Route.Search),
+            Tab.Library to mutableStateListOf<Route>(Route.Library),
         )
 
     private var entries = 0L
@@ -166,8 +180,9 @@ fun ShuraAppShell(
 ) {
     val shell = viewModel { ShellViewModel() }
     val home = viewModel { HomeViewModel(deps.player, deps.history, deps.currentHour) }
-    val search = viewModel { SearchViewModel(SearchSources.of(deps.catalog), deps.player, deps.onPlaybackIntent) }
-    val player = viewModel { PlayerViewModel(deps.player, deps.settings) }
+    val search =
+        viewModel { SearchViewModel(SearchSources.of(deps.catalog), deps.player, deps.onPlaybackIntent, deps.library) }
+    val player = viewModel { PlayerViewModel(deps.player, deps.settings, deps.library) }
     // At shell level, so the lyrics survive closing and opening the player.
     val lyrics = deps.lyrics?.let { repository -> viewModel { LyricsViewModel(deps.player, repository::lyrics) } }
     val sheet = rememberPlayerSheetState()
@@ -203,12 +218,13 @@ fun ShuraAppShell(
                                     entry<Route.Home> { HomeScreen(home.model, onSearch = { shell.tab = Tab.Search }) }
                                     entry<Route.Search> { SearchScreen(search.controller, searchLinks) }
                                     pages(deps, navigation)
+                                    deps.library?.let { libraryPages(it, deps.player, shell, navigation) }
                                 },
                         )
                     }
                 }
                 MiniPlayer(player.model, sheet, Modifier.padding(bottom = Shura.spacing.s))
-                BottomChrome(selected = shell.tab, onSelect = { shell.tab = it })
+                BottomChrome(shell.tab, hasLibrary = deps.library != null, onSelect = { shell.tab = it })
             }
             PlayerOverlay(
                 player.model,
@@ -245,6 +261,7 @@ private fun PlayerModes(
 @Composable
 private fun BottomChrome(
     selected: Tab,
+    hasLibrary: Boolean,
     onSelect: (Tab) -> Unit,
 ) {
     val tint = Shura.colors.surface1
@@ -257,6 +274,11 @@ private fun BottomChrome(
             NavItem(ShuraIcons.Home, stringResource(Res.string.tab_home), selected == Tab.Home) { onSelect(Tab.Home) }
             NavItem(ShuraIcons.Search, stringResource(Res.string.tab_search), selected == Tab.Search) {
                 onSelect(Tab.Search)
+            }
+            if (hasLibrary) {
+                NavItem(ShuraIcons.Library, stringResource(Res.string.tab_library), selected == Tab.Library) {
+                    onSelect(Tab.Library)
+                }
             }
         }
     }
@@ -319,12 +341,35 @@ private fun EntryProviderScope<Route>.pages(
     navigation: BrowseNavigation,
 ) {
     entry<Route.Album> { route ->
-        AlbumScreen(viewModel { AlbumViewModel(deps.catalog, deps.player, route.id) }.model, navigation)
+        AlbumScreen(viewModel { AlbumViewModel(deps.catalog, deps.player, route.id, deps.library) }.model, navigation)
     }
     entry<Route.Artist> { route ->
-        ArtistScreen(viewModel { ArtistViewModel(deps.catalog, deps.player, route.id) }.model, navigation)
+        ArtistScreen(viewModel { ArtistViewModel(deps.catalog, deps.player, route.id, deps.library) }.model, navigation)
     }
     entry<Route.Playlist> { route ->
-        PlaylistScreen(viewModel { PlaylistViewModel(deps.catalog, deps.player, route.link) }.model, navigation)
+        PlaylistScreen(
+            viewModel { PlaylistViewModel(deps.catalog, deps.player, route.link, deps.library) }.model,
+            navigation,
+        )
+    }
+}
+
+/** The Library tab and the liked songs; its links push catalog pages on the same tab. */
+private fun EntryProviderScope<Route>.libraryPages(
+    library: Library,
+    player: AudioPlayer,
+    shell: ShellViewModel,
+    navigation: BrowseNavigation,
+) {
+    val links =
+        LibraryLinks(
+            onLikedSongs = { shell.push(Route.LikedSongs) },
+            onAlbum = navigation.onAlbum,
+            onArtist = navigation.onArtist,
+            onPlaylist = { id -> navigation.onPlaylist(BrowseLink(id)) },
+        )
+    entry<Route.Library> { LibraryScreen(viewModel { LibraryViewModel(library) }.model, links) }
+    entry<Route.LikedSongs> {
+        LikedSongsScreen(viewModel { LikedSongsViewModel(library, player) }.model, links, onBack = shell::pop)
     }
 }

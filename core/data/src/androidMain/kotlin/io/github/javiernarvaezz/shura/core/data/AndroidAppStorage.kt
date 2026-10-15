@@ -7,8 +7,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlin.coroutines.CoroutineContext
 
 /**
- * The app's database (`shura.db`, app-private storage, excluded from backups), migrated to the current schema when
- * opened, behind the queue store, the settings and the lyrics cache.
+ * The app's database (`shura.db`, app-private storage), migrated to the current schema when opened, behind the
+ * queue store, the settings, the lyrics cache and the library. It is the only file in Android backups and device
+ * transfers, by name (the app's backup rules): nothing secret may be stored in it.
  */
 class AndroidAppStorage(
     context: Context,
@@ -22,4 +23,6 @@ class AndroidAppStorage(
     val settings = SqlPlaybackSettings(database, scope, ioContext)
 
     val lyrics = SqlLyricsStore(database, ioContext)
+
+    val library = SqlLibrary(database, scope, ioContext)
 }
