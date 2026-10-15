@@ -6,8 +6,8 @@ import io.ktor.client.plugins.api.createClientPlugin
 /**
  * Hosts the app may contact over HTTP (ADR 0001): YouTube for catalog, stream resolution and PoToken
  * attestation, googlevideo for media, the two exact hosts that serve the BotGuard interpreter (its path is
- * validated separately), the exact hosts that serve artwork and LRCLIB for lyrics. Remote solver-config hosts are
- * never allowed (R3).
+ * validated separately), the exact hosts that serve artwork, LRCLIB for lyrics and Google's sign-out. Remote
+ * solver-config hosts are never allowed (R3).
  *
  * Does not cover the PoToken `WebView`, which has its own network stack and allowlist (R2, R7).
  */
@@ -27,6 +27,8 @@ object HostPolicy {
             "yt3.googleusercontent.com",
             // Lyrics (`:core:lyrics`).
             "lrclib.net",
+            // Signing out ends the session on Google's side too (Phase 3, E4); the sign-in itself is in a WebView.
+            "accounts.google.com",
         )
 
     fun isAllowed(host: String): Boolean {

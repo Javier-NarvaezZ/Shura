@@ -41,7 +41,6 @@ class HostPolicyTest {
         assertTrue(HostPolicy.isAllowed("www.gstatic.com"))
         listOf(
             "google.com",
-            "accounts.google.com",
             "mail.google.com",
             "gstatic.com",
             "fonts.gstatic.com",
@@ -79,6 +78,19 @@ class HostPolicyTest {
             "lrclib.net.evil.com",
             "evillrclib.net",
             "lrclib.com",
+        ).forEach { assertFalse(HostPolicy.isAllowed(it), it) }
+    }
+
+    @Test
+    fun allowsOnlyTheExactGoogleAccountsHostForSigningOut() {
+        assertTrue(HostPolicy.isAllowed("accounts.google.com"))
+        listOf(
+            "myaccount.google.com",
+            "google.com",
+            "accounts.google.com.co",
+            "accounts.google.com.evil.com",
+            "evilaccounts.google.com",
+            "mail.google.com",
         ).forEach { assertFalse(HostPolicy.isAllowed(it), it) }
     }
 
