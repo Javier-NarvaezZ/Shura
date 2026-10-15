@@ -3,6 +3,7 @@ package io.github.javiernarvaezz.shura
 import android.annotation.SuppressLint
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import android.view.Gravity
@@ -44,8 +45,11 @@ class LoginActivity : ComponentActivity() {
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // Before any WebView in this process: its data stays apart from the app's other WebViews.
-        runCatching { WebView.setDataDirectorySuffix(WebViewData.SIGN_IN_SUFFIX) }
+        // Before any WebView in this process: its data stays apart from the app's other WebViews (Android 9+; on
+        // 8.x it shares the default directory, which the main process deletes after sign-in and at every start).
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            runCatching { WebView.setDataDirectorySuffix(WebViewData.SIGN_IN_SUFFIX) }
+        }
         window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         val view =
             WebView(this).apply {

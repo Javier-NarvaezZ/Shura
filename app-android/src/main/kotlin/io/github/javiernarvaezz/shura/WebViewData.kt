@@ -2,6 +2,7 @@ package io.github.javiernarvaezz.shura
 
 import android.app.ActivityManager
 import android.content.Context
+import android.os.Build
 import android.os.Process
 import android.webkit.CookieManager
 import android.webkit.WebStorage
@@ -55,6 +56,11 @@ object WebViewData {
     fun wipeSignIn(context: Context) {
         File(context.dataDir, "app_webview_$SIGN_IN_SUFFIX").deleteRecursively()
         File(context.cacheDir, "WebView_$SIGN_IN_SUFFIX").deleteRecursively()
+        // Android 8.x has no per-process directory: sign-in used the default one.
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) {
+            File(context.dataDir, "app_webview").deleteRecursively()
+            File(context.cacheDir, "WebView").deleteRecursively()
+        }
     }
 
     private const val WAIT_STEPS = 30
