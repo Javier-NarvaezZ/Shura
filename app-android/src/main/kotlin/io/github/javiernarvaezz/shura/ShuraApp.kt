@@ -8,7 +8,13 @@ import coil3.ImageLoader
 import coil3.SingletonImageLoader
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import coil3.serviceLoaderEnabled
+import io.github.javiernarvaezz.shura.core.auth.CookieJarText
+import io.github.javiernarvaezz.shura.core.auth.KeystoreSessionStore
+import io.github.javiernarvaezz.shura.core.auth.SapisidHash
+import io.github.javiernarvaezz.shura.core.auth.Session
 import io.github.javiernarvaezz.shura.core.data.AndroidAppStorage
+import io.github.javiernarvaezz.shura.core.innertube.AccountCredentials
+import io.github.javiernarvaezz.shura.core.innertube.InnerTubeAccountClient
 import io.github.javiernarvaezz.shura.core.innertube.InnerTubeClient
 import io.github.javiernarvaezz.shura.core.innertube.InnerTubeConfig
 import io.github.javiernarvaezz.shura.core.lyrics.LrcLibClient
@@ -23,6 +29,11 @@ import io.github.javiernarvaezz.shura.core.stream.BotGuardPoTokenMinter
 import io.github.javiernarvaezz.shura.core.stream.FilePreprocessedPlayerStore
 import io.github.javiernarvaezz.shura.core.stream.InnerTubeXStreamResolver
 import io.github.javiernarvaezz.shura.core.stream.WebViewJsRuntime
+import io.github.javiernarvaezz.shura.feature.settings.AccountCheck
+import io.github.javiernarvaezz.shura.feature.settings.AccountModel
+import io.ktor.client.request.get
+import io.ktor.client.request.header
+import io.ktor.http.HttpHeaders
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -35,6 +46,12 @@ class ShuraApp :
     SingletonImageLoader.Factory {
     /** Created on first use from the main thread (the media controller binds to the creating thread's looper). */
     val graph: AppGraph by lazy { AppGraph(this) }
+
+    override fun onCreate() {
+        super.onCreate()
+        // Before any WebView exists: nothing of a previous sign-in may survive (ADR 0002).
+        WebViewData.wipeAtStart(this)
+    }
 
     override val playbackDependencies: PlaybackDependencies get() = graph.playbackDependencies
 
@@ -68,10 +85,9 @@ class AppGraph(
         )
 
     /** Catalog language and region follow the device locale at startup. */
-    val catalog =
-        Locale.getDefault().let { locale ->
-            InnerTubeClient(network.ktor, InnerTubeConfig.forDevice(locale.language, locale.country))
-        }
+    private val catalogConfig = Locale.getDefault().let { InnerTubeConfig.forDevice(it.language, it.country) }
+
+    val catalog = InnerTubeClient(network.ktor, catalogConfig)
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -87,6 +103,39 @@ class AppGraph(
 
     /** Liked songs, saved albums and playlists, followed artists: the local library, in the app database. */
     val library = storage.library
+
+    /** Account requests (as the signed-in user), apart from the anonymous catalog client. */
+    private val accountClient = InnerTubeAccountClient(network.ktor, catalogConfig)
+
+    /**
+     * The YouTube Music account (ADR 0002): the session encrypted with a Keystore key, checked with Google at start,
+     * and signed out at Google before it is deleted here.
+     */
+    val account =
+        AccountModel(
+            store = KeystoreSessionStore.create(context),
+            check = ::checkSession,
+            signOutRemotely = ::signOutAtGoogle,
+            ioContext = Dispatchers.IO,
+            scope = scope,
+        )
+
+    private suspend fun checkSession(session: Session): AccountCheck {
+        val secret = SapisidHash.secret(session.cookies) ?: return AccountCheck(false, null, emptyList())
+        val credentials =
+            AccountCredentials(
+                cookie = CookieJarText.header(session.cookies),
+                authorization = SapisidHash.header(secret, YOUTUBE_MUSIC, System.currentTimeMillis() / MILLIS),
+                onBehalfOfUser = session.onBehalfOfUser,
+            )
+        val menu = accountClient.accountMenu(credentials)
+        return AccountCheck(menu.signedIn, menu.accountName, menu.setCookies)
+    }
+
+    /** Google's sign-out URL with Google's cookies ends the session on Google's side too. */
+    private suspend fun signOutAtGoogle(session: Session) {
+        network.ktor.get(GOOGLE_SIGN_OUT) { header(HttpHeaders.Cookie, CookieJarText.header(session.googleCookies)) }
+    }
 
     /**
      * Lyrics from LRCLIB through the single client (`lrclib.net` is on the allowlist), cached in the app database.
@@ -160,3 +209,7 @@ private const val HOMEPAGE = "https://github.com/Javier-NarvaezZ/Shura"
 /** The installed version name (from the manifest), so it never drifts from the build. */
 private fun versionName(context: Context): String =
     context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "unknown"
+
+private const val YOUTUBE_MUSIC = "https://music.youtube.com"
+private const val GOOGLE_SIGN_OUT = "https://accounts.google.com/Logout"
+private const val MILLIS = 1000

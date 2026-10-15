@@ -15,4 +15,9 @@
     <string name="playback_section">Reproducción</string>
     <string name="autoplay">Reproducción automática</string>
     <string name="autoplay_hint">Al terminar la cola, sigue con canciones parecidas</string>
+    <string name="sign_in_title">Iniciar sesión</string>
+    <string name="sign_in_help">¿Problemas para iniciar sesión?</string>
+    <string name="sign_in_help_body">Si Google te pide una verificación con la cámara (por ejemplo, un video selfie), complétala en el navegador del teléfono y vuelve a iniciar sesión aquí. Sunloop no usa la cámara.</string>
+    <string name="camera_check">Google pide una verificación con tu cámara. Complétala en el navegador y vuelve a iniciar sesión aquí.</string>
+    <string name="open_browser">Abrir en el navegador</string>
 </resources>

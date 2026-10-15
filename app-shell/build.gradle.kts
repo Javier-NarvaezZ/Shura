@@ -15,6 +15,7 @@ kotlin {
             implementation(projects.feature.player)
             implementation(projects.feature.lyrics)
             implementation(projects.feature.library)
+            implementation(projects.feature.settings)
             implementation(projects.core.lyrics)
             implementation(libs.navigation3.ui)
             implementation(libs.lifecycle.viewmodel.compose)
