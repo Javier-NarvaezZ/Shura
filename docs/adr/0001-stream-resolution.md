@@ -557,6 +557,10 @@ These are binding for `:core:stream` and its platform code.
 - The rules list what is included, so everything else stays out without an explicit rule: the `WebView`'s data (`app_webview`), files, shared preferences and any future session store.
 - Cloud backup runs only with end-to-end encryption: `disableIfNoEncryptionCapabilities` on Android 12+, and `requireFlags="clientSideEncryption"` on Android 9–11. Android 8.x ignores the flag.
 - **Rule:** nothing secret may go in `shura.db`. Session cookies (Phase 3, E4) live in their own encrypted store outside it.
+- **Verified** on the Android 17 emulator (2026-10-15) with the local backup transport, after adding marker files to `files/` and `app_webview/`:
+  - encrypted cloud backup and device transfer measured only `databases/shura.db` (and its journal, which Android adds for databases);
+  - after `pm clear` and a restore, the library, queue, history and lyrics came back, and the markers did not;
+  - cloud backup without encryption was rejected and nothing was copied.
 
 **Crashes:**
 - `onRenderProcessGone` fails pending calls and destroys the `WebView` instead of crashing the app. The minter resets and builds a new runtime on the next mint.
