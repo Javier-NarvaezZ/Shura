@@ -44,6 +44,17 @@ class AccountModel(
     val state: StateFlow<AuthState> = mutableState.asStateFlow()
 
     init {
+        reload()
+    }
+
+    /** The session for account requests (Phase 3, E5); null when signed out. */
+    suspend fun session(): Session? = mutex.withLock { current }
+
+    /**
+     * Reads the stored session again (at start, and after the sign-in screen, which stores a new session from its
+     * own process), then checks it with Google.
+     */
+    fun reload() {
         scope.launch {
             mutex.withLock {
                 when (val stored = withContext(ioContext) { store.load() }) {
@@ -53,28 +64,17 @@ class AccountModel(
                     }
 
                     StoredSession.Absent -> {
-                        mutableState.value = AuthState.SignedOut
+                        if (current != null || mutableState.value is AuthState.SignedIn) {
+                            mutableState.value = AuthState.SignedOut
+                        }
+                        current = null
                     }
 
                     StoredSession.Unreadable -> {
+                        current = null
                         mutableState.value = AuthState.NeedsSignIn
                     }
                 }
-            }
-            refresh()
-        }
-    }
-
-    /** The session for account requests (Phase 3, E5); null when signed out. */
-    suspend fun session(): Session? = mutex.withLock { current }
-
-    /** Stores a session the sign-in screen obtained, then asks Google for the account's name. */
-    fun onSignedIn(session: Session) {
-        scope.launch {
-            mutex.withLock {
-                withContext(ioContext) { store.save(session) }
-                current = session
-                mutableState.value = AuthState.SignedIn(session.accountName)
             }
             refresh()
         }

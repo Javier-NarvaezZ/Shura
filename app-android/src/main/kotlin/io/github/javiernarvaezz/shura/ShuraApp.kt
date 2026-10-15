@@ -1,9 +1,12 @@
 package io.github.javiernarvaezz.shura
 
+import android.app.ActivityManager
 import android.app.Application
 import android.content.Context
 import android.net.ConnectivityManager
+import android.os.Build
 import android.os.PowerManager
+import android.os.Process
 import coil3.ImageLoader
 import coil3.SingletonImageLoader
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
@@ -49,8 +52,22 @@ class ShuraApp :
 
     override fun onCreate() {
         super.onCreate()
-        // Before any WebView exists: nothing of a previous sign-in may survive (ADR 0002).
-        WebViewData.wipeAtStart(this)
+        // Main process only, before any WebView exists: nothing of a previous sign-in may survive (ADR 0002). The
+        // sign-in process (`:signin`) must not touch the main process's WebView data.
+        if (isMainProcess()) WebViewData.wipeAtStart(this)
+    }
+
+    private fun isMainProcess(): Boolean {
+        val name =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                getProcessName()
+            } else {
+                getSystemService(ActivityManager::class.java)
+                    ?.runningAppProcesses
+                    ?.firstOrNull { it.pid == Process.myPid() }
+                    ?.processName
+            }
+        return name == null || name == packageName
     }
 
     override val playbackDependencies: PlaybackDependencies get() = graph.playbackDependencies

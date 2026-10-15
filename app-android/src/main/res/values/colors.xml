@@ -2,4 +2,9 @@
 <resources>
     <!-- Sunloop background (docs/brand/DESIGN.md): window, splash and launcher icon background. -->
     <color name="sunloop_background">#FF120D0B</color>
+    <!-- Sign-in screen (Android views: it runs in its own process). -->
+    <color name="sunloop_surface">#FF2A201C</color>
+    <color name="sunloop_text">#FFFFF4EC</color>
+    <color name="sunloop_accent">#FFFF5E3A</color>
+    <color name="sunloop_on_accent">#FF120D0B</color>
 </resources>

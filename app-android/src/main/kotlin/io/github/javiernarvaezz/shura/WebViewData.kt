@@ -1,6 +1,8 @@
 package io.github.javiernarvaezz.shura
 
+import android.app.ActivityManager
 import android.content.Context
+import android.os.Process
 import android.webkit.CookieManager
 import android.webkit.WebStorage
 import android.webkit.WebView
@@ -22,12 +24,39 @@ object WebViewData {
         WebStorage.getInstance().deleteAllData()
     }
 
+    /** The sign-in process's WebView data directory suffix: `app_webview_signin`. */
+    const val SIGN_IN_SUFFIX = "signin"
+
     /**
-     * At process start, before any WebView exists: deletes what a previous run left (a sign-in interrupted by the
-     * process dying, or files a destroyed WebView wrote back while shutting down).
+     * In the main process at start, before any WebView exists: deletes what a previous run left (a sign-in
+     * interrupted by the process dying, or files a destroyed WebView wrote back while shutting down).
      */
     fun wipeAtStart(context: Context) {
         File(context.dataDir, "app_webview").deleteRecursively()
         File(context.cacheDir, "WebView").deleteRecursively()
+        wipeSignIn(context)
     }
+
+    /**
+     * In the main process, after the sign-in screen closed: ends the sign-in process (same app, so allowed), waits
+     * for it to go, then deletes its WebView data. Blocking: call off the main thread.
+     */
+    fun endSignIn(context: Context) {
+        val name = "${context.packageName}:$SIGN_IN_SUFFIX"
+        val manager = context.getSystemService(ActivityManager::class.java)
+
+        fun alive() = manager?.runningAppProcesses.orEmpty().filter { it.processName == name }
+        alive().forEach { Process.killProcess(it.pid) }
+        repeat(WAIT_STEPS) { if (alive().isNotEmpty()) Thread.sleep(WAIT_STEP_MS) }
+        wipeSignIn(context)
+    }
+
+    /** Deletes the sign-in WebView's whole data directory; the sign-in process must not be running. */
+    fun wipeSignIn(context: Context) {
+        File(context.dataDir, "app_webview_$SIGN_IN_SUFFIX").deleteRecursively()
+        File(context.cacheDir, "WebView_$SIGN_IN_SUFFIX").deleteRecursively()
+    }
+
+    private const val WAIT_STEPS = 30
+    private const val WAIT_STEP_MS = 100L
 }

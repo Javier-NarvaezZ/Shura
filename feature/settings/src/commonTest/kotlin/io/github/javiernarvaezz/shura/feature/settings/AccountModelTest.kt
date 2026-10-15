@@ -92,13 +92,26 @@ class AccountModelTest {
         }
 
     @Test
-    fun signingInSavesTheSessionAndFetchesTheName() =
+    fun aSessionStoredBySignInIsPickedUpOnReload() =
         runTest {
             val model = model()
-            model.onSignedIn(session)
+            assertEquals(AuthState.SignedOut, model.state.value)
+            // The sign-in screen stores the session from its own process.
+            store.stored = StoredSession.Present(session)
+            model.reload()
             runCurrent()
             assertEquals(AuthState.SignedIn("Test Account"), model.state.value)
-            assertTrue(store.stored is StoredSession.Present)
+        }
+
+    @Test
+    fun aCancelledSignInLeavesAnExpiredOrUnreadableNoticeInPlace() =
+        runTest {
+            store.stored = StoredSession.Unreadable
+            val model = model()
+            assertEquals(AuthState.NeedsSignIn, model.state.value)
+            model.reload()
+            runCurrent()
+            assertEquals(AuthState.NeedsSignIn, model.state.value)
         }
 
     @Test
