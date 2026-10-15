@@ -51,6 +51,7 @@ class EncryptedSessionFile(
         buildJsonObject {
             put("version", 1)
             putJsonObject("cookies") { session.cookies.forEach { (name, value) -> put(name, value) } }
+            putJsonObject("googleCookies") { session.googleCookies.forEach { (name, value) -> put(name, value) } }
             session.dataSyncId?.let { put("dataSyncId", it) }
             session.accountName?.let { put("accountName", it) }
             put("signedInAt", session.signedInAtMillis)
@@ -58,14 +59,19 @@ class EncryptedSessionFile(
 
     private fun decode(bytes: ByteArray): Session {
         val json = Json.parseToJsonElement(bytes.decodeToString()).jsonObject
-        val cookies = LinkedHashMap<String, String>()
-        json.getValue("cookies").jsonObject.forEach { (name, value) -> cookies[name] = value.jsonPrimitive.content }
         return Session(
-            cookies = cookies,
+            cookies = json.cookies("cookies"),
             dataSyncId = json.string("dataSyncId"),
             accountName = json.string("accountName"),
             signedInAtMillis = json.getValue("signedInAt").jsonPrimitive.long,
+            googleCookies = json.cookies("googleCookies"),
         )
+    }
+
+    private fun JsonObject.cookies(key: String): Map<String, String> {
+        val cookies = LinkedHashMap<String, String>()
+        (get(key) as? JsonObject)?.forEach { (name, value) -> cookies[name] = value.jsonPrimitive.content }
+        return cookies
     }
 
     private fun JsonObject.string(key: String): String? = (get(key) as? JsonPrimitive)?.content

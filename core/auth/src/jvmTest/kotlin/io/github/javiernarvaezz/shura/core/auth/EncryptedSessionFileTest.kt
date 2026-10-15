@@ -29,6 +29,7 @@ class EncryptedSessionFileTest {
             dataSyncId = "UCchannel||user",
             accountName = "Test Account",
             signedInAtMillis = 1_800_000_000_000,
+            googleCookies = linkedMapOf("SID" to "secret-google-sid"),
         )
 
     @Test
@@ -41,7 +42,14 @@ class EncryptedSessionFileTest {
     fun theFileHoldsNoReadableSecret() {
         store().save(session)
         val bytes = file.readBytes().decodeToString()
-        listOf("secret-sapisid-value", "secret-sid", "UCchannel", "Test Account", "SAPISID").forEach {
+        listOf(
+            "secret-sapisid-value",
+            "secret-sid",
+            "secret-google-sid",
+            "UCchannel",
+            "Test Account",
+            "SAPISID",
+        ).forEach {
             assertFalse(it in bytes, it)
         }
     }
