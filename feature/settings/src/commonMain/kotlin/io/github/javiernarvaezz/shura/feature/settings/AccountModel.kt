@@ -38,6 +38,8 @@ class AccountModel(
     private val scope: CoroutineScope,
     /** Told whether Google accepted the session each time it answered a check (to measure how long one lasts). */
     private val onChecked: (alive: Boolean) -> Unit = {},
+    /** Told when the user signs out, after the session is deleted (e.g. to drop actions queued for it). */
+    private val onSignedOut: suspend () -> Unit = {},
 ) {
     private val mutableState = MutableStateFlow<AuthState>(AuthState.SignedOut)
     private val mutex = Mutex()
@@ -135,6 +137,7 @@ class AccountModel(
                 current = null
                 mutableState.value = AuthState.SignedOut
             }
+            onSignedOut()
         }
     }
 }
