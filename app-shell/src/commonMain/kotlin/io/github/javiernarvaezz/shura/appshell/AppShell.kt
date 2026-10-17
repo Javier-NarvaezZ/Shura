@@ -74,6 +74,7 @@ import io.github.javiernarvaezz.shura.feature.browse.PlaylistScreen
 import io.github.javiernarvaezz.shura.feature.browse.PlaylistViewModel
 import io.github.javiernarvaezz.shura.feature.home.HomeScreen
 import io.github.javiernarvaezz.shura.feature.home.HomeViewModel
+import io.github.javiernarvaezz.shura.feature.library.AccountLibraryModel
 import io.github.javiernarvaezz.shura.feature.library.LibraryLinks
 import io.github.javiernarvaezz.shura.feature.library.LibraryScreen
 import io.github.javiernarvaezz.shura.feature.library.LibraryViewModel
@@ -119,6 +120,8 @@ class ShellDependencies(
     val account: AccountModel? = null,
     /** Opens the platform's sign-in screen. */
     val onSignIn: () -> Unit = {},
+    /** The signed-in account's library for the Library tab; null where there is no account (desktop). */
+    val accountLibrary: AccountLibraryModel? = null,
 )
 
 enum class Tab { Home, Search, Library }
@@ -226,7 +229,7 @@ fun ShuraAppShell(
                                     homePages(home, shell, deps)
                                     entry<Route.Search> { SearchScreen(search.controller, searchLinks) }
                                     pages(deps, navigation)
-                                    deps.library?.let { libraryPages(it, deps.player, shell, navigation) }
+                                    deps.library?.let { libraryPages(it, deps, shell, navigation) }
                                 },
                         )
                     }
@@ -365,10 +368,11 @@ private fun EntryProviderScope<Route>.pages(
 /** The Library tab and the liked songs; its links push catalog pages on the same tab. */
 private fun EntryProviderScope<Route>.libraryPages(
     library: Library,
-    player: AudioPlayer,
+    deps: ShellDependencies,
     shell: ShellViewModel,
     navigation: BrowseNavigation,
 ) {
+    val account = deps.accountLibrary
     val links =
         LibraryLinks(
             onLikedSongs = { shell.push(Route.LikedSongs) },
@@ -376,9 +380,13 @@ private fun EntryProviderScope<Route>.libraryPages(
             onArtist = navigation.onArtist,
             onPlaylist = { id -> navigation.onPlaylist(BrowseLink(id)) },
         )
-    entry<Route.Library> { LibraryScreen(viewModel { LibraryViewModel(library) }.model, links) }
+    entry<Route.Library> {
+        val model = viewModel { LibraryViewModel(library, account?.likedSongs) }.model
+        LibraryScreen(model, links, account = account, onSignIn = deps.onSignIn)
+    }
     entry<Route.LikedSongs> {
-        LikedSongsScreen(viewModel { LikedSongsViewModel(library, player) }.model, links, onBack = shell::pop)
+        val model = viewModel { LikedSongsViewModel(library, deps.player, account?.likedSongs) }.model
+        LikedSongsScreen(model, links, onBack = shell::pop)
     }
 }
 

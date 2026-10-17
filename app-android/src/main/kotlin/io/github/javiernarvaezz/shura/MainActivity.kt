@@ -53,6 +53,7 @@ class MainActivity : ComponentActivity() {
                             lyrics = graph.lyrics,
                             library = graph.library,
                             account = graph.account,
+                            accountLibrary = graph.accountLibrary,
                             onSignIn = { signIn.launch(Intent(this, LoginActivity::class.java)) },
                         )
                     },

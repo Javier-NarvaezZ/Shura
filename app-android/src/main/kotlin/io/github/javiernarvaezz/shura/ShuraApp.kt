@@ -24,6 +24,7 @@ import io.github.javiernarvaezz.shura.core.innertube.InnerTubeClient
 import io.github.javiernarvaezz.shura.core.innertube.InnerTubeConfig
 import io.github.javiernarvaezz.shura.core.lyrics.LrcLibClient
 import io.github.javiernarvaezz.shura.core.lyrics.LyricsRepository
+import io.github.javiernarvaezz.shura.core.model.Song
 import io.github.javiernarvaezz.shura.core.network.ShuraNetwork
 import io.github.javiernarvaezz.shura.core.player.AndroidAudioPlayer
 import io.github.javiernarvaezz.shura.core.player.AudioPlayer
@@ -34,6 +35,8 @@ import io.github.javiernarvaezz.shura.core.stream.BotGuardPoTokenMinter
 import io.github.javiernarvaezz.shura.core.stream.FilePreprocessedPlayerStore
 import io.github.javiernarvaezz.shura.core.stream.InnerTubeXStreamResolver
 import io.github.javiernarvaezz.shura.core.stream.WebViewJsRuntime
+import io.github.javiernarvaezz.shura.feature.library.AccountLibraryModel
+import io.github.javiernarvaezz.shura.feature.library.AccountLibrarySnapshot
 import io.github.javiernarvaezz.shura.feature.settings.AccountCheck
 import io.github.javiernarvaezz.shura.feature.settings.AccountLikes
 import io.github.javiernarvaezz.shura.feature.settings.AccountModel
@@ -43,6 +46,8 @@ import io.ktor.http.HttpHeaders
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import java.io.File
 import java.util.Locale
@@ -166,6 +171,37 @@ class AppGraph(
 
     val library = accountLikes.library
 
+    /** The signed-in account's library for the Library tab, refreshed at most every 30 minutes. */
+    val accountLibrary =
+        AccountLibraryModel(account.state, ::loadAccountLibrary, System::currentTimeMillis, scope)
+
+    private suspend fun loadAccountLibrary(): AccountLibrarySnapshot? {
+        val credentials = account.session()?.let(::credentialsOf) ?: return null
+        return coroutineScope {
+            val playlists = async { accountClient.playlists(credentials) }
+            val albums = async { accountClient.albums(credentials) }
+            val artists = async { accountClient.artists(credentials) }
+            val (liked, likedCookies) = likedSongs(credentials)
+            val pages = listOf(playlists.await(), albums.await(), artists.await())
+            account.keepCookies(pages.flatMap { it.setCookies } + likedCookies)
+            AccountLibrarySnapshot(liked, playlists.await().value, albums.await().value, artists.await().value)
+        }
+    }
+
+    /** The account's liked songs, page by page up to [MAX_LIKED]; with the cookies the responses rotated. */
+    private suspend fun likedSongs(credentials: AccountCredentials): Pair<List<Song>, List<String>> {
+        val songs = mutableListOf<Song>()
+        val cookies = mutableListOf<String>()
+        var continuation: String? = null
+        do {
+            val page = accountClient.likedSongs(credentials, continuation)
+            songs += page.value.tracks
+            cookies += page.setCookies
+            continuation = page.value.continuation
+        } while (continuation != null && songs.size < MAX_LIKED)
+        return songs.take(MAX_LIKED) to cookies
+    }
+
     private suspend fun checkSession(session: Session): AccountCheck {
         val credentials = credentialsOf(session) ?: return AccountCheck(false, null, emptyList())
         val menu = accountClient.accountMenu(credentials)
@@ -265,3 +301,4 @@ private fun versionName(context: Context): String =
 private const val YOUTUBE_MUSIC = "https://music.youtube.com"
 private const val GOOGLE_SIGN_OUT = "https://accounts.google.com/Logout"
 private const val MILLIS = 1000
+private const val MAX_LIKED = 500

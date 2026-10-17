@@ -19,4 +19,10 @@
     <string name="go_to_artist">Ir al artista</string>
     <string name="like">Me gusta</string>
     <string name="unlike">Quitar de Me gusta</string>
+    <string name="account_section">De tu cuenta de YouTube Music</string>
+    <string name="device_section">En este dispositivo</string>
+    <string name="account_loading">Cargando tu biblioteca…</string>
+    <string name="account_offline">Sin conexión: mostrando lo último cargado.</string>
+    <string name="account_sign_in_needed">Tu sesión caducó. Vuelve a iniciar sesión para ver tu biblioteca de YouTube Music.</string>
+    <string name="account_sign_in">Iniciar sesión</string>
 </resources>
