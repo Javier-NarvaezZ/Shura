@@ -35,6 +35,7 @@ class MainActivity : ComponentActivity() {
         )
         super.onCreate(savedInstanceState)
         applyDebugLaunchOptions(intent) // Debug builds only; before the graph is first used.
+        debugDumpAccountFixtures(intent, applicationContext, graph) // Debug builds only.
         setContent {
             ShuraTheme {
                 ShuraAppShell(

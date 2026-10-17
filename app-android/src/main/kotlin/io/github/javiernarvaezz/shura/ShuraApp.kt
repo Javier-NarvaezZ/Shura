@@ -122,7 +122,7 @@ class AppGraph(
     val library = storage.library
 
     /** Account requests (as the signed-in user), apart from the anonymous catalog client. */
-    private val accountClient = InnerTubeAccountClient(network.ktor, catalogConfig)
+    internal val accountClient = InnerTubeAccountClient(network.ktor, catalogConfig)
 
     /**
      * The YouTube Music account (ADR 0002): the session encrypted with a Keystore key, checked with Google at start,
@@ -138,15 +138,19 @@ class AppGraph(
         )
 
     private suspend fun checkSession(session: Session): AccountCheck {
-        val secret = SapisidHash.secret(session.cookies) ?: return AccountCheck(false, null, emptyList())
-        val credentials =
-            AccountCredentials(
-                cookie = CookieJarText.header(session.cookies),
-                authorization = SapisidHash.header(secret, YOUTUBE_MUSIC, System.currentTimeMillis() / MILLIS),
-                onBehalfOfUser = session.onBehalfOfUser,
-            )
+        val credentials = credentialsOf(session) ?: return AccountCheck(false, null, emptyList())
         val menu = accountClient.accountMenu(credentials)
         return AccountCheck(menu.signedIn, menu.accountName, menu.setCookies)
+    }
+
+    /** What signs a request as [session]'s user, freshly timed; null when its cookies cannot sign. */
+    internal fun credentialsOf(session: Session): AccountCredentials? {
+        val secret = SapisidHash.secret(session.cookies) ?: return null
+        return AccountCredentials(
+            cookie = CookieJarText.header(session.cookies),
+            authorization = SapisidHash.header(secret, YOUTUBE_MUSIC, System.currentTimeMillis() / MILLIS),
+            onBehalfOfUser = session.onBehalfOfUser,
+        )
     }
 
     /** Google's sign-out URL with Google's cookies ends the session on Google's side too. */
