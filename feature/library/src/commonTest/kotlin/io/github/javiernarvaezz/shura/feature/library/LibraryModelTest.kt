@@ -6,6 +6,7 @@ import io.github.javiernarvaezz.shura.core.model.PlaylistSummary
 import io.github.javiernarvaezz.shura.core.testing.FakeAudioPlayer
 import io.github.javiernarvaezz.shura.core.testing.FakeLibrary
 import io.github.javiernarvaezz.shura.core.testing.testSong
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlin.random.Random
@@ -73,5 +74,18 @@ class LibraryModelTest {
             runCurrent()
             assertEquals(3, model.songs.value.size)
             assertFalse(songs[0] in model.songs.value)
+        }
+
+    @Test
+    fun withAnAccountTheLikedSongsJoinWithoutDuplicates() =
+        runTest {
+            library.setLiked(songs[0], true)
+            library.setLiked(songs[2], true)
+            val account = MutableStateFlow(listOf(songs[1], songs[2]))
+            val model = LikedSongsModel(library, player, backgroundScope, Random(1), accountLiked = account)
+            val tab = LibraryModel(library, backgroundScope, accountLiked = account)
+            runCurrent()
+            assertEquals(listOf(songs[1], songs[2], songs[0]), model.songs.value)
+            assertEquals(3, tab.state.value.likedCount)
         }
 }

@@ -104,6 +104,18 @@ class AccountModelTest {
         }
 
     @Test
+    fun cookiesRotatedByAnyAccountResponseAreStored() =
+        runTest {
+            store.stored = StoredSession.Present(session)
+            val model = model()
+            runCurrent()
+            model.keepCookies(listOf("SIDCC=fresh; path=/"))
+            runCurrent()
+            assertEquals("fresh", (store.stored as StoredSession.Present).session.cookies["SIDCC"])
+            assertEquals("fresh", model.session()?.cookies?.get("SIDCC"))
+        }
+
+    @Test
     fun anUnreadableSessionAsksToSignInAgain() =
         runTest {
             store.stored = StoredSession.Unreadable

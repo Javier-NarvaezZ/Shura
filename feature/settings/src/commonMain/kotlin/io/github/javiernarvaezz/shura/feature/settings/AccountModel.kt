@@ -118,6 +118,21 @@ class AccountModel(
         }
     }
 
+    /** Keeps session cookies an account response rotated ([setCookies]), so the stored session stays current. */
+    fun keepCookies(setCookies: List<String>) {
+        if (setCookies.isEmpty()) return
+        scope.launch {
+            mutex.withLock {
+                val session = current ?: return@withLock
+                val cookies = CookieJarText.merge(session.cookies, setCookies)
+                if (cookies == session.cookies) return@withLock
+                val updated = session.copy(cookies = cookies)
+                withContext(ioContext) { store.save(updated) }
+                current = updated
+            }
+        }
+    }
+
     /** Ends the session at Google (best effort), then deletes it here; always ends signed out. */
     @Suppress("TooGenericExceptionCaught", "SwallowedException") // The local session is deleted either way.
     fun signOut() {
