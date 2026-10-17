@@ -54,6 +54,7 @@ dependencies {
     implementation(projects.core.lyrics)
     implementation(projects.feature.search)
     implementation(projects.feature.settings)
+    implementation(projects.feature.library)
     implementation(projects.core.auth)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.ktor.client.core)

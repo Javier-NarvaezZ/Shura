@@ -1,0 +1,7 @@
+-- Version 5 → 6: likes waiting to reach the account (Phase 3, E5).
+CREATE TABLE account_like_pending (
+    video_id TEXT NOT NULL PRIMARY KEY,
+    liked INTEGER NOT NULL,
+    account TEXT NOT NULL,
+    queued_at INTEGER NOT NULL
+);

@@ -1,0 +1,20 @@
+-- "Me gusta" actions not yet sent to the YouTube Music account (Phase 3, E5): one per song, the latest wins.
+-- account is an anonymous fingerprint (a hash) of the account the action was made with, never the account id.
+CREATE TABLE account_like_pending (
+    video_id TEXT NOT NULL PRIMARY KEY,
+    liked INTEGER NOT NULL,
+    account TEXT NOT NULL,
+    queued_at INTEGER NOT NULL
+);
+
+pendingLikes:
+SELECT * FROM account_like_pending ORDER BY queued_at;
+
+putPendingLike:
+INSERT OR REPLACE INTO account_like_pending(video_id, liked, account, queued_at) VALUES (?, ?, ?, ?);
+
+removePendingLike:
+DELETE FROM account_like_pending WHERE video_id = ? AND liked = ? AND account = ? AND queued_at = ?;
+
+clearPendingLikes:
+DELETE FROM account_like_pending;

@@ -36,6 +36,10 @@ class AccountModel(
     private val signOutRemotely: suspend (Session) -> Unit,
     private val ioContext: CoroutineContext,
     private val scope: CoroutineScope,
+    /** Told whether Google accepted the session each time it answered a check (to measure how long one lasts). */
+    private val onChecked: (alive: Boolean) -> Unit = {},
+    /** Told when the user signs out, after the session is deleted (e.g. to drop actions queued for it). */
+    private val onSignedOut: suspend () -> Unit = {},
 ) {
     private val mutableState = MutableStateFlow<AuthState>(AuthState.SignedOut)
     private val mutex = Mutex()
@@ -93,6 +97,7 @@ class AccountModel(
                 } catch (e: Exception) {
                     return@launch
                 }
+            withContext(ioContext) { onChecked(answer.signedIn) }
             mutex.withLock {
                 if (current !== session) return@withLock
                 if (answer.signedIn) {
@@ -109,6 +114,21 @@ class AccountModel(
                     current = null
                     mutableState.value = AuthState.Expired
                 }
+            }
+        }
+    }
+
+    /** Keeps session cookies an account response rotated ([setCookies]), so the stored session stays current. */
+    fun keepCookies(setCookies: List<String>) {
+        if (setCookies.isEmpty()) return
+        scope.launch {
+            mutex.withLock {
+                val session = current ?: return@withLock
+                val cookies = CookieJarText.merge(session.cookies, setCookies)
+                if (cookies == session.cookies) return@withLock
+                val updated = session.copy(cookies = cookies)
+                withContext(ioContext) { store.save(updated) }
+                current = updated
             }
         }
     }
@@ -132,6 +152,7 @@ class AccountModel(
                 current = null
                 mutableState.value = AuthState.SignedOut
             }
+            onSignedOut()
         }
     }
 }

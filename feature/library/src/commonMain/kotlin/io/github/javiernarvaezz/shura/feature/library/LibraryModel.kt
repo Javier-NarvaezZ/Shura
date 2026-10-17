@@ -32,17 +32,27 @@ data class LibraryUiState(
 class LibraryModel(
     library: Library,
     scope: CoroutineScope,
+    /** The signed-in account's liked songs, joined with the local ones in the count; null without an account. */
+    accountLiked: StateFlow<List<Song>>? = null,
 ) {
+    private val liked = likedSongsOf(library, accountLiked, scope)
+
     val state: StateFlow<LibraryUiState> =
-        combine(
-            library.likedSongs,
-            library.playlists,
-            library.albums,
-            library.artists,
-        ) { liked, playlists, albums, artists ->
+        combine(liked, library.playlists, library.albums, library.artists) { liked, playlists, albums, artists ->
             LibraryUiState(liked.size, playlists, albums, artists)
         }.stateIn(scope, SharingStarted.Eagerly, LibraryUiState())
 }
+
+/** Local liked songs, joined after the account's when there is an account ([mergeLiked]). */
+private fun likedSongsOf(
+    library: Library,
+    accountLiked: StateFlow<List<Song>>?,
+    scope: CoroutineScope,
+): StateFlow<List<Song>> =
+    accountLiked
+        ?.let { account ->
+            combine(account, library.likedSongs, ::mergeLiked).stateIn(scope, SharingStarted.Eagerly, emptyList())
+        } ?: library.likedSongs
 
 /** The liked songs as a playlist: play, shuffle, play from one, queue, and unlike from the menu. */
 class LikedSongsModel(
@@ -50,10 +60,12 @@ class LikedSongsModel(
     player: AudioPlayer,
     scope: CoroutineScope,
     random: Random = Random.Default,
+    accountLiked: StateFlow<List<Song>>? = null,
 ) {
     private val playback = TrackPlayback(player, random)
 
-    val songs: StateFlow<List<Song>> = library.likedSongs
+    /** The account's liked songs first (when signed in), then local ones it does not have. */
+    val songs: StateFlow<List<Song>> = likedSongsOf(library, accountLiked, scope)
 
     val likes = SongLikes(library, scope)
 
@@ -73,13 +85,15 @@ class LikedSongsModel(
 
 class LibraryViewModel(
     library: Library,
+    accountLiked: StateFlow<List<Song>>? = null,
 ) : ViewModel() {
-    val model = LibraryModel(library, viewModelScope)
+    val model = LibraryModel(library, viewModelScope, accountLiked)
 }
 
 class LikedSongsViewModel(
     library: Library,
     player: AudioPlayer,
+    accountLiked: StateFlow<List<Song>>? = null,
 ) : ViewModel() {
-    val model = LikedSongsModel(library, player, viewModelScope)
+    val model = LikedSongsModel(library, player, viewModelScope, accountLiked = accountLiked)
 }
