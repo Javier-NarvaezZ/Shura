@@ -1,5 +1,9 @@
 package io.github.javiernarvaezz.shura.core.innertube
 
+import io.github.javiernarvaezz.shura.core.model.AlbumSummary
+import io.github.javiernarvaezz.shura.core.model.ArtistSummary
+import io.github.javiernarvaezz.shura.core.model.PlaylistSummary
+import io.github.javiernarvaezz.shura.core.model.TrackPage
 import io.github.javiernarvaezz.shura.core.model.VideoId
 import io.ktor.client.HttpClient
 import io.ktor.client.request.header
@@ -35,6 +39,14 @@ class AccountCredentials(
 /** An account response and its `Set-Cookie` headers (rotated session cookies to keep). */
 class AccountResponse(
     val json: JsonElement,
+    val setCookies: List<String>,
+) {
+    fun <T> map(parse: (JsonElement) -> T) = AccountResult(parse(json), setCookies)
+}
+
+/** A parsed account response, with the rotated session cookies it brought. */
+class AccountResult<T>(
+    val value: T,
     val setCookies: List<String>,
 )
 
@@ -89,6 +101,26 @@ class InnerTubeAccountClient(
             }
         return AccountResponse(json, setCookies)
     }
+
+    /** The account's liked songs, a page at a time ([continuation] for the next ones). */
+    suspend fun likedSongs(
+        credentials: AccountCredentials,
+        continuation: String? = null,
+    ): AccountResult<TrackPage> =
+        if (continuation == null) {
+            raw(credentials, InnerTubeRequest.Browse(AccountLibrary.LIKED_SONGS)).map(AccountLibrary::likedSongs)
+        } else {
+            raw(credentials, InnerTubeRequest.Continuation(continuation)).map(AccountLibrary::likedSongsContinuation)
+        }
+
+    suspend fun playlists(credentials: AccountCredentials): AccountResult<List<PlaylistSummary>> =
+        raw(credentials, InnerTubeRequest.Browse("FEmusic_liked_playlists")).map(AccountLibrary::playlists)
+
+    suspend fun albums(credentials: AccountCredentials): AccountResult<List<AlbumSummary>> =
+        raw(credentials, InnerTubeRequest.Browse("FEmusic_liked_albums")).map(AccountLibrary::albums)
+
+    suspend fun artists(credentials: AccountCredentials): AccountResult<List<ArtistSummary>> =
+        raw(credentials, InnerTubeRequest.Browse("FEmusic_library_corpus_artists")).map(AccountLibrary::artists)
 
     /** Adds the song to the account's liked songs ([liked]) or removes it from them. */
     suspend fun setLiked(

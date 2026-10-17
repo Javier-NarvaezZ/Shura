@@ -45,9 +45,10 @@ internal object Carousels {
             is PlaylistShelf -> playlists.isEmpty()
         }
 
-    private fun album(
+    /** A two-row item (carousel or grid) linking to an album. */
+    fun album(
         item: JsonObject,
-        pageArtists: List<Artist>,
+        pageArtists: List<Artist> = emptyList(),
     ): AlbumSummary? {
         val target = item.target(PageTypes.ALBUM) ?: return null
         val subtitle = runsOf(item["subtitle"])
@@ -67,8 +68,8 @@ internal object Carousels {
             ArtistSummary(it.id, it.title, largestThumbnail(item["thumbnailRenderer"]), textOf(item["subtitle"]))
         }
 
-    /** Subtitle "Playlist • <author>". */
-    private fun playlist(item: JsonObject): PlaylistSummary? =
+    /** A two-row item linking to a playlist; subtitle "Playlist • <author>". */
+    fun playlist(item: JsonObject): PlaylistSummary? =
         item.target(PageTypes.PLAYLIST)?.let {
             val fields = runsOf(item["subtitle"]).fields()
             PlaylistSummary(it.id, it.title, fields.getOrNull(1), largestThumbnail(item["thumbnailRenderer"]))
