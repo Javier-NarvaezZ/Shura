@@ -56,6 +56,8 @@ object WebViewData {
     fun wipeSignIn(context: Context) {
         File(context.dataDir, "app_webview_$SIGN_IN_SUFFIX").deleteRecursively()
         File(context.cacheDir, "WebView_$SIGN_IN_SUFFIX").deleteRecursively()
+        // The WebView's own record of visited origins (metrics): it would show a sign-in happened.
+        File(context.dataDir, "shared_prefs/$VISITED_ORIGINS").delete()
         // Android 8.x has no per-process directory: sign-in used the default one.
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) {
             File(context.dataDir, "app_webview").deleteRecursively()
@@ -63,6 +65,7 @@ object WebViewData {
         }
     }
 
+    private const val VISITED_ORIGINS = "AwOriginVisitLoggerPrefs.xml"
     private const val WAIT_STEPS = 30
     private const val WAIT_STEP_MS = 100L
 }
