@@ -1,5 +1,6 @@
 package io.github.javiernarvaezz.shura.core.innertube
 
+import io.github.javiernarvaezz.shura.core.model.VideoId
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.MockRequestHandleScope
@@ -152,5 +153,41 @@ class InnerTubeAccountClientTest {
             listOf(HttpHeaders.Cookie, HttpHeaders.Authorization, "X-Goog-AuthUser").forEach {
                 assertNull(request.headers[it], it)
             }
+        }
+
+    @Test
+    fun likingAndUnlikingTargetTheSongAsTheUser() =
+        runTest {
+            val client = client(body = "{}")
+            client.setLiked(credentials, VideoId("abcdefghijk"), liked = true)
+            client.setLiked(credentials, VideoId("abcdefghijk"), liked = false)
+            assertEquals(
+                listOf("/youtubei/v1/like/like", "/youtubei/v1/like/removelike"),
+                requests.map { it.url.encodedPath },
+            )
+            requests.forEach { request ->
+                assertEquals("SAPISIDHASH 1_abc", request.headers[HttpHeaders.Authorization])
+                val body = Json.parseToJsonElement((request.body as TextContent).text).jsonObject
+                assertEquals(
+                    "abcdefghijk",
+                    body
+                        .getValue("target")
+                        .jsonObject
+                        .getValue("videoId")
+                        .jsonPrimitive.content,
+                )
+            }
+        }
+
+    @Test
+    fun libraryPagesAreBrowsedAsTheUser() =
+        runTest {
+            val response =
+                client(setCookies = listOf("SIDCC=n; path=/"), body = """{"contents":{}}""")
+                    .raw(credentials, InnerTubeRequest.Browse("FEmusic_liked_playlists"))
+            val request = requests.single()
+            assertEquals("/youtubei/v1/browse", request.url.encodedPath)
+            assertEquals("SID=s; SAPISID=p", request.headers[HttpHeaders.Cookie])
+            assertEquals(listOf("SIDCC=n; path=/"), response.setCookies)
         }
 }

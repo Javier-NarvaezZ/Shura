@@ -1,5 +1,6 @@
 package io.github.javiernarvaezz.shura.core.innertube
 
+import io.github.javiernarvaezz.shura.core.model.VideoId
 import io.ktor.client.HttpClient
 import io.ktor.client.request.header
 import io.ktor.client.request.post
@@ -31,6 +32,12 @@ class AccountCredentials(
     override fun toString(): String = "AccountCredentials(redacted)"
 }
 
+/** An account response and its `Set-Cookie` headers (rotated session cookies to keep). */
+class AccountResponse(
+    val json: JsonElement,
+    val setCookies: List<String>,
+)
+
 /** The account menu: whether the session is signed in and, if so, the account's display name. */
 class AccountMenu(
     val signedIn: Boolean,
@@ -54,6 +61,44 @@ class InnerTubeAccountClient(
         val name = AccountMenuParser.accountName(json)
         return AccountMenu(signedIn = name != null, accountName = name?.takeIf { it.isNotBlank() }, setCookies)
     }
+
+    /**
+     * A browse or continuation request as the user, raw: the library pages ([AccountLibrary] parses them) and
+     * diagnostics. Returns the response and its `Set-Cookie` headers.
+     */
+    suspend fun raw(
+        credentials: AccountCredentials,
+        request: InnerTubeRequest,
+    ): AccountResponse {
+        val (json, setCookies) =
+            when (request) {
+                is InnerTubeRequest.Browse -> {
+                    post("browse", credentials) {
+                        put("browseId", request.browseId)
+                        request.params?.let { put("params", it) }
+                    }
+                }
+
+                is InnerTubeRequest.Continuation -> {
+                    post("browse", credentials) { put("continuation", request.token) }
+                }
+
+                else -> {
+                    throw IllegalArgumentException("Account requests are browse or continuation only")
+                }
+            }
+        return AccountResponse(json, setCookies)
+    }
+
+    /** Adds the song to the account's liked songs ([liked]) or removes it from them. */
+    suspend fun setLiked(
+        credentials: AccountCredentials,
+        videoId: VideoId,
+        liked: Boolean,
+    ): List<String> =
+        post(if (liked) "like/like" else "like/removelike", credentials) {
+            putJsonObject("target") { put("videoId", videoId.value) }
+        }.second
 
     private suspend fun post(
         endpoint: String,
