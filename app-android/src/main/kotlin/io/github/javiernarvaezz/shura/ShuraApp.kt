@@ -15,6 +15,7 @@ import io.github.javiernarvaezz.shura.core.auth.CookieJarText
 import io.github.javiernarvaezz.shura.core.auth.KeystoreSessionStore
 import io.github.javiernarvaezz.shura.core.auth.SapisidHash
 import io.github.javiernarvaezz.shura.core.auth.Session
+import io.github.javiernarvaezz.shura.core.auth.SessionHealthLog
 import io.github.javiernarvaezz.shura.core.data.AndroidAppStorage
 import io.github.javiernarvaezz.shura.core.innertube.AccountCredentials
 import io.github.javiernarvaezz.shura.core.innertube.InnerTubeAccountClient
@@ -121,6 +122,12 @@ class AppGraph(
     /** Liked songs, saved albums and playlists, followed artists: the local library, in the app database. */
     val library = storage.library
 
+    /**
+     * One line per day with whether Google still accepted the session ("alive" or "expired"), to measure how long a
+     * session lasts. Read with `dumpsys activity <package>/.MainActivity`.
+     */
+    val sessionHealth = SessionHealthLog(File(context.noBackupFilesDir, "session-health.txt"))
+
     /** Account requests (as the signed-in user), apart from the anonymous catalog client. */
     internal val accountClient = InnerTubeAccountClient(network.ktor, catalogConfig)
 
@@ -135,6 +142,7 @@ class AppGraph(
             signOutRemotely = ::signOutAtGoogle,
             ioContext = Dispatchers.IO,
             scope = scope,
+            onChecked = { alive -> sessionHealth.record(alive) },
         )
 
     private suspend fun checkSession(session: Session): AccountCheck {

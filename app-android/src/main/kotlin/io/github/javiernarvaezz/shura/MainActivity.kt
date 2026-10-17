@@ -12,6 +12,8 @@ import androidx.compose.runtime.remember
 import io.github.javiernarvaezz.shura.appshell.ShellDependencies
 import io.github.javiernarvaezz.shura.appshell.ShuraAppShell
 import io.github.javiernarvaezz.shura.core.ui.theme.ShuraTheme
+import java.io.FileDescriptor
+import java.io.PrintWriter
 import java.time.LocalTime
 
 class MainActivity : ComponentActivity() {
@@ -59,5 +61,17 @@ class MainActivity : ComponentActivity() {
         }
         // Compose paints the whole background itself; the window's own fill under it is wasted work every frame.
         window.setBackgroundDrawable(null)
+    }
+
+    /** `dumpsys activity <package>/.MainActivity`: how long sessions lasted ("<date> alive" or "<date> expired"). */
+    override fun dump(
+        prefix: String,
+        fd: FileDescriptor?,
+        writer: PrintWriter,
+        args: Array<out String>?,
+    ) {
+        super.dump(prefix, fd, writer, args)
+        writer.println("${prefix}Session checks (one line per day):")
+        graph.sessionHealth.lines().forEach { writer.println("$prefix  $it") }
     }
 }

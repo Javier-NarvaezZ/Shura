@@ -36,6 +36,8 @@ class AccountModel(
     private val signOutRemotely: suspend (Session) -> Unit,
     private val ioContext: CoroutineContext,
     private val scope: CoroutineScope,
+    /** Told whether Google accepted the session each time it answered a check (to measure how long one lasts). */
+    private val onChecked: (alive: Boolean) -> Unit = {},
 ) {
     private val mutableState = MutableStateFlow<AuthState>(AuthState.SignedOut)
     private val mutex = Mutex()
@@ -93,6 +95,7 @@ class AccountModel(
                 } catch (e: Exception) {
                     return@launch
                 }
+            withContext(ioContext) { onChecked(answer.signedIn) }
             mutex.withLock {
                 if (current !== session) return@withLock
                 if (answer.signedIn) {

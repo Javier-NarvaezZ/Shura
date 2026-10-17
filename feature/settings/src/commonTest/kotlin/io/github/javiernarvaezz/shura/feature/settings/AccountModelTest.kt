@@ -19,6 +19,7 @@ class AccountModelTest {
     private var check: suspend (Session) -> AccountCheck = { AccountCheck(true, "Test Account", emptyList()) }
     private val signOuts = mutableListOf<Session>()
     private var signOutFails = false
+    private val checks = mutableListOf<Boolean>()
 
     private fun TestScope.model(): AccountModel {
         val model =
@@ -31,6 +32,7 @@ class AccountModelTest {
                 },
                 ioContext = StandardTestDispatcher(testScheduler),
                 scope = backgroundScope,
+                onChecked = { checks += it },
             )
         runCurrent()
         return model
@@ -82,6 +84,23 @@ class AccountModelTest {
             runCurrent()
             assertEquals(AuthState.SignedIn("Known"), model.state.value)
             assertTrue(store.stored is StoredSession.Present)
+        }
+
+    @Test
+    fun eachAnswerFromGoogleIsRecordedButAnUnreachableGoogleIsNot() =
+        runTest {
+            store.stored = StoredSession.Present(session)
+            model()
+            runCurrent()
+            check = { AccountCheck(false, null, emptyList()) }
+            store.stored = StoredSession.Present(session)
+            val second = model()
+            runCurrent()
+            check = { error("offline") }
+            store.stored = StoredSession.Present(session)
+            second.reload()
+            runCurrent()
+            assertEquals(listOf(true, false), checks)
         }
 
     @Test
