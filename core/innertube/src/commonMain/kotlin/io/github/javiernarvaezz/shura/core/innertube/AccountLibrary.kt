@@ -28,9 +28,42 @@ internal object AccountLibrary {
 
     fun albums(root: JsonElement): List<AlbumSummary> = gridItems(root).mapNotNull { Carousels.album(it) }
 
-    fun artists(root: JsonElement): List<ArtistSummary> = SearchRows.artists(root)
+    /**
+     * The library's artists. Rows link to the artist's library page (`MPLA` + channel id, `LIBRARY_ARTIST`); the
+     * channel id after the prefix is the artist's own page. Rows linking straight to an artist are taken as they are.
+     */
+    fun artists(root: JsonElement): List<ArtistSummary> =
+        findAll(root, ListItems.RENDERER).mapNotNull(::libraryArtist).ifEmpty { SearchRows.artists(root) }
+
+    private fun libraryArtist(row: JsonObject): ArtistSummary? {
+        val browse = row.path("navigationEndpoint", "browseEndpoint")
+        val id = browse.path("browseId").string()?.takeIf { it.startsWith(LIBRARY_ARTIST_PREFIX) }
+        val name =
+            ListItems
+                .column(row, 0)
+                .joinToString("") { it.text }
+                .trim()
+                .takeIf { it.isNotEmpty() }
+        return if (id != null && name != null && browse.pageType() == LIBRARY_ARTIST) {
+            ArtistSummary(
+                id = id.removePrefix(LIBRARY_ARTIST_PREFIX),
+                name = name,
+                thumbnailUrl = largestThumbnail(row["thumbnail"]),
+                subtitle =
+                    ListItems
+                        .column(row, 1)
+                        .fields()
+                        .joinToString(" • ")
+                        .ifEmpty { null },
+            )
+        } else {
+            null
+        }
+    }
 
     private fun gridItems(root: JsonElement): List<JsonObject> = findAll(root, "musicTwoRowItemRenderer")
 
     const val LIKED_SONGS = "VLLM"
+    private const val LIBRARY_ARTIST = "MUSIC_PAGE_TYPE_LIBRARY_ARTIST"
+    private const val LIBRARY_ARTIST_PREFIX = "MPLA"
 }

@@ -20,7 +20,7 @@ private val PAGES =
         "liked_songs" to "VLLM",
         "liked_playlists" to "FEmusic_liked_playlists",
         "liked_albums" to "FEmusic_liked_albums",
-        "library_artists" to "FEmusic_library_corpus_artists",
+        "library_artists" to "FEmusic_library_corpus_track_artists",
     )
 
 /**

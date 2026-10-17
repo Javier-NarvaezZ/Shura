@@ -119,8 +119,12 @@ class InnerTubeAccountClient(
     suspend fun albums(credentials: AccountCredentials): AccountResult<List<AlbumSummary>> =
         raw(credentials, InnerTubeRequest.Browse("FEmusic_liked_albums")).map(AccountLibrary::albums)
 
+    /**
+     * The library's artists, as YouTube Music's Library → Artists shows them: the artists of the library's songs,
+     * including followed ones. (`FEmusic_library_corpus_artists` lists subscriptions only and missed some.)
+     */
     suspend fun artists(credentials: AccountCredentials): AccountResult<List<ArtistSummary>> =
-        raw(credentials, InnerTubeRequest.Browse("FEmusic_library_corpus_artists")).map(AccountLibrary::artists)
+        raw(credentials, InnerTubeRequest.Browse("FEmusic_library_corpus_track_artists")).map(AccountLibrary::artists)
 
     /** Adds the song to the account's liked songs ([liked]) or removes it from them. */
     suspend fun setLiked(

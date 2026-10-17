@@ -54,10 +54,11 @@ class AccountLibraryTest {
     }
 
     @Test
-    fun followedArtists() {
+    fun theLibrarysArtistsAsYouTubeMusicListsThem() {
         val artists = AccountLibrary.artists(page("library_artists"))
-        assertEquals(listOf("Kendrick Lamar"), artists.map { it.name })
-        assertTrue(artists.single().id.startsWith("UC"))
+        assertEquals(listOf("Kendrick Lamar", "Tyler, The Creator", "Eddie Santiago"), artists.map { it.name })
+        assertEquals(listOf("15 canciones", "2 canciones", "1 canción"), artists.map { it.subtitle })
+        assertTrue(artists.all { it.id.startsWith("UC") })
     }
 
     @Test
