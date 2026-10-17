@@ -28,26 +28,24 @@ class LrcLibClient(
     private val userAgent: String = DEFAULT_USER_AGENT,
 ) {
     /**
-     * The best lyrics for [query]: synced lyrics when any match, otherwise plain ones.
+     * The best lyrics for [query]: synced lyrics when any match, otherwise plain ones (see [choose]).
      *
-     * With an album, LRCLIB's exact match (title, artist, album and duration) is tried first. Search results count
-     * when their duration is within [TEXT_TOLERANCE] of the song's, and keep their timing only within
-     * [DURATION_TOLERANCE]: further off, every line could be late or early, so only the words are shown. When the
-     * title and artist as they are match nothing, they are searched once more without upload tags ([LyricsTitle]).
+     * With an album, LRCLIB's exact match (title, artist, album and duration) is tried first; synced lyrics that fit
+     * the song, or an instrumental, need no search, unless the song is explicit: then the search's versions are
+     * compared too, so an uncensored one can win. Search results count when their duration is within
+     * [TEXT_TOLERANCE] of the song's, and keep their timing only within [DURATION_TOLERANCE] and when they fit
+     * ([Candidate.of]). When the title and artist as they are match nothing, they are searched once more without
+     * upload tags ([LyricsTitle]).
      *
      * @throws LyricsException.NotFound when nothing matches.
      */
     suspend fun lyrics(query: LyricsQuery): Lyrics {
         val exact = query.album?.let { album -> exactMatch(query, album) }
-        if (exact != null && exact !is Lyrics.Plain) return exact
-        // Search only looks for synced lyrics to beat plain ones; if it fails, the plain ones still count.
-        val searched = if (exact == null) searchWithCleanedTitle(query) else searchOrNull(query)
-        return when {
-            searched is Lyrics.Synced -> searched
-            exact != null -> exact
-            searched != null -> searched
-            else -> throw LyricsException.NotFound()
-        }
+        val settled = exact?.lyrics is Lyrics.Instrumental || (exact?.lyrics is Lyrics.Synced && !query.explicit)
+        if (exact != null && settled) return exact.lyrics
+        // Search only looks for better versions than the exact match; if it fails, the exact match still counts.
+        val searched = if (exact == null) searchWithCleanedTitle(query) else searchOrEmpty(query)
+        return choose(listOfNotNull(exact) + searched, query.explicit) ?: throw LyricsException.NotFound()
     }
 
     /**
@@ -57,7 +55,7 @@ class LrcLibClient(
     private suspend fun exactMatch(
         query: LyricsQuery,
         album: String,
-    ): Lyrics? {
+    ): Candidate? {
         val response =
             get("get") {
                 parameter("track_name", query.title)
@@ -68,52 +66,39 @@ class LrcLibClient(
         return if (response.status == HttpStatusCode.NotFound || response.status in BUSY) {
             null
         } else {
-            LrcLibRecord.from(body(response)).lyrics()
+            Candidate.of(LrcLibRecord.from(body(response)), query.duration, exact = true)
         }
     }
 
     @Suppress("SwallowedException") // The caller already has lyrics to show instead.
-    private suspend fun searchOrNull(query: LyricsQuery): Lyrics? =
+    private suspend fun searchOrEmpty(query: LyricsQuery): List<Candidate> =
         try {
             searchWithCleanedTitle(query)
         } catch (e: LyricsException) {
-            null
+            emptyList()
         }
 
     /** Search as the song is named; if nothing matches, once more without upload tags, when that changes anything. */
-    private suspend fun searchWithCleanedTitle(query: LyricsQuery): Lyrics? {
-        searchMatch(query.title, query.artist, query.duration)?.let { return it }
+    private suspend fun searchWithCleanedTitle(query: LyricsQuery): List<Candidate> {
+        searchMatches(query.title, query.artist, query.duration).ifEmpty { null }?.let { return it }
         val title = LyricsTitle.clean(query.title)
         val artist = LyricsTitle.cleanArtist(query.artist)
-        return if (title != query.title || artist != query.artist) searchMatch(title, artist, query.duration) else null
+        val changed = title != query.title || artist != query.artist
+        return if (changed) searchMatches(title, artist, query.duration) else emptyList()
     }
 
-    private suspend fun searchMatch(
+    private suspend fun searchMatches(
         title: String,
         artist: String,
         duration: Duration,
-    ): Lyrics? {
+    ): List<Candidate> {
         val response =
             get("search") {
                 parameter("track_name", title)
                 parameter("artist_name", artist)
             }
-        return LrcLibRecord
-            .listFrom(body(response))
-            .mapNotNull { record ->
-                val off = (record.duration - duration).absoluteValue
-                val lyrics = if (off <= DURATION_TOLERANCE) record.lyrics() else record.text()
-                lyrics?.takeIf { off <= TEXT_TOLERANCE }?.let { it to off }
-            }.minWithOrNull(compareBy<Pair<Lyrics, Duration>> { rank(it.first) }.thenBy { it.second })
-            ?.first
+        return LrcLibRecord.listFrom(body(response)).mapNotNull { Candidate.of(it, duration) }
     }
-
-    private fun rank(lyrics: Lyrics): Int =
-        when (lyrics) {
-            is Lyrics.Synced -> 0
-            is Lyrics.Plain -> 1
-            Lyrics.Instrumental -> 2
-        }
 
     private suspend fun get(
         endpoint: String,

@@ -2,12 +2,16 @@ package io.github.javiernarvaezz.shura.core.lyrics
 
 import kotlin.time.Duration
 
-/** What to look lyrics up for. [title] and [artist] are trimmed and must not be blank; a blank [album] is unknown. */
+/**
+ * What to look lyrics up for. [title] and [artist] are trimmed and must not be blank; a blank [album] is unknown.
+ * [explicit] is the catalog's advisory: such a song should get its uncensored lyrics.
+ */
 class LyricsQuery(
     title: String,
     artist: String,
     album: String?,
     val duration: Duration,
+    val explicit: Boolean = false,
 ) {
     val title: String = title.trim()
     val artist: String = artist.trim()

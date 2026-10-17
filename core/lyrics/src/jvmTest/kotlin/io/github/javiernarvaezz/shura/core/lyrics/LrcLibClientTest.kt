@@ -112,15 +112,15 @@ class LrcLibClientTest {
         }
 
     @Test
-    fun searchPicksTheSyncedResultClosestInDuration() =
+    fun searchKeepsOnlyTheWordsOfATextTimedForAnotherCut() =
         runTest {
-            // Within 2 s of 165 s only "Tesoros De Colección" (164.05 s) qualifies.
+            // Within 2 s of 165 s only "Tesoros De Colección" (164.05 s) qualifies, but its text was timed for the
+            // 187 s recording: its last line starts at 2:56, after the song has ended.
             val lyrics =
                 client(search = Recorded("search/pedro_infante.json"))
                     .lyrics(LyricsQuery("Cielito Lindo", "Pedro Infante", null, 165.seconds))
 
-            val expected = synced(Fixtures.searchRecord("search/pedro_infante.json", 20_696_091))
-            assertEquals(Lyrics.Synced(expected), lyrics)
+            assertEquals(Lyrics.Plain(plain(Fixtures.searchRecord("search/pedro_infante.json", 20_696_091))), lyrics)
         }
 
     @Test

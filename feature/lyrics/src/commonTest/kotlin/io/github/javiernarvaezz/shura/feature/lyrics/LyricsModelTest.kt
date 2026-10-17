@@ -19,6 +19,7 @@ import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
@@ -83,6 +84,16 @@ class LyricsModelTest {
             assertEquals("First", query.artist)
             assertEquals("Album 1", query.album)
             assertEquals(200.seconds, query.duration)
+            assertFalse(query.explicit)
+        }
+
+    @Test
+    fun anExplicitSongAsksForItsUncensoredLyrics() =
+        runTest {
+            play(song(1).copy(isExplicit = true))
+            model().setVisible(true)
+            runCurrent()
+            assertTrue(requests.single().second.explicit)
         }
 
     @Test

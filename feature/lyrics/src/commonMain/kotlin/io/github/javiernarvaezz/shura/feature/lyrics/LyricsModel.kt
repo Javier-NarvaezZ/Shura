@@ -149,7 +149,7 @@ class LyricsModel(
                         if (duration == null) {
                             LyricsUiState.NotFound
                         } else {
-                            val query = LyricsQuery(song.title, artist, song.album?.title, duration)
+                            val query = LyricsQuery(song.title, artist, song.album?.title, duration, song.isExplicit)
                             lyrics(song.videoId.value, query, refresh).toUiState()
                         }
                     } catch (e: CancellationException) {
