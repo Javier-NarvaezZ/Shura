@@ -11,6 +11,7 @@ import coil3.ImageLoader
 import coil3.SingletonImageLoader
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import coil3.serviceLoaderEnabled
+import io.github.javiernarvaezz.shura.core.auth.AccountFingerprint
 import io.github.javiernarvaezz.shura.core.auth.CookieJarText
 import io.github.javiernarvaezz.shura.core.auth.KeystoreSessionStore
 import io.github.javiernarvaezz.shura.core.auth.SapisidHash
@@ -34,6 +35,7 @@ import io.github.javiernarvaezz.shura.core.stream.FilePreprocessedPlayerStore
 import io.github.javiernarvaezz.shura.core.stream.InnerTubeXStreamResolver
 import io.github.javiernarvaezz.shura.core.stream.WebViewJsRuntime
 import io.github.javiernarvaezz.shura.feature.settings.AccountCheck
+import io.github.javiernarvaezz.shura.feature.settings.AccountLikes
 import io.github.javiernarvaezz.shura.feature.settings.AccountModel
 import io.ktor.client.request.get
 import io.ktor.client.request.header
@@ -41,6 +43,7 @@ import io.ktor.http.HttpHeaders
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import java.io.File
 import java.util.Locale
 
@@ -119,9 +122,6 @@ class AppGraph(
 
     val settings = storage.settings
 
-    /** Liked songs, saved albums and playlists, followed artists: the local library, in the app database. */
-    val library = storage.library
-
     /**
      * One line per day with whether Google still accepted the session ("alive" or "expired"), to measure how long a
      * session lasts. Read with `dumpsys activity <package>/.MainActivity`.
@@ -143,7 +143,28 @@ class AppGraph(
             ioContext = Dispatchers.IO,
             scope = scope,
             onChecked = { alive -> sessionHealth.record(alive) },
+            onSignedOut = { storage.pendingLikes.clear() },
         )
+
+    /**
+     * The local library (liked songs, saved albums and playlists, followed artists), whose likes also reach the
+     * signed-in account, queued while offline (the queue is flushed when the network comes back).
+     */
+    private val accountLikes =
+        AccountLikes(
+            local = storage.library,
+            pending = storage.pendingLikes,
+            account = account,
+            send = { session, videoId, liked ->
+                val credentials = checkNotNull(credentialsOf(session)) { "Session cannot sign" }
+                accountClient.setLiked(credentials, videoId, liked)
+            },
+            fingerprint = AccountFingerprint::of,
+            scope = scope,
+            now = System::currentTimeMillis,
+        )
+
+    val library = accountLikes.library
 
     private suspend fun checkSession(session: Session): AccountCheck {
         val credentials = credentialsOf(session) ?: return AccountCheck(false, null, emptyList())
@@ -229,6 +250,8 @@ class AppGraph(
 
     init {
         debugMaybePrewarm(streamResolver, trace)
+        // Likes queued while offline go to the account as soon as there is a network again.
+        scope.launch { networkRegained.collect { accountLikes.flush() } }
     }
 }
 
