@@ -94,6 +94,8 @@ import io.github.javiernarvaezz.shura.feature.search.SearchLinks
 import io.github.javiernarvaezz.shura.feature.search.SearchScreen
 import io.github.javiernarvaezz.shura.feature.search.SearchSources
 import io.github.javiernarvaezz.shura.feature.search.SearchViewModel
+import io.github.javiernarvaezz.shura.feature.settings.AccountModel
+import io.github.javiernarvaezz.shura.feature.settings.SettingsScreen
 import kotlinx.coroutines.flow.Flow
 import org.jetbrains.compose.resources.stringResource
 
@@ -113,6 +115,10 @@ class ShellDependencies(
     val lyrics: LyricsRepository? = null,
     /** The user's library on this device; null hides the Library tab and the like and save actions (desktop). */
     val library: Library? = null,
+    /** The YouTube Music account; null where there is none yet (desktop). */
+    val account: AccountModel? = null,
+    /** Opens the platform's sign-in screen. */
+    val onSignIn: () -> Unit = {},
 )
 
 enum class Tab { Home, Search, Library }
@@ -125,6 +131,8 @@ internal sealed interface Route {
     data object Library : Route
 
     data object LikedSongs : Route
+
+    data object Settings : Route
 
     /** [entry] tells apart two visits to the same page in one back stack (album → artist → same album). */
     data class Album(
@@ -215,7 +223,7 @@ fun ShuraAppShell(
                                 ),
                             entryProvider =
                                 entryProvider {
-                                    entry<Route.Home> { HomeScreen(home.model, onSearch = { shell.tab = Tab.Search }) }
+                                    homePages(home, shell, deps)
                                     entry<Route.Search> { SearchScreen(search.controller, searchLinks) }
                                     pages(deps, navigation)
                                     deps.library?.let { libraryPages(it, deps.player, shell, navigation) }
@@ -373,3 +381,28 @@ private fun EntryProviderScope<Route>.libraryPages(
         LikedSongsScreen(viewModel { LikedSongsViewModel(library, player) }.model, links, onBack = shell::pop)
     }
 }
+
+/** Home, and Settings opened from it. */
+private fun EntryProviderScope<Route>.homePages(
+    home: HomeViewModel,
+    shell: ShellViewModel,
+    deps: ShellDependencies,
+) {
+    entry<Route.Home> {
+        HomeScreen(home.model, onSearch = { shell.tab = Tab.Search }, onSettings = { shell.push(Route.Settings) })
+    }
+    entry<Route.Settings> { Settings(deps, shell::pop) }
+}
+
+/** Settings: the account (where there is one) and playback. */
+@Composable
+private fun Settings(
+    deps: ShellDependencies,
+    onBack: () -> Unit,
+) = SettingsScreen(
+    account = deps.account,
+    autoplay = deps.settings?.autoplay,
+    onAutoplayChange = { deps.settings?.setAutoplay(it) },
+    onSignIn = deps.onSignIn,
+    onBack = onBack,
+)

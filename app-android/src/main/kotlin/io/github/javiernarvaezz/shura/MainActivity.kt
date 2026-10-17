@@ -1,11 +1,13 @@
 package io.github.javiernarvaezz.shura
 
+import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.remember
 import io.github.javiernarvaezz.shura.appshell.ShellDependencies
 import io.github.javiernarvaezz.shura.appshell.ShuraAppShell
@@ -14,6 +16,16 @@ import java.time.LocalTime
 
 class MainActivity : ComponentActivity() {
     private val graph get() = (application as ShuraApp).graph
+
+    /** However the sign-in screen ended: end its process, delete its WebView data, then read the session. */
+    private val signIn =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+            val context = applicationContext
+            Thread {
+                WebViewData.endSignIn(context)
+                graph.account.reload()
+            }.start()
+        }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // Dark only: light status and navigation bar icons whatever the system theme.
@@ -37,6 +49,8 @@ class MainActivity : ComponentActivity() {
                             settings = graph.settings,
                             lyrics = graph.lyrics,
                             library = graph.library,
+                            account = graph.account,
+                            onSignIn = { signIn.launch(Intent(this, LoginActivity::class.java)) },
                         )
                     },
                 )

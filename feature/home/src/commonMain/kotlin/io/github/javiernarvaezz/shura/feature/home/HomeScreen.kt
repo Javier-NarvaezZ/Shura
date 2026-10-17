@@ -19,6 +19,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -34,6 +36,7 @@ import io.github.javiernarvaezz.shura.core.ui.artwork.Artwork
 import io.github.javiernarvaezz.shura.core.ui.components.MediaTile
 import io.github.javiernarvaezz.shura.core.ui.components.PlayPauseButton
 import io.github.javiernarvaezz.shura.core.ui.components.shimmer
+import io.github.javiernarvaezz.shura.core.ui.icons.ShuraIcons
 import io.github.javiernarvaezz.shura.core.ui.theme.Shura
 import io.github.javiernarvaezz.shura.feature.home.resources.Res
 import io.github.javiernarvaezz.shura.feature.home.resources.continue_listening
@@ -48,6 +51,7 @@ import io.github.javiernarvaezz.shura.feature.home.resources.pause
 import io.github.javiernarvaezz.shura.feature.home.resources.paused
 import io.github.javiernarvaezz.shura.feature.home.resources.play
 import io.github.javiernarvaezz.shura.feature.home.resources.recently_played
+import io.github.javiernarvaezz.shura.feature.home.resources.settings
 import org.jetbrains.compose.resources.stringResource
 
 /** Home: a greeting, the song to continue, and recently played songs. [onSearch] opens the Search tab. */
@@ -56,6 +60,7 @@ fun HomeScreen(
     model: HomeModel,
     onSearch: () -> Unit,
     modifier: Modifier = Modifier,
+    onSettings: (() -> Unit)? = null,
 ) {
     val state by model.state.collectAsStateWithLifecycle()
     LazyColumn(
@@ -63,7 +68,7 @@ fun HomeScreen(
         contentPadding = PaddingValues(bottom = Shura.spacing.xl),
         verticalArrangement = Arrangement.spacedBy(Shura.spacing.xl),
     ) {
-        item(key = "greeting") { Greeting(state.dayPart) }
+        item(key = "greeting") { Greeting(state.dayPart, onSettings) }
         when {
             state.loading -> {
                 item(key = "loading") { LoadingRow() }
@@ -88,19 +93,32 @@ fun HomeScreen(
 }
 
 @Composable
-private fun Greeting(dayPart: DayPart) {
+private fun Greeting(
+    dayPart: DayPart,
+    onSettings: (() -> Unit)?,
+) {
     val text =
         when (dayPart) {
             DayPart.Morning -> Res.string.greeting_morning
             DayPart.Afternoon -> Res.string.greeting_afternoon
             DayPart.Night -> Res.string.greeting_night
         }
-    Text(
-        stringResource(text),
-        style = MaterialTheme.typography.headlineMedium,
-        color = Shura.colors.text,
-        modifier = Modifier.padding(horizontal = Shura.spacing.gutter).padding(top = Shura.spacing.xl),
-    )
+    Row(
+        Modifier.fillMaxWidth().padding(start = Shura.spacing.gutter).padding(top = Shura.spacing.xl),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            stringResource(text),
+            style = MaterialTheme.typography.headlineMedium,
+            color = Shura.colors.text,
+            modifier = Modifier.weight(1f),
+        )
+        if (onSettings != null) {
+            IconButton(onClick = onSettings) {
+                Icon(ShuraIcons.Settings, stringResource(Res.string.settings), tint = Shura.colors.textMuted)
+            }
+        }
+    }
 }
 
 @Composable

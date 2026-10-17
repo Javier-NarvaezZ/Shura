@@ -30,6 +30,16 @@
         </activity>
 
         <!--
+            Google sign-in (ADR 0002), in its own process with its own WebView data, deleted when it ends. Not recreated
+            on rotation: recreating would wipe the half-done sign-in.
+        -->
+        <activity
+            android:name=".LoginActivity"
+            android:process=":signin"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|uiMode"
+            android:exported="false" />
+
+        <!--
             Exported without a permission on purpose: system UI, Bluetooth and other media controllers must be able
             to connect. The session trusts nothing they send: untrusted controllers are read-only and media items are
             rebuilt from a validated video id (PlaybackService).
