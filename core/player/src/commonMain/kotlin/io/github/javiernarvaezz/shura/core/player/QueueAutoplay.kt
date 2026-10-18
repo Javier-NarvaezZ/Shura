@@ -6,6 +6,9 @@ import io.github.javiernarvaezz.shura.core.model.Song
  * When and what to add so a queue does not end (autoplay): once the song playing is the last in play order, its
  * related songs not already queued, a batch at a time. Repeat wins (the queue never ends), and the queue stops
  * growing at [MAX_QUEUE] songs.
+ *
+ * The related songs of a video upload are all videos, so after a video the last song (not video) played before it
+ * is asked instead; a queue of only videos (a playlist of videos) goes on from its video.
  */
 object QueueAutoplay {
     const val BATCH = 20
@@ -16,9 +19,13 @@ object QueueAutoplay {
         queue: QueueState,
         enabled: Boolean,
     ): Song? {
-        val last = queue.playOrder.lastOrNull() ?: queue.items.lastIndex
+        val order = queue.playOrder.ifEmpty { queue.items.indices.toList() }
         val ready = enabled && queue.repeat == RepeatMode.Off && queue.items.size < MAX_QUEUE
-        return queue.current?.takeIf { ready && queue.currentIndex == last }
+        val current = queue.current?.takeIf { ready && queue.currentIndex == order.lastOrNull() }
+        return when {
+            current == null || !current.isVideo -> current
+            else -> order.asReversed().map { queue.items[it] }.firstOrNull { !it.isVideo } ?: current
+        }
     }
 
     /** The songs to append from [related]: not already in the queue, at most a batch, never past the cap. */
