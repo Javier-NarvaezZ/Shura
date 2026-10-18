@@ -3,6 +3,7 @@ package io.github.javiernarvaezz.shura.feature.lyrics
 import io.github.javiernarvaezz.shura.core.lyrics.LyricLine
 import io.github.javiernarvaezz.shura.core.lyrics.Lyrics
 import io.github.javiernarvaezz.shura.core.lyrics.LyricsException
+import io.github.javiernarvaezz.shura.core.lyrics.LyricsOffsets
 import io.github.javiernarvaezz.shura.core.lyrics.LyricsQuery
 import io.github.javiernarvaezz.shura.core.model.AlbumRef
 import io.github.javiernarvaezz.shura.core.model.Artist
@@ -52,10 +53,25 @@ class LyricsModelTest {
                     answer(query)
                 },
                 scope = backgroundScope,
+                offsets = offsets,
             )
         runCurrent()
         return model
     }
+
+    private val offsets =
+        object : LyricsOffsets {
+            val saved = mutableMapOf<String, Duration>()
+
+            override suspend fun get(key: String): Duration = saved[key] ?: Duration.ZERO
+
+            override suspend fun set(
+                key: String,
+                offset: Duration,
+            ) {
+                if (offset == Duration.ZERO) saved.remove(key) else saved[key] = offset
+            }
+        }
 
     @Test
     fun loadsOnlyWhileShown() =
@@ -297,5 +313,82 @@ class LyricsModelTest {
             val model = model()
             model.seekTo(LyricLine(42.seconds, "two"))
             assertEquals(listOf("seekTo:42"), player.calls)
+        }
+
+    @Test
+    fun aTimingFixMovesTheShownPositionAndTheSeeks() =
+        runTest {
+            play(song(1))
+            player.progress = PlaybackProgress(10.seconds, 200.seconds, 10.seconds)
+            val model = model()
+            repeat(4) { model.timing.shift(LyricsOffsets.STEP) }
+            runCurrent()
+
+            assertEquals(2.seconds, model.timing.offset.value)
+            assertEquals(12.seconds, model.position())
+            model.seekTo(LyricLine(42.seconds, "two"))
+            assertEquals(listOf("seekTo:40"), player.calls)
+            assertEquals(mapOf(song(1).videoId.value to 2.seconds), offsets.saved)
+        }
+
+    @Test
+    fun aSeekForAFixedLineNeverGoesBeforeTheStart() =
+        runTest {
+            play(song(1))
+            val model = model()
+            model.timing.shift(2.seconds)
+            model.seekTo(LyricLine(1.seconds, "one"))
+            assertEquals(listOf("seekTo:0"), player.calls)
+        }
+
+    @Test
+    fun eachSongKeepsItsOwnFix() =
+        runTest {
+            offsets.saved[song(2).videoId.value] = (-1).seconds
+            play(song(1))
+            val model = model()
+            model.timing.shift(LyricsOffsets.STEP)
+            runCurrent()
+
+            play(song(2))
+            runCurrent()
+            assertEquals((-1).seconds, model.timing.offset.value)
+
+            play(song(1))
+            runCurrent()
+            assertEquals(LyricsOffsets.STEP, model.timing.offset.value)
+        }
+
+    @Test
+    fun resettingTheFixForgetsIt() =
+        runTest {
+            play(song(1))
+            val model = model()
+            model.timing.shift(LyricsOffsets.STEP)
+            runCurrent()
+            model.timing.reset()
+            runCurrent()
+
+            assertEquals(Duration.ZERO, model.timing.offset.value)
+            assertTrue(offsets.saved.isEmpty())
+        }
+
+    @Test
+    fun theFixStopsAtItsLimit() =
+        runTest {
+            play(song(1))
+            val model = model()
+            repeat(130) { model.timing.shift(-LyricsOffsets.STEP) }
+            assertEquals(-LyricsOffsets.LIMIT, model.timing.offset.value)
+        }
+
+    @Test
+    fun withoutASongThereIsNothingToFix() =
+        runTest {
+            val model = model()
+            model.timing.shift(LyricsOffsets.STEP)
+            runCurrent()
+            assertEquals(Duration.ZERO, model.timing.offset.value)
+            assertTrue(offsets.saved.isEmpty())
         }
 }

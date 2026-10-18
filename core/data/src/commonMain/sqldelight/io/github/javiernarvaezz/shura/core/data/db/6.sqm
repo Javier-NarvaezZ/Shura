@@ -1,0 +1,8 @@
+-- Version 6 → 7: lyrics timing fixes per song (Phase 3, E5b). Cached lyrics were chosen by the earlier rules (and
+-- album songs played as the artist's videos), so the cache starts over; it fills again as songs play.
+CREATE TABLE lyrics_offset (
+    video_id TEXT NOT NULL PRIMARY KEY,
+    offset_ms INTEGER NOT NULL
+);
+
+DELETE FROM lyrics_cache;

@@ -51,6 +51,7 @@ import io.github.javiernarvaezz.shura.appshell.resources.Res
 import io.github.javiernarvaezz.shura.appshell.resources.tab_home
 import io.github.javiernarvaezz.shura.appshell.resources.tab_library
 import io.github.javiernarvaezz.shura.appshell.resources.tab_search
+import io.github.javiernarvaezz.shura.core.lyrics.LyricsOffsets
 import io.github.javiernarvaezz.shura.core.lyrics.LyricsRepository
 import io.github.javiernarvaezz.shura.core.model.BrowseLink
 import io.github.javiernarvaezz.shura.core.model.MusicCatalog
@@ -114,6 +115,8 @@ class ShellDependencies(
     val settings: PlaybackSettings? = null,
     /** Lyrics for a song (cached); null hides the lyrics (desktop, until it has a database). */
     val lyrics: LyricsRepository? = null,
+    /** The user's timing fix for each song's lyrics; null keeps none. */
+    val lyricsOffsets: LyricsOffsets? = null,
     /** The user's library on this device; null hides the Library tab and the like and save actions (desktop). */
     val library: Library? = null,
     /** The YouTube Music account; null where there is none yet (desktop). */
@@ -195,7 +198,10 @@ fun ShuraAppShell(
         viewModel { SearchViewModel(SearchSources.of(deps.catalog), deps.player, deps.onPlaybackIntent, deps.library) }
     val player = viewModel { PlayerViewModel(deps.player, deps.settings, deps.library) }
     // At shell level, so the lyrics survive closing and opening the player.
-    val lyrics = deps.lyrics?.let { repository -> viewModel { LyricsViewModel(deps.player, repository::lyrics) } }
+    val lyrics =
+        deps.lyrics?.let { repository ->
+            viewModel { LyricsViewModel(deps.player, repository::lyrics, deps.lyricsOffsets) }
+        }
     val sheet = rememberPlayerSheetState()
     val tabs = rememberSaveableStateHolder()
     val navigation = remember(shell) { browseNavigation(shell) }

@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.javiernarvaezz.shura.core.lyrics.LyricLine
 import io.github.javiernarvaezz.shura.core.lyrics.Lyrics
+import io.github.javiernarvaezz.shura.core.lyrics.LyricsOffsets
 import io.github.javiernarvaezz.shura.core.lyrics.LyricsQuery
 import io.github.javiernarvaezz.shura.core.model.Song
 import io.github.javiernarvaezz.shura.core.model.VideoId
@@ -54,12 +55,14 @@ sealed interface LyricsUiState {
  * The current song's lyrics; plain so it can be tested without Android.
  *
  * Lyrics are looked up only while shown ([setVisible]): song details reach LRCLIB only when the user asks for the
- * lyrics. [lyrics] returns null when a song has none (see `LyricsRepository`).
+ * lyrics. [lyrics] returns null when a song has none (see `LyricsRepository`). The user's timing fix for each song
+ * ([timing]) is kept in [offsets].
  */
 class LyricsModel(
     private val player: AudioPlayer,
     private val lyrics: suspend (key: String, query: LyricsQuery, refresh: Boolean) -> Lyrics?,
     private val scope: CoroutineScope,
+    offsets: LyricsOffsets? = null,
 ) {
     private val mutableState = MutableStateFlow<LyricsUiState>(LyricsUiState.Idle)
     private val visible = MutableStateFlow(false)
@@ -73,12 +76,16 @@ class LyricsModel(
 
     val state: StateFlow<LyricsUiState> = mutableState.asStateFlow()
 
+    /** The current song's timing fix ([LyricsTiming.offset]); applied to [position] and [seekTo]. */
+    val timing = LyricsTiming(offsets, scope)
+
     /** Whether the song is playing, so the shown line follows the music only then. */
     val isPlaying: StateFlow<Boolean> = isPlayingFlow()
 
     init {
         scope.launch {
             combine(player.queue.map { it.current }.distinctUntilChanged(), visible, ::Pair).collect { (song, shown) ->
+                timing.show(song?.videoId)
                 if (song?.videoId != loaded) clear()
                 if (shown && song != null && loaded == null) load(song)
             }
@@ -110,10 +117,10 @@ class LyricsModel(
         if (mutableState.value == LyricsUiState.NotFound) load(song, refresh = true)
     }
 
-    /** Where the song is now; read on demand while synced lyrics are shown. */
-    fun position(): Duration = player.progress().position
+    /** Where the song is now in the lyrics' timing (the timing fix applied); read on demand while they are shown. */
+    fun position(): Duration = player.progress().position + timing.offset.value
 
-    fun seekTo(line: LyricLine) = player.seekTo(line.time)
+    fun seekTo(line: LyricLine) = player.seekTo((line.time - timing.offset.value).coerceAtLeast(Duration.ZERO))
 
     private fun clear() {
         job?.cancel()
@@ -194,6 +201,7 @@ private val DURATION_POLL = 250.milliseconds
 class LyricsViewModel(
     player: AudioPlayer,
     lyrics: suspend (key: String, query: LyricsQuery, refresh: Boolean) -> Lyrics?,
+    offsets: LyricsOffsets? = null,
 ) : ViewModel() {
-    val model = LyricsModel(player, lyrics, viewModelScope)
+    val model = LyricsModel(player, lyrics, viewModelScope, offsets)
 }

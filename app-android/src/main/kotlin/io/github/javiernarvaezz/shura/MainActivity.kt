@@ -51,6 +51,7 @@ class MainActivity : ComponentActivity() {
                             networkRegained = graph.networkRegained,
                             settings = graph.settings,
                             lyrics = graph.lyrics,
+                            lyricsOffsets = graph.lyricsOffsets,
                             library = graph.library,
                             account = graph.account,
                             accountLibrary = graph.accountLibrary,
