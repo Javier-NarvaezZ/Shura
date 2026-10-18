@@ -34,7 +34,7 @@ class SqlQueueStoreTest {
             isExplicit = true,
         )
     private val minimal = Song(VideoId("dQw4w9WgXcQ"), "Minimal", emptyList())
-    private val third = Song(VideoId("kJQP7kiw5Fk"), "Third", listOf(Artist("Y")))
+    private val third = Song(VideoId("kJQP7kiw5Fk"), "Third", listOf(Artist("Y")), isVideo = true)
 
     private fun songs(count: Int) =
         List(count) { i -> Song(VideoId("abcdefgh" + i.toString().padStart(3, '0')), "Song $i", listOf(Artist("A$i"))) }
@@ -146,5 +146,32 @@ class SqlQueueStoreTest {
             store.recordPlay(renamed, atMillis = 2_000)
 
             assertEquals(listOf(renamed), store.recent(limit = 10).first())
+        }
+
+    @Test
+    fun theHistoryKeepsWhetherASongIsAVideo() =
+        runTest {
+            val store = store()
+            store.recordPlay(third, atMillis = 1_000)
+
+            assertEquals(listOf(third), store.recent(limit = 10).first())
+        }
+
+    @Test
+    fun theMigrationTo8KeepsSavedSongsAsTracks() =
+        runTest {
+            // A version 7 database: no video column yet.
+            listOf("queue_item", "play_history", "liked_song").forEach {
+                driver.execute(null, "ALTER TABLE $it DROP COLUMN video", 0)
+            }
+            driver.execute(
+                null,
+                "INSERT INTO play_history(video_id, title, artist_names, artist_ids, explicit, played_at) " +
+                    "VALUES ('dQw4w9WgXcQ', 'Minimal', '[]', '[]', 0, 1)",
+                0,
+            )
+            ShuraDatabase.Schema.migrate(driver, oldVersion = 7, newVersion = 8)
+
+            assertEquals(listOf(minimal), store().recent(limit = 10).first())
         }
 }

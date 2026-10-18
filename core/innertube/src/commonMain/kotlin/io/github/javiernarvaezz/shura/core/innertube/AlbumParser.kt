@@ -54,7 +54,7 @@ private fun Song.asAlbumTrack(row: JsonObject): Song {
             .firstOrNull { it.startsWith(SONG_CREDITS) }
             ?.removePrefix(SONG_CREDITS)
             ?.let { runCatching { VideoId(it) }.getOrNull() }
-    return if (track == null) this else copy(videoId = track)
+    return if (track == null) this else copy(videoId = track, isVideo = false)
 }
 
 private const val SONG_CREDITS = "MPTC"

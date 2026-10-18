@@ -41,6 +41,7 @@ internal object NextParser {
             duration = textOf(item["lengthText"])?.let(ListItems::parseDuration),
             thumbnailUrl = largestThumbnail(item["thumbnail"]),
             isExplicit = ListItems.isExplicit(item["badges"]),
+            isVideo = ListItems.isVideo(ListItems.musicVideoType(item)),
         )
     }
 }

@@ -92,4 +92,10 @@ class PlaylistParserTest {
     fun aResponseWithoutTracksOrTitleIsAParseFailure() {
         assertFailsWith<InnerTubeException.Parse> { PlaylistParser.parse(JsonObject(emptyMap()), "VLPL1") }
     }
+
+    @Test
+    fun aPlaylistsVideosAreMarkedAsVideosAndItsSongsAreNot() {
+        assertTrue(page("playlist/playlist_short.json", "VLPL1").tracks.all { it.isVideo })
+        assertTrue(page("playlist/playlist_artist_songs.json", "VLOLAK1").tracks.none { it.isVideo })
+    }
 }

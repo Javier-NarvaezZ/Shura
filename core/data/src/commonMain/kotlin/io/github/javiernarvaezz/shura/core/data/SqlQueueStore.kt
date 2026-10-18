@@ -83,6 +83,7 @@ class SqlQueueStore(
                 thumbnail_url = fields.thumbnailUrl,
                 explicit = fields.explicit.toLong(),
                 played_at = atMillis,
+                video = fields.video.toLong(),
             )
             history.prune(MAX_HISTORY.toLong())
         }
@@ -136,6 +137,7 @@ class SqlQueueStore(
                 duration_ms = durationMs,
                 thumbnail_url = thumbnailUrl,
                 explicit = explicit.toLong(),
+                video = video.toLong(),
             )
 
         private fun Queue_item.toSong(): Song? =
@@ -150,6 +152,7 @@ class SqlQueueStore(
                     durationMs = duration_ms,
                     thumbnailUrl = thumbnail_url,
                     explicit = explicit != 0L,
+                    video = video != 0L,
                 ).toSong()
             }.getOrNull()
 
@@ -165,6 +168,7 @@ class SqlQueueStore(
                     durationMs = duration_ms,
                     thumbnailUrl = thumbnail_url,
                     explicit = explicit != 0L,
+                    video = video != 0L,
                 ).toSong()
             }.getOrNull()
     }

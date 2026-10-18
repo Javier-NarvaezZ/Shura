@@ -82,6 +82,7 @@ class AlbumParserTest {
             ).map(::VideoId)
 
         assertEquals(songs, page.tracks.map { it.videoId })
+        assertTrue(page.tracks.none { it.isVideo })
     }
 
     @Test
@@ -90,6 +91,8 @@ class AlbumParserTest {
 
         val tracks = AlbumParser.parse(withoutCredits, id).tracks
         assertEquals(VideoId("Bpd-yqMBp_A"), tracks.first().videoId)
+        // Without its track, the row stays the artist's video.
+        assertTrue(tracks.first().isVideo)
         assertEquals(12, tracks.size)
     }
 

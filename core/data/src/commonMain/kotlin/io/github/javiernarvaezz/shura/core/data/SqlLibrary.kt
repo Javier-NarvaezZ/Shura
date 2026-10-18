@@ -63,6 +63,7 @@ class SqlLibrary(
                 thumbnail_url = fields.thumbnailUrl,
                 explicit = fields.explicit.toLong(),
                 liked_at = now(),
+                video = fields.video.toLong(),
             )
         } else {
             queries.unlike(song.videoId.value)
@@ -135,6 +136,7 @@ class SqlLibrary(
                 durationMs = duration_ms,
                 thumbnailUrl = thumbnail_url,
                 explicit = explicit != 0L,
+                video = video != 0L,
             ).toSong()
 
         fun Saved_album.toAlbum(): AlbumSummary {

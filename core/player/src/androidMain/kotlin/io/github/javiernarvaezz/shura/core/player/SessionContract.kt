@@ -28,6 +28,7 @@ private object SongExtras {
     const val DURATION_MS = "shura.song.durationMs"
     const val THUMBNAIL_URL = "shura.song.thumbnailUrl"
     const val EXPLICIT = "shura.song.explicit"
+    const val VIDEO = "shura.song.video"
 }
 
 private fun SongFields.toBundle(): Bundle =
@@ -41,6 +42,7 @@ private fun SongFields.toBundle(): Bundle =
         durationMs?.let { putLong(SongExtras.DURATION_MS, it) }
         putString(SongExtras.THUMBNAIL_URL, thumbnailUrl)
         putBoolean(SongExtras.EXPLICIT, explicit)
+        putBoolean(SongExtras.VIDEO, video)
     }
 
 private fun Bundle.toSongFields(): SongFields? {
@@ -55,6 +57,7 @@ private fun Bundle.toSongFields(): SongFields? {
         durationMs = if (containsKey(SongExtras.DURATION_MS)) getLong(SongExtras.DURATION_MS) else null,
         thumbnailUrl = getString(SongExtras.THUMBNAIL_URL),
         explicit = getBoolean(SongExtras.EXPLICIT),
+        video = getBoolean(SongExtras.VIDEO),
     )
 }
 

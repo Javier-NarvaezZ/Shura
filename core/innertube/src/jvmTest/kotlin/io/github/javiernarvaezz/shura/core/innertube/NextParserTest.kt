@@ -38,4 +38,18 @@ class NextParserTest {
     fun aResponseWithoutAListGivesNothing() {
         assertEquals(emptyList(), NextParser.parse(JsonObject(emptyMap()), seed))
     }
+
+    @Test
+    fun songsAreNotVideos() {
+        assertTrue(songs.none { it.isVideo })
+    }
+
+    @Test
+    fun aRadioSeededByAVideoIsAllVideos() {
+        val seed = VideoId("NLZRYQMLDW4")
+        val videos = NextParser.parse(Json.parseToJsonElement(Fixtures.read("next/next_video_dna.json")), seed)
+
+        assertTrue(videos.isNotEmpty())
+        assertTrue(videos.all { it.isVideo })
+    }
 }
