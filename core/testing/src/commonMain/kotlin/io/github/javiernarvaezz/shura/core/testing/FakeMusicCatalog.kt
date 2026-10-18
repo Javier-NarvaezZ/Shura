@@ -5,6 +5,7 @@ import io.github.javiernarvaezz.shura.core.model.AlbumSummary
 import io.github.javiernarvaezz.shura.core.model.ArtistPage
 import io.github.javiernarvaezz.shura.core.model.ArtistSummary
 import io.github.javiernarvaezz.shura.core.model.BrowseLink
+import io.github.javiernarvaezz.shura.core.model.DiscographyPage
 import io.github.javiernarvaezz.shura.core.model.MusicCatalog
 import io.github.javiernarvaezz.shura.core.model.PlaylistPage
 import io.github.javiernarvaezz.shura.core.model.PlaylistSummary
@@ -29,6 +30,7 @@ class FakeMusicCatalog : MusicCatalog {
     val playlists = mutableMapOf<String, PlaylistPage>()
     val continuations = mutableMapOf<String, TrackPage>()
     val related = mutableMapOf<VideoId, List<Song>>()
+    val discographies = mutableMapOf<String, DiscographyPage>()
 
     override suspend fun searchSongs(query: String) = answer("searchSongs:$query", songs[query])
 
@@ -47,6 +49,10 @@ class FakeMusicCatalog : MusicCatalog {
     override suspend fun playlistContinuation(token: String) = answer("continuation:$token", continuations[token])
 
     override suspend fun relatedSongs(videoId: VideoId) = answer("related:${videoId.value}", related[videoId])
+
+    override suspend fun discography(link: BrowseLink) = answer("discography:${link.id}", discographies[link.id])
+
+    override suspend fun discographyFilter(token: String) = answer("discographyFilter:$token", discographies[token])
 
     private fun <T> answer(
         call: String,

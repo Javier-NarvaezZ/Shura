@@ -5,6 +5,7 @@ import io.github.javiernarvaezz.shura.core.model.AlbumSummary
 import io.github.javiernarvaezz.shura.core.model.Artist
 import io.github.javiernarvaezz.shura.core.model.ArtistShelf
 import io.github.javiernarvaezz.shura.core.model.ArtistSummary
+import io.github.javiernarvaezz.shura.core.model.BrowseLink
 import io.github.javiernarvaezz.shura.core.model.CatalogShelf
 import io.github.javiernarvaezz.shura.core.model.PlaylistShelf
 import io.github.javiernarvaezz.shura.core.model.PlaylistSummary
@@ -25,17 +26,46 @@ internal object Carousels {
         carousel: JsonObject,
         pageArtists: List<Artist> = emptyList(),
     ): CatalogShelf? {
-        val title = textOf(carousel.path("header", "musicCarouselShelfBasicHeaderRenderer", "title")) ?: return null
+        val header = carousel.path("header", "musicCarouselShelfBasicHeaderRenderer")
+        val title = textOf(header.path("title")) ?: return null
         val items = (carousel["contents"] as? JsonArray)?.mapNotNull { it.path(ITEM) as? JsonObject }.orEmpty()
         val type = items.firstOrNull().path("navigationEndpoint", "browseEndpoint").pageType()
         val shelf =
             when (type) {
-                PageTypes.ALBUM -> AlbumShelf(title, items.mapNotNull { album(it, pageArtists) })
-                PageTypes.ARTIST -> ArtistShelf(title, items.mapNotNull(::artist))
-                PageTypes.PLAYLIST -> PlaylistShelf(title, items.mapNotNull(::playlist))
-                else -> null
+                PageTypes.ALBUM -> {
+                    AlbumShelf(
+                        title,
+                        items.mapNotNull { album(it, pageArtists) },
+                        discographyLink(header),
+                    )
+                }
+
+                PageTypes.ARTIST -> {
+                    ArtistShelf(title, items.mapNotNull(::artist))
+                }
+
+                PageTypes.PLAYLIST -> {
+                    PlaylistShelf(title, items.mapNotNull(::playlist))
+                }
+
+                else -> {
+                    null
+                }
             }
         return shelf?.takeIf { !it.isEmpty() }
+    }
+
+    /** The shelf's "Más" when it opens the artist's discography (other "Más" lead to video lists, not shown). */
+    private fun discographyLink(header: JsonElement?): BrowseLink? {
+        val browse = header.path("moreContentButton", "buttonRenderer", "navigationEndpoint", "browseEndpoint")
+        val id = browse.path("browseId").string()
+        return if (id != null &&
+            browse.pageType() == PageTypes.DISCOGRAPHY
+        ) {
+            BrowseLink(id, browse.path("params").string())
+        } else {
+            null
+        }
     }
 
     private fun CatalogShelf.isEmpty(): Boolean =

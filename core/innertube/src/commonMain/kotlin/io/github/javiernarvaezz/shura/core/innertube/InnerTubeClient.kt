@@ -5,6 +5,7 @@ import io.github.javiernarvaezz.shura.core.model.AlbumSummary
 import io.github.javiernarvaezz.shura.core.model.ArtistPage
 import io.github.javiernarvaezz.shura.core.model.ArtistSummary
 import io.github.javiernarvaezz.shura.core.model.BrowseLink
+import io.github.javiernarvaezz.shura.core.model.DiscographyPage
 import io.github.javiernarvaezz.shura.core.model.MusicCatalog
 import io.github.javiernarvaezz.shura.core.model.PlaylistPage
 import io.github.javiernarvaezz.shura.core.model.PlaylistSummary
@@ -67,6 +68,12 @@ class InnerTubeClient(
     override suspend fun playlistContinuation(token: String): TrackPage =
         PlaylistParser.parseContinuation(raw(InnerTubeRequest.Continuation(token)))
 
+    override suspend fun discography(link: BrowseLink): DiscographyPage =
+        DiscographyParser.parse(raw(InnerTubeRequest.Browse(link.id, link.params)))
+
+    override suspend fun discographyFilter(token: String): DiscographyPage =
+        DiscographyParser.parse(raw(InnerTubeRequest.Reload(token)))
+
     override suspend fun relatedSongs(videoId: VideoId): List<Song> =
         NextParser.parse(raw(InnerTubeRequest.Next(videoId)), videoId)
 
@@ -102,14 +109,22 @@ class InnerTubeClient(
             is InnerTubeRequest.Continuation -> {
                 post("browse") { put("continuation", request.token) }
             }
+
+            // Sent in the body, a reload token is refused (HTTP 400).
+            is InnerTubeRequest.Reload -> {
+                post("browse", mapOf("ctoken" to request.token, "continuation" to request.token, "type" to "next")) {}
+            }
         }
 
+    /** [query]: values already URL-safe (validated tokens), added to the address as they are. */
     private suspend fun post(
         endpoint: String,
+        query: Map<String, String> = emptyMap(),
         fields: JsonObjectBuilder.() -> Unit,
     ): JsonElement =
         post(
             endpoint,
+            query.entries.joinToString("") { (key, value) -> "&$key=$value" },
             buildJsonObject {
                 putJsonObject("context") {
                     putJsonObject("client") {
@@ -125,11 +140,12 @@ class InnerTubeClient(
 
     private suspend fun post(
         endpoint: String,
+        query: String,
         body: JsonElement,
     ): JsonElement {
         val response: HttpResponse =
             transport {
-                httpClient.post("$API_BASE/$endpoint?prettyPrint=false") {
+                httpClient.post("$API_BASE/$endpoint?prettyPrint=false$query") {
                     header(HttpHeaders.UserAgent, config.userAgent)
                     header("X-Goog-Api-Format-Version", "1")
                     header("X-YouTube-Client-Name", CLIENT_ID)

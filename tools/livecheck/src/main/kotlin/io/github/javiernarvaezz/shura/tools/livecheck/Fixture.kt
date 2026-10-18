@@ -23,6 +23,7 @@ import java.io.File
  * - `fixture <path> search <songs|albums|artists|playlists> <query…>`
  * - `fixture <path> continuation <path of the previous page's fixture>`
  * - `fixture <path> next <video id>`
+ * - `fixture <path> reload <path of a page's fixture> <chip text…>`: the page shown with that chip (filter)
  *
  * Output: the written path and its size only.
  */
@@ -36,6 +37,7 @@ internal suspend fun recordFixture(args: List<String>) {
             "search" -> InnerTubeRequest.Search(args.drop(3).joinToString(" "), searchFilter(args[2]))
             "continuation" -> InnerTubeRequest.Continuation(continuationToken(File(root, args[2])))
             "next" -> InnerTubeRequest.Next(VideoId(args[2]))
+            "reload" -> InnerTubeRequest.Reload(chipToken(File(root, args[2]), args.drop(3).joinToString(" ")))
             else -> error("Unknown request kind")
         }
     val client = InnerTubeClient(ShuraNetwork(emptyList()).ktor, InnerTubeConfig.forDevice("es", "CO"))
@@ -66,6 +68,36 @@ private fun continuationToken(page: File): String =
             }
         },
     ) { "No continuation in ${page.name}" }
+
+/** The reload token of the chip named [text] in a recorded page. */
+private fun chipToken(
+    page: File,
+    text: String,
+): String =
+    requireNotNull(
+        findFirst(Json.parseToJsonElement(page.readText())) { key, value ->
+            val chip = (value as? JsonObject)?.takeIf { key == "chipCloudChipRenderer" }
+            val label = chip?.let { findFirst(it["text"] ?: JsonObject(emptyMap())) { k, v -> runText(k, v) } }
+            if (label == text) {
+                findFirst(chip["navigationEndpoint"] ?: JsonObject(emptyMap())) { k, v ->
+                    if (k ==
+                        "reloadContinuationData"
+                    ) {
+                        ((v as? JsonObject)?.get("continuation") as? JsonPrimitive)?.contentOrNull
+                    } else {
+                        null
+                    }
+                }
+            } else {
+                null
+            }
+        },
+    ) { "No chip \"$text\" in ${page.name}" }
+
+private fun runText(
+    key: String,
+    value: JsonElement,
+): String? = if (key == "text") (value as? JsonPrimitive)?.contentOrNull else null
 
 private fun findFirst(
     element: JsonElement,

@@ -115,6 +115,7 @@ internal object PageTypes {
     const val ARTIST = "MUSIC_PAGE_TYPE_ARTIST"
     const val ALBUM = "MUSIC_PAGE_TYPE_ALBUM"
     const val PLAYLIST = "MUSIC_PAGE_TYPE_PLAYLIST"
+    const val DISCOGRAPHY = "MUSIC_PAGE_TYPE_ARTIST_DISCOGRAPHY"
 }
 
 private val YEAR = Regex("""^\d{4}$""")
