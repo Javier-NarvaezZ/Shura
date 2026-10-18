@@ -29,4 +29,15 @@ class ArtworkUrlTest {
     fun noUrlGivesNoUrl() {
         assertNull(artworkUrl(null, 544))
     }
+
+    @Test
+    fun aShownSizeIsRoundedUpToTheNextStep() {
+        assertEquals(120, artworkStep(1))
+        assertEquals(226, artworkStep(126))
+        assertEquals(544, artworkStep(544))
+        assertEquals(1080, artworkStep(950))
+        assertEquals(1440, artworkStep(1081))
+        // Beyond the largest step, the largest: Google's covers are not sharper than that.
+        assertEquals(1440, artworkStep(3000))
+    }
 }

@@ -221,7 +221,7 @@ private fun FlyingCover(
     ) {
         Artwork(
             song.thumbnailUrl,
-            sizePx = PLAYER_COVER_PX,
+            sizePx = playerCoverPx(),
             contentDescription = null,
             modifier = Modifier.fillMaxSize(),
             shape = RectangleShape,

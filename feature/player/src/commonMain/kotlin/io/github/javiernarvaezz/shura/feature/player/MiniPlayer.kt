@@ -33,6 +33,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -40,6 +41,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.javiernarvaezz.shura.core.model.Song
 import io.github.javiernarvaezz.shura.core.player.PlaybackError
 import io.github.javiernarvaezz.shura.core.ui.artwork.Artwork
+import io.github.javiernarvaezz.shura.core.ui.artwork.artworkStep
 import io.github.javiernarvaezz.shura.core.ui.artwork.rememberArtworkTint
 import io.github.javiernarvaezz.shura.core.ui.components.ChromeSurface
 import io.github.javiernarvaezz.shura.core.ui.components.PlayPauseButton
@@ -115,7 +117,7 @@ fun MiniPlayer(
             ) {
                 Artwork(
                     song.thumbnailUrl,
-                    sizePx = PLAYER_COVER_PX,
+                    sizePx = playerCoverPx(),
                     contentDescription = null,
                     modifier =
                         Modifier
@@ -258,5 +260,13 @@ private val MINI_COVER = 44.dp
 private val MINI_BUTTON = 40.dp
 private val LINE_HEIGHT = 2.dp
 
-/** One size for the mini and the player cover, so both share Coil's cache and the flight never reloads. */
-internal const val PLAYER_COVER_PX = 544
+/**
+ * One size for the mini and the player cover, so both share Coil's cache and the flight never reloads: the step
+ * ([artworkStep]) that covers the screen's narrower side, which the player's cover never exceeds (1080 px on a
+ * 1080 × 2400 phone).
+ */
+@Composable
+internal fun playerCoverPx(): Int {
+    val screen = LocalWindowInfo.current.containerSize
+    return artworkStep(minOf(screen.width, screen.height))
+}
