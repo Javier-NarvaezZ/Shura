@@ -82,7 +82,19 @@ class AlbumModelTest {
             model.playNext(tracks[1])
             model.enqueue(tracks[3])
 
-            assertEquals(listOf("playQueue:T0,T1,T2,T3@2", "playNext:T1", "enqueue:T3"), player.calls)
+            assertEquals(listOf("shuffle:false", "playQueue:T0,T1,T2,T3@2", "playNext:T1", "enqueue:T3"), player.calls)
+        }
+
+    @Test
+    fun aTappedTrackPlaysInAlbumOrderAfterAShuffle() =
+        runTest {
+            catalog.albums["MPREb_1"] = page
+            val model = model()
+            model.shuffle()
+            player.calls.clear()
+            model.playTrack(1)
+
+            assertEquals(listOf("shuffle:false", "playQueue:T0,T1,T2,T3@1"), player.calls)
         }
 
     @Test
