@@ -17,7 +17,8 @@ fun PreloadUpcomingArtwork(model: PlayerModel) {
     val url by model.upcomingArtworkUrl.collectAsState()
     val context = LocalPlatformContext.current
     val networkRegained = LocalNetworkRegained.current
-    LaunchedEffect(url) {
-        url?.let { preloadArtwork(context, it, PLAYER_COVER_PX, networkRegained) }
+    val sizePx = playerCoverPx()
+    LaunchedEffect(url, sizePx) {
+        url?.let { preloadArtwork(context, it, sizePx, networkRegained) }
     }
 }

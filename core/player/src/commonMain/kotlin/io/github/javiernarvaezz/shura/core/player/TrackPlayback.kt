@@ -5,7 +5,7 @@ import kotlin.random.Random
 
 /**
  * How a list of songs (a catalog page, the liked songs) plays: all in order, shuffled, from one of them, or one song
- * next or last.
+ * next or last. Only [shuffle] mixes: playing all or from a song plays the list in its order and turns shuffle off.
  */
 class TrackPlayback(
     private val player: AudioPlayer,
@@ -24,12 +24,14 @@ class TrackPlayback(
         player.playQueue(tracks, random.nextInt(tracks.size))
     }
 
-    /** From [index], with the whole list as the queue, keeping the current shuffle setting. */
+    /** From [index], with the whole list as the queue, in its order. */
     fun playFrom(
         tracks: List<Song>,
         index: Int,
     ) {
-        if (index in tracks.indices) player.playQueue(tracks, index)
+        if (index !in tracks.indices) return
+        player.setShuffle(false)
+        player.playQueue(tracks, index)
     }
 
     fun playNext(song: Song) = player.playNext(listOf(song))

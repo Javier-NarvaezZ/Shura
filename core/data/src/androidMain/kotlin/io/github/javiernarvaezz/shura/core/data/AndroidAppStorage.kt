@@ -24,6 +24,8 @@ class AndroidAppStorage(
 
     val lyrics = SqlLyricsStore(database, ioContext)
 
+    val lyricsOffsets = SqlLyricsOffsets(database, ioContext)
+
     val library = SqlLibrary(database, scope, ioContext)
 
     val pendingLikes = SqlPendingLikes(database, ioContext)

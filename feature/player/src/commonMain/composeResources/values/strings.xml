@@ -36,4 +36,6 @@
     <string name="error_audio">No se pudo cargar el audio. Inténtalo de nuevo.</string>
     <string name="error_format">Este dispositivo no puede reproducir el formato de esta canción.</string>
     <string name="error_generic">Algo salió mal al cargar la canción.</string>
+    <string name="cover_enlarge">Ver la portada en grande</string>
+    <string name="cover_full">Portada</string>
 </resources>

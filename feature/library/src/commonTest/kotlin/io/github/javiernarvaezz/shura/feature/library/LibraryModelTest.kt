@@ -59,9 +59,10 @@ class LibraryModelTest {
             val names = liked.joinToString(",") { it.title }
             assertEquals("shuffle:false", player.calls[0])
             assertEquals("playQueue:$names@0", player.calls[1])
-            assertEquals("playQueue:$names@2", player.calls[2])
-            assertEquals("shuffle:true", player.calls[3])
-            assertTrue(player.calls[4].startsWith("playQueue:$names@"))
+            assertEquals("shuffle:false", player.calls[2])
+            assertEquals("playQueue:$names@2", player.calls[3])
+            assertEquals("shuffle:true", player.calls[4])
+            assertTrue(player.calls[5].startsWith("playQueue:$names@"))
         }
 
     @Test
