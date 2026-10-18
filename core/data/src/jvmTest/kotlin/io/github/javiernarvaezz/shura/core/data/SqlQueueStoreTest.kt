@@ -160,10 +160,11 @@ class SqlQueueStoreTest {
     @Test
     fun theMigrationTo8KeepsSavedSongsAsTracks() =
         runTest {
-            // A version 7 database: no video column yet.
+            // A version 7 database: no video column and no known video tracks yet.
             listOf("queue_item", "play_history", "liked_song").forEach {
                 driver.execute(null, "ALTER TABLE $it DROP COLUMN video", 0)
             }
+            driver.execute(null, "DROP TABLE video_track", 0)
             driver.execute(
                 null,
                 "INSERT INTO play_history(video_id, title, artist_names, artist_ids, explicit, played_at) " +

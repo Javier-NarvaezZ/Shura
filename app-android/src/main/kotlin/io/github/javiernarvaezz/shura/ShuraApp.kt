@@ -22,10 +22,12 @@ import io.github.javiernarvaezz.shura.core.innertube.AccountCredentials
 import io.github.javiernarvaezz.shura.core.innertube.InnerTubeAccountClient
 import io.github.javiernarvaezz.shura.core.innertube.InnerTubeClient
 import io.github.javiernarvaezz.shura.core.innertube.InnerTubeConfig
+import io.github.javiernarvaezz.shura.core.innertube.InnerTubeException
 import io.github.javiernarvaezz.shura.core.lyrics.LrcLibClient
 import io.github.javiernarvaezz.shura.core.lyrics.LyricsOffsets
 import io.github.javiernarvaezz.shura.core.lyrics.LyricsRepository
 import io.github.javiernarvaezz.shura.core.model.Song
+import io.github.javiernarvaezz.shura.core.model.VideoId
 import io.github.javiernarvaezz.shura.core.network.ShuraNetwork
 import io.github.javiernarvaezz.shura.core.player.AndroidAudioPlayer
 import io.github.javiernarvaezz.shura.core.player.AudioPlayer
@@ -38,6 +40,7 @@ import io.github.javiernarvaezz.shura.core.stream.InnerTubeXStreamResolver
 import io.github.javiernarvaezz.shura.core.stream.WebViewJsRuntime
 import io.github.javiernarvaezz.shura.feature.library.AccountLibraryModel
 import io.github.javiernarvaezz.shura.feature.library.AccountLibrarySnapshot
+import io.github.javiernarvaezz.shura.feature.library.asTracks
 import io.github.javiernarvaezz.shura.feature.settings.AccountCheck
 import io.github.javiernarvaezz.shura.feature.settings.AccountLikes
 import io.github.javiernarvaezz.shura.feature.settings.AccountModel
@@ -49,6 +52,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.takeWhile
 import kotlinx.coroutines.launch
 import java.io.File
 import java.util.Locale
@@ -124,6 +130,25 @@ class AppGraph(
      */
     private val storage = AndroidAppStorage(context, Dispatchers.IO, scope)
 
+    /**
+     * Songs saved before album rows were mapped to their tracks still have the artist's video id: moved once to the
+     * track, each album page asked once (a network failure leaves the rest for later; an album gone is skipped).
+     */
+    private val savedSongRepair = storage.savedSongRepair(::albumTracks)
+
+    /** Videos known to stand for an album track, and that track. */
+    private val videoTracks = savedSongRepair.tracks.stateIn(scope, SharingStarted.Eagerly, emptyMap())
+
+    @Suppress("SwallowedException") // A network failure only means "later"; anything else skips the album.
+    private suspend fun albumTracks(albumId: String): Map<VideoId, VideoId>? =
+        try {
+            catalog.album(albumId).trackOfVideo
+        } catch (e: InnerTubeException.Network) {
+            null
+        } catch (e: InnerTubeException) {
+            emptyMap()
+        }
+
     val store = storage.queue
 
     val settings = storage.settings
@@ -168,6 +193,12 @@ class AppGraph(
             fingerprint = AccountFingerprint::of,
             scope = scope,
             now = System::currentTimeMillis,
+            videosOf = { track ->
+                videoTracks.value
+                    .filterValues { it == track }
+                    .keys
+                    .toList()
+            },
         )
 
     val library = accountLikes.library
@@ -200,7 +231,7 @@ class AppGraph(
             cookies += page.setCookies
             continuation = page.value.continuation
         } while (continuation != null && songs.size < MAX_LIKED)
-        return songs.take(MAX_LIKED) to cookies
+        return songs.take(MAX_LIKED).asTracks(videoTracks.value) to cookies
     }
 
     private suspend fun checkSession(session: Session): AccountCheck {
@@ -292,6 +323,10 @@ class AppGraph(
         debugMaybePrewarm(streamResolver, trace)
         // Likes queued while offline go to the account as soon as there is a network again.
         scope.launch { networkRegained.collect { accountLikes.flush() } }
+        scope.launch {
+            var repaired = savedSongRepair.repairOnce()
+            networkRegained.takeWhile { !repaired }.collect { repaired = savedSongRepair.repairOnce() }
+        }
     }
 }
 

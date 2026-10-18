@@ -18,7 +18,8 @@ import kotlinx.coroutines.sync.withLock
  * is sent to YouTube Music ([send]). Offline, or with an expired session, it waits; it is sent when [flush] runs
  * again (network back, sign-in, start). Liking then unliking sends only the last action. Each queued action
  * carries an anonymous [fingerprint] of its account and is sent only to that account; one for another account is
- * discarded. Signing out empties the queue ([AccountModel]'s sign-out hook).
+ * discarded. Signing out empties the queue ([AccountModel]'s sign-out hook). Removing a like also removes it from
+ * the videos that stand for the song ([videosOf]): songs from albums were once liked as the artist's video.
  */
 class AccountLikes(
     private val local: Library,
@@ -28,6 +29,7 @@ class AccountLikes(
     private val fingerprint: (Session) -> String?,
     private val scope: CoroutineScope,
     private val now: () -> Long,
+    private val videosOf: (VideoId) -> List<VideoId> = { emptyList() },
 ) {
     private val mutex = Mutex()
 
@@ -76,7 +78,8 @@ class AccountLikes(
         scope.launch {
             val session = account.session() ?: return@launch
             val owner = fingerprint(session) ?: return@launch
-            mutex.withLock { pending.put(PendingLike(song.videoId, liked, owner, now())) }
+            val targets = if (liked) listOf(song.videoId) else listOf(song.videoId) + videosOf(song.videoId)
+            mutex.withLock { targets.forEach { pending.put(PendingLike(it, liked, owner, now())) } }
             flush()
         }
     }

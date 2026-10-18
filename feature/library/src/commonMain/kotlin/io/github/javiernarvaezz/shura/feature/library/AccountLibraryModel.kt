@@ -5,6 +5,7 @@ import io.github.javiernarvaezz.shura.core.model.AlbumSummary
 import io.github.javiernarvaezz.shura.core.model.ArtistSummary
 import io.github.javiernarvaezz.shura.core.model.PlaylistSummary
 import io.github.javiernarvaezz.shura.core.model.Song
+import io.github.javiernarvaezz.shura.core.model.VideoId
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -116,11 +117,25 @@ class AccountLibraryModel(
     }
 }
 
+/**
+ * These songs with each video known to stand for an album track ([trackOf]) shown as that track: songs from
+ * albums were once liked as the artist's video.
+ */
+fun List<Song>.asTracks(trackOf: Map<VideoId, VideoId>): List<Song> =
+    if (trackOf.isEmpty()) {
+        this
+    } else {
+        map { song ->
+            trackOf[song.videoId]?.let { song.copy(videoId = it, isVideo = false) }
+                ?: song
+        }
+    }
+
 /** The liked songs to show: the account's in its order, then local ones it does not have. */
 fun mergeLiked(
     account: List<Song>,
     local: List<Song>,
 ): List<Song> {
-    val seen = account.mapTo(HashSet()) { it.videoId }
-    return account + local.filter { it.videoId !in seen }
+    // The account can have a song twice once its liked video is shown as the track (asTracks).
+    return (account + local).distinctBy { it.videoId }
 }

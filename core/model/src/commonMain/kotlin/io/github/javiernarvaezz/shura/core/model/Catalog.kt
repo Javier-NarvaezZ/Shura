@@ -88,6 +88,8 @@ data class AlbumPage(
     val description: String? = null,
     /** E.g. other versions of the album and releases like it. */
     val shelves: List<CatalogShelf> = emptyList(),
+    /** For rows that linked the artist's video upload: that video, and the album track [tracks] has instead. */
+    val trackOfVideo: Map<VideoId, VideoId> = emptyMap(),
 ) {
     /** The sum of the tracks' durations, or null when none is known. */
     val knownDuration: Duration?

@@ -30,13 +30,17 @@ internal object AlbumParser {
                 isExplicit = ListItems.isExplicit(header["subtitleBadge"]),
             )
         val defaults = TrackDefaults(artists, AlbumRef(title, id), album.thumbnailUrl)
+        val rows =
+            findAll(root, "musicShelfRenderer")
+                .flatMap(ListItems::rows)
+                .mapNotNull { row -> ListItems.song(row, defaults)?.let { it to it.asAlbumTrack(row) } }
         return AlbumPage(
             album = album,
-            tracks =
-                findAll(root, "musicShelfRenderer")
-                    .flatMap(ListItems::rows)
-                    .mapNotNull { row -> ListItems.song(row, defaults)?.let { it.asAlbumTrack(row) } }
-                    .distinctBy { it.videoId },
+            tracks = rows.map { it.second }.distinctBy { it.videoId },
+            trackOfVideo =
+                rows
+                    .filter { (row, track) -> row.videoId != track.videoId }
+                    .associate { (row, track) -> row.videoId to track.videoId },
             description = textOf(findAll(header, "musicDescriptionShelfRenderer").firstOrNull()?.get("description")),
             shelves = findAll(root, Carousels.RENDERER).mapNotNull { Carousels.of(it, artists) },
         )

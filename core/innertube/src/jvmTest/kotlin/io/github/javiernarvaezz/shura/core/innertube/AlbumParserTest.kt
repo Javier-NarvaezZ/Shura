@@ -83,6 +83,9 @@ class AlbumParserTest {
 
         assertEquals(songs, page.tracks.map { it.videoId })
         assertTrue(page.tracks.none { it.isVideo })
+        // What each row's video was, so songs saved from it before can be repaired.
+        assertEquals(12, page.trackOfVideo.size)
+        assertEquals(VideoId("VAFGFL7PhRs"), page.trackOfVideo[VideoId("Bpd-yqMBp_A")])
     }
 
     @Test
@@ -93,6 +96,7 @@ class AlbumParserTest {
         assertEquals(VideoId("Bpd-yqMBp_A"), tracks.first().videoId)
         // Without its track, the row stays the artist's video.
         assertTrue(tracks.first().isVideo)
+        assertEquals(emptyMap(), AlbumParser.parse(withoutCredits, id).trackOfVideo)
         assertEquals(12, tracks.size)
     }
 
