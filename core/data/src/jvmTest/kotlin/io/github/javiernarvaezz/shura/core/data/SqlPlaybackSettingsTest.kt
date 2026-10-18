@@ -6,6 +6,7 @@ import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -64,8 +65,10 @@ class SqlPlaybackSettingsTest {
 
     @Test
     fun aDatabaseFromVersionOneGainsTheSettingsTable() {
-        val old = JdbcSqliteDriver(JdbcSqliteDriver.IN_MEMORY)
-        old.execute(null, "CREATE TABLE queue_state (id INTEGER PRIMARY KEY)", 0)
+        // A copy of the released version 1 schema (kept for migration checks).
+        val file = File.createTempFile("shura-v1", ".db").apply { deleteOnExit() }
+        File("src/commonMain/sqldelight/databases/1.db").copyTo(file, overwrite = true)
+        val old = JdbcSqliteDriver("jdbc:sqlite:${file.path}")
         ShuraDatabase.Schema.migrate(old, oldVersion = 1, newVersion = ShuraDatabase.Schema.version)
 
         ShuraDatabase(old).settingsQueries.put("autoplay", "false")

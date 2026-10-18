@@ -16,6 +16,8 @@
     <string name="hours_minutes">%1$d h %2$d min</string>
     <string name="popular_songs">Canciones populares</string>
     <string name="see_all">Ver todas</string>
+    <string name="see_all_releases">Ver todos</string>
+    <string name="discography_empty">No hay lanzamientos aquí.</string>
     <string name="about">Acerca de</string>
     <string name="subscribers">%1$s suscriptores</string>
     <string name="no_tracks">Esta página no tiene canciones disponibles.</string>

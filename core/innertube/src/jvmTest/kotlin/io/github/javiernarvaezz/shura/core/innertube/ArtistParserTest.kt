@@ -66,6 +66,12 @@ class ArtistParserTest {
             "VLRDCLAK5uy_kP_oochBOnGUJCZtvOsCbRC3NkI8HLPek",
             (page.shelves[2] as PlaylistShelf).playlists.first().id,
         )
+        // "Más": the whole discography of each kind; shelves without it have none.
+        assertEquals(BrowseLink("MPADUCeWBcJf4eNsQmGQO-N98eTg", "ggMIegYIARoCAQI%3D"), albums.more)
+        assertEquals(
+            BrowseLink("MPADUCeWBcJf4eNsQmGQO-N98eTg", "ggMIegYIAhoCAQI%3D"),
+            (page.shelves[1] as AlbumShelf).more,
+        )
         val similar = page.shelves.last() as ArtistShelf
         assertEquals("Maná", similar.artists.first().name)
         assertEquals("UCtSeeqnGJM5ngqJWZ1vQygw", similar.artists.first().id)

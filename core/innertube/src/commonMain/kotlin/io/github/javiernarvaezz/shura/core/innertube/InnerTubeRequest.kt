@@ -47,6 +47,15 @@ sealed interface InnerTubeRequest {
         }
     }
 
+    /** A list shown again with another filter (a chip): its reload token, which is sent in the address. */
+    class Reload(
+        val token: String,
+    ) : InnerTubeRequest {
+        init {
+            require(TOKEN.matches(token)) { "Invalid reload token" }
+        }
+    }
+
     private companion object {
         val ID = Regex("^[A-Za-z0-9_-]{1,200}$")
         val TOKEN = Regex("^[A-Za-z0-9_%=-]{1,2000}$")

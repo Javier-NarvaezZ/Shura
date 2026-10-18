@@ -26,6 +26,7 @@ class AccountLikesTest {
     private val accountA = Session(mapOf("SID" to "a"), "||userA", "A", 1)
     private val accountB = Session(mapOf("SID" to "b"), "||userB", "B", 1)
     private var clock = 100L
+    private var videosOf: (VideoId) -> List<VideoId> = { emptyList() }
 
     private lateinit var account: AccountModel
 
@@ -52,6 +53,7 @@ class AccountLikesTest {
                 fingerprint = { it.dataSyncId },
                 scope = backgroundScope,
                 now = { clock++ },
+                videosOf = { videosOf(it) },
             )
         runCurrent()
         return likes
@@ -66,6 +68,28 @@ class AccountLikesTest {
             assertEquals(listOf(song), local.likedSongs.value)
             assertEquals(listOf(song.videoId.value to true), sent)
             assertTrue(pending.all().isEmpty())
+        }
+
+    @Test
+    fun removingALikeAlsoRemovesItFromTheVideosThatStandForTheSong() =
+        runTest {
+            // Liked in the account as the artist's video, back when album rows played as videos.
+            val video = VideoId("NLZRYQMLDW4")
+            videosOf = { if (it == song.videoId) listOf(video) else emptyList() }
+            val likes = setUp(accountA)
+            likes.library.setLiked(song, false)
+            runCurrent()
+            assertEquals(setOf(song.videoId.value to false, video.value to false), sent.toSet())
+        }
+
+    @Test
+    fun aLikeGoesOnlyToTheSong() =
+        runTest {
+            videosOf = { listOf(VideoId("NLZRYQMLDW4")) }
+            val likes = setUp(accountA)
+            likes.library.setLiked(song, true)
+            runCurrent()
+            assertEquals(listOf(song.videoId.value to true), sent)
         }
 
     @Test

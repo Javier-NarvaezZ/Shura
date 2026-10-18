@@ -127,6 +127,17 @@ class AccountLibraryModelTest {
         assertEquals(listOf(c), mergeLiked(account = emptyList(), local = listOf(c)))
     }
 
+    @Test
+    fun aLikedVideoKnownToStandForATrackShowsAsTheTrack() {
+        val video = testSong(7).copy(isVideo = true)
+        val track = testSong(8)
+        val shown = listOf(video, testSong(9)).asTracks(mapOf(video.videoId to track.videoId))
+
+        assertEquals(listOf(video.copy(videoId = track.videoId, isVideo = false), testSong(9)), shown)
+        // Liked here as the track too: shown once.
+        assertEquals(listOf(shown[0], testSong(9)), mergeLiked(account = shown, local = listOf(shown[0])))
+    }
+
     private companion object {
         const val MINUTE = 60_000L
     }

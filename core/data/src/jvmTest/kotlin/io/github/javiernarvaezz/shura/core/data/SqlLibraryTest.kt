@@ -37,6 +37,7 @@ class SqlLibraryTest {
             (180 + n).seconds,
             "https://lh3.googleusercontent.com/$n",
             isExplicit = n % 2 == 0,
+            isVideo = n == 2,
         )
 
     private val album =
@@ -105,7 +106,7 @@ class SqlLibraryTest {
     @Test
     fun anUnreadableRowIsSkippedNotFatal() =
         runTest {
-            database.libraryQueries.like("bad", "Broken", "[not json", "[]", null, null, null, null, 0, 5)
+            database.libraryQueries.like("bad", "Broken", "[not json", "[]", null, null, null, null, 0, 5, 0)
             val library = library()
             library.setLiked(song(1), true)
             runCurrent()

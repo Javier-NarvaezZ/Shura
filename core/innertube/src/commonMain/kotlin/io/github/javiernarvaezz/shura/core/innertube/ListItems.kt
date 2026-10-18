@@ -40,7 +40,8 @@ internal object ListItems {
         item: JsonObject,
         defaults: TrackDefaults? = null,
     ): Song? {
-        val videoId = videoId(item)?.takeIf { defaults != null || musicVideoType(item) == ALBUM_AUDIO }
+        val type = musicVideoType(item)
+        val videoId = videoId(item)?.takeIf { defaults != null || type == ALBUM_AUDIO }
         val title = column(item, 0).joinToString("") { it.text }.trim()
         if (videoId == null || title.isBlank()) return null
         val details = (1 until columnCount(item)).flatMap { column(item, it) }
@@ -59,8 +60,12 @@ internal object ListItems {
             duration = (details + fixedColumns(item)).firstNotNullOfOrNull { parseDuration(it.text) },
             thumbnailUrl = largestThumbnail(item["thumbnail"]) ?: defaults?.thumbnailUrl,
             isExplicit = isExplicit(item["badges"]),
+            isVideo = isVideo(type),
         )
     }
+
+    /** Whether a `musicVideoType` names a video upload rather than an album track; unknown counts as a track. */
+    fun isVideo(musicVideoType: String?): Boolean = musicVideoType != null && musicVideoType != ALBUM_AUDIO
 
     fun parseDuration(text: String): Duration? {
         val match = DURATION.matchEntire(text.trim()) ?: return null
@@ -103,7 +108,7 @@ internal object ListItems {
         return runCatching { VideoId(raw) }.getOrNull()
     }
 
-    private fun musicVideoType(item: JsonObject): String? =
+    fun musicVideoType(item: JsonObject): String? =
         findAll(item, "watchEndpointMusicConfig").firstNotNullOfOrNull { it["musicVideoType"].string() }
             ?: findStrings(item, "musicVideoType").firstOrNull()
 }

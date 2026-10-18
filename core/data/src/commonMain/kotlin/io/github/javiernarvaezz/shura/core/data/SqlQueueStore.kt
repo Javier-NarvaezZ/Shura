@@ -13,6 +13,7 @@ import io.github.javiernarvaezz.shura.core.player.RepeatMode
 import io.github.javiernarvaezz.shura.core.player.SongFields
 import io.github.javiernarvaezz.shura.core.player.toFields
 import io.github.javiernarvaezz.shura.core.player.toSong
+import io.github.javiernarvaezz.shura.core.player.videoIdOf
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
@@ -83,6 +84,7 @@ class SqlQueueStore(
                 thumbnail_url = fields.thumbnailUrl,
                 explicit = fields.explicit.toLong(),
                 played_at = atMillis,
+                video = fields.video.toLong(),
             )
             history.prune(MAX_HISTORY.toLong())
         }
@@ -98,7 +100,18 @@ class SqlQueueStore(
     private fun readSnapshot(): QueueSnapshot? =
         runCatching {
             val state = queue.state().executeAsOneOrNull() ?: return@runCatching null
-            val items = queue.items().executeAsList().map { requireNotNull(it.toSong()) { "Invalid queue item" } }
+            // A video known to stand for an album track is restored as the track (see SavedSongRepair).
+            val tracks =
+                database.repairQueries
+                    .videoTracks()
+                    .executeAsList()
+                    .associate { it.video_id to it.track_id }
+            val items =
+                queue.items().executeAsList().map { row ->
+                    val song = requireNotNull(row.toSong()) { "Invalid queue item" }
+                    tracks[song.videoId.value]?.let(::videoIdOf)?.let { song.copy(videoId = it, isVideo = false) }
+                        ?: song
+                }
             QueueSnapshot(
                 items = items,
                 currentIndex = state.current_index.toInt(),
@@ -136,6 +149,7 @@ class SqlQueueStore(
                 duration_ms = durationMs,
                 thumbnail_url = thumbnailUrl,
                 explicit = explicit.toLong(),
+                video = video.toLong(),
             )
 
         private fun Queue_item.toSong(): Song? =
@@ -150,6 +164,7 @@ class SqlQueueStore(
                     durationMs = duration_ms,
                     thumbnailUrl = thumbnail_url,
                     explicit = explicit != 0L,
+                    video = video != 0L,
                 ).toSong()
             }.getOrNull()
 
@@ -165,6 +180,7 @@ class SqlQueueStore(
                     durationMs = duration_ms,
                     thumbnailUrl = thumbnail_url,
                     explicit = explicit != 0L,
+                    video = video != 0L,
                 ).toSong()
             }.getOrNull()
     }

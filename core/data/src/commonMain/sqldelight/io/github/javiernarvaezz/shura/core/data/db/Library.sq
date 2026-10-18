@@ -10,7 +10,9 @@ CREATE TABLE liked_song (
     duration_ms INTEGER,
     thumbnail_url TEXT,
     explicit INTEGER NOT NULL,
-    liked_at INTEGER NOT NULL
+    liked_at INTEGER NOT NULL,
+    -- A video upload rather than an album track (schema 8); 0 for rows saved before it was known.
+    video INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE saved_album (
@@ -44,8 +46,8 @@ likedSongs:
 SELECT * FROM liked_song ORDER BY liked_at DESC, rowid DESC;
 
 like:
-INSERT OR REPLACE INTO liked_song(video_id, title, artist_names, artist_ids, album_title, album_id, duration_ms, thumbnail_url, explicit, liked_at)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+INSERT OR REPLACE INTO liked_song(video_id, title, artist_names, artist_ids, album_title, album_id, duration_ms, thumbnail_url, explicit, liked_at, video)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 unlike:
 DELETE FROM liked_song WHERE video_id = ?;

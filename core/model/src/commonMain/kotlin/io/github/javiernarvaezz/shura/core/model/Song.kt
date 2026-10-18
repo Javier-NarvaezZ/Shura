@@ -40,7 +40,9 @@ data class AlbumRef(
 /**
  * A playable track in the catalog.
  *
- * [isExplicit] mirrors the catalog's lyrics advisory; it must not influence stream resolution.
+ * [isExplicit] mirrors the catalog's lyrics advisory; it must not influence stream resolution. [isVideo] marks a
+ * video upload (a music video, an "Official Audio" upload, a user's video) rather than an album track; such uploads
+ * can be a different cut than the song, and their artwork is a video frame.
  */
 data class Song(
     val videoId: VideoId,
@@ -50,6 +52,7 @@ data class Song(
     val duration: Duration? = null,
     val thumbnailUrl: String? = null,
     val isExplicit: Boolean = false,
+    val isVideo: Boolean = false,
 ) {
     init {
         require(title.isNotBlank()) { "Song title must not be blank" }

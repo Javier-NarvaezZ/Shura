@@ -96,17 +96,22 @@ fun MediaTile(
     }
 }
 
-/** A titled horizontal row of tiles; [key] keeps each tile's state with its item. */
+/**
+ * A titled horizontal row of tiles, with an optional [action] in its title ("Ver todos"); [key] keeps each tile's
+ * state with its item.
+ */
 @Composable
 fun <T : Any> MediaRail(
     title: String,
     items: List<T>,
     key: (T) -> Any,
     modifier: Modifier = Modifier,
+    action: String? = null,
+    onAction: () -> Unit = {},
     tile: @Composable (T) -> Unit,
 ) {
     Column(modifier, verticalArrangement = Arrangement.spacedBy(Shura.spacing.s)) {
-        SectionHeader(title)
+        SectionHeader(title, action = action, onAction = onAction)
         LazyRow(
             contentPadding = PaddingValues(horizontal = Shura.spacing.gutter),
             horizontalArrangement = Arrangement.spacedBy(Shura.spacing.m),

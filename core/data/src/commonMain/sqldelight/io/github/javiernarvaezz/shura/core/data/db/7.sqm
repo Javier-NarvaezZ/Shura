@@ -1,0 +1,10 @@
+-- Version 7 → 8: which saved songs are video uploads rather than album tracks (Phase 3, E5c). Rows saved before
+-- are unknown and stay 0; songs that came from an album are repaired separately (their album pages name the track).
+ALTER TABLE queue_item ADD COLUMN video INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE play_history ADD COLUMN video INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE liked_song ADD COLUMN video INTEGER NOT NULL DEFAULT 0;
+
+CREATE TABLE video_track (
+    video_id TEXT NOT NULL PRIMARY KEY,
+    track_id TEXT NOT NULL
+);

@@ -44,6 +44,7 @@ data class SongFields(
     val durationMs: Long?,
     val thumbnailUrl: String?,
     val explicit: Boolean,
+    val video: Boolean = false,
 )
 
 fun Song.toFields(): SongFields =
@@ -57,6 +58,7 @@ fun Song.toFields(): SongFields =
         durationMs = duration?.inWholeMilliseconds,
         thumbnailUrl = thumbnailUrl,
         explicit = isExplicit,
+        video = isVideo,
     )
 
 /** The song, or null when the fields are invalid (e.g. a malformed video id from an untrusted controller). */
@@ -71,5 +73,6 @@ fun SongFields.toSong(): Song? =
             duration = durationMs?.milliseconds,
             thumbnailUrl = thumbnailUrl,
             isExplicit = explicit,
+            isVideo = video,
         )
     }.getOrNull()

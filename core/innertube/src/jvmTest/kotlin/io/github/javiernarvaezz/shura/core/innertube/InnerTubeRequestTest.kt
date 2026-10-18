@@ -81,6 +81,21 @@ class InnerTubeRequestTest {
         }
 
     @Test
+    fun aReloadSendsItsTokenInTheAddressNotTheBody() =
+        runTest {
+            client.raw(InnerTubeRequest.Reload("4qmFsgI2EhxNUEFE_%3D"))
+
+            val url = requests.last().url
+            assertTrue(url.encodedPath.endsWith("/browse"))
+            // As the response gave it, not encoded again.
+            assertTrue("ctoken=4qmFsgI2EhxNUEFE_%3D" in url.encodedQuery)
+            assertTrue("continuation=4qmFsgI2EhxNUEFE_%3D" in url.encodedQuery)
+            assertEquals("next", url.parameters["type"])
+            assertFalse(body().containsKey("continuation"))
+            assertFailsWith<IllegalArgumentException> { InnerTubeRequest.Reload("tok en") }
+        }
+
+    @Test
     fun eachSearchFilterSendsItsParams() =
         runTest {
             for (filter in SearchFilter.entries) {

@@ -1,0 +1,40 @@
+-- Video uploads known to stand for an album track (an album row linked the artist's video; its song credits named
+-- the track). Saved songs with such a video id are moved to the track.
+CREATE TABLE video_track (
+    video_id TEXT NOT NULL PRIMARY KEY,
+    track_id TEXT NOT NULL
+);
+
+videoTracks:
+SELECT video_id, track_id FROM video_track;
+
+putVideoTrack:
+INSERT OR REPLACE INTO video_track(video_id, track_id) VALUES (?, ?);
+
+-- The albums that saved songs came from.
+savedAlbumIds:
+SELECT album_id FROM queue_item WHERE album_id LIKE 'MPREb%'
+UNION SELECT album_id FROM play_history WHERE album_id LIKE 'MPREb%'
+UNION SELECT album_id FROM liked_song WHERE album_id LIKE 'MPREb%';
+
+moveQueueItem:
+UPDATE queue_item SET video_id = :track, video = 0 WHERE video_id = :video;
+
+moveHistory:
+UPDATE play_history SET video_id = :track, video = 0 WHERE video_id = :video;
+
+-- A like already given to the track wins; the video's is then removed.
+moveLike:
+UPDATE OR IGNORE liked_song SET video_id = :track, video = 0 WHERE video_id = :video;
+
+removeLike:
+DELETE FROM liked_song WHERE video_id = ?;
+
+moveLyricsOffset:
+UPDATE OR IGNORE lyrics_offset SET video_id = :track WHERE video_id = :video;
+
+removeLyricsOffset:
+DELETE FROM lyrics_offset WHERE video_id = ?;
+
+forgetLyrics:
+DELETE FROM lyrics_cache WHERE video_id = ?;

@@ -32,6 +32,31 @@ class QueueAutoplayTest {
     }
 
     @Test
+    fun afterAVideoTheRadioStartsFromTheLastSongBeforeIt() {
+        // A radio started from a video is all videos; started from a song, it is songs.
+        val items = listOf(song(0), song(1), song(2).copy(isVideo = true), song(3).copy(isVideo = true))
+        val queue = QueueState(items, currentIndex = 3, playOrder = listOf(0, 1, 2, 3))
+
+        assertEquals(song(1), QueueAutoplay.seedFor(queue, enabled = true))
+    }
+
+    @Test
+    fun withShuffleTheSongBeforeAVideoFollowsThePlayOrder() {
+        val items = listOf(song(0), song(1), song(2).copy(isVideo = true))
+        val queue = QueueState(items, currentIndex = 2, playOrder = listOf(1, 0, 2))
+
+        assertEquals(song(0), QueueAutoplay.seedFor(queue, enabled = true))
+    }
+
+    @Test
+    fun aQueueOfOnlyVideosGoesOnFromItsVideo() {
+        val items = List(3) { song(it).copy(isVideo = true) }
+        val queue = QueueState(items, currentIndex = 2, playOrder = listOf(0, 1, 2))
+
+        assertEquals(items[2], QueueAutoplay.seedFor(queue, enabled = true))
+    }
+
+    @Test
     fun nothingWhenOffRepeatingOrFull() {
         assertNull(QueueAutoplay.seedFor(queue(3, current = 2), enabled = false))
         assertNull(QueueAutoplay.seedFor(queue(3, current = 2, repeat = RepeatMode.All), enabled = true))

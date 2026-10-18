@@ -67,10 +67,25 @@ sealed interface CatalogShelf {
     val title: String
 }
 
+/** [more]: the artist's whole discography of this kind, when the shelf shows only part of it ("Más"). */
 data class AlbumShelf(
     override val title: String,
     val albums: List<AlbumSummary>,
+    val more: BrowseLink? = null,
 ) : CatalogShelf
+
+/** An artist's discography (albums, or singles and EPs), with the filters to switch between them. */
+data class DiscographyPage(
+    val albums: List<AlbumSummary>,
+    val filters: List<DiscographyFilter> = emptyList(),
+)
+
+/** A filter of a discography ("Álbumes", "Sencillos y EP"); [token] shows the discography with it. */
+data class DiscographyFilter(
+    val label: String,
+    val selected: Boolean,
+    val token: String?,
+)
 
 data class ArtistShelf(
     override val title: String,
@@ -88,6 +103,8 @@ data class AlbumPage(
     val description: String? = null,
     /** E.g. other versions of the album and releases like it. */
     val shelves: List<CatalogShelf> = emptyList(),
+    /** For rows that linked the artist's video upload: that video, and the album track [tracks] has instead. */
+    val trackOfVideo: Map<VideoId, VideoId> = emptyMap(),
 ) {
     /** The sum of the tracks' durations, or null when none is known. */
     val knownDuration: Duration?
@@ -146,4 +163,10 @@ interface MusicCatalog {
 
     /** The songs YouTube Music would play after [videoId] (its radio), without it. */
     suspend fun relatedSongs(videoId: VideoId): List<Song>
+
+    /** An artist's discography, from an album shelf's [AlbumShelf.more]. */
+    suspend fun discography(link: BrowseLink): DiscographyPage
+
+    /** The same discography with another filter ([DiscographyFilter.token]). */
+    suspend fun discographyFilter(token: String): DiscographyPage
 }

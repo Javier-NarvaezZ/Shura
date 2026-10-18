@@ -8,4 +8,6 @@ class BrowseNavigation(
     val onAlbum: (String) -> Unit,
     val onArtist: (String) -> Unit,
     val onPlaylist: (BrowseLink) -> Unit,
+    /** An artist's whole discography, from an album shelf's "Ver todos" (the shelf's title). */
+    val onDiscography: (BrowseLink, String) -> Unit = { _, _ -> },
 )
