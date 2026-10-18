@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -53,9 +54,14 @@ import io.github.javiernarvaezz.shura.feature.library.resources.liked_none
 import io.github.javiernarvaezz.shura.feature.library.resources.liked_one
 import io.github.javiernarvaezz.shura.feature.library.resources.liked_songs
 import io.github.javiernarvaezz.shura.feature.library.resources.playlists
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
 import org.jetbrains.compose.resources.stringResource
 
-/** The Library tab: the liked songs, then saved playlists, albums and followed artists, newest first. */
+/**
+ * The Library tab: the liked songs, then saved playlists, albums and followed artists, newest first. Each
+ * [scrollToTop] (its tab touched again) goes back to the top.
+ */
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
 fun LibraryScreen(
@@ -64,8 +70,11 @@ fun LibraryScreen(
     modifier: Modifier = Modifier,
     account: AccountLibraryModel? = null,
     onSignIn: () -> Unit = {},
+    scrollToTop: Flow<Unit> = emptyFlow(),
 ) {
     val state by model.state.collectAsStateWithLifecycle()
+    val list = rememberLazyListState()
+    LaunchedEffect(scrollToTop) { scrollToTop.collect { list.animateScrollToItem(0) } }
     val accountState = account?.state?.collectAsStateWithLifecycle()?.value ?: AccountLibraryState()
     LaunchedEffect(account) { account?.refresh() }
     PullToRefreshBox(
@@ -75,6 +84,7 @@ fun LibraryScreen(
     ) {
         LazyColumn(
             Modifier.fillMaxSize(),
+            state = list,
             contentPadding = PaddingValues(bottom = Shura.spacing.xl),
             verticalArrangement = Arrangement.spacedBy(Shura.spacing.xl),
         ) {

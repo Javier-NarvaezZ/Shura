@@ -18,12 +18,14 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -52,19 +54,28 @@ import io.github.javiernarvaezz.shura.feature.home.resources.paused
 import io.github.javiernarvaezz.shura.feature.home.resources.play
 import io.github.javiernarvaezz.shura.feature.home.resources.recently_played
 import io.github.javiernarvaezz.shura.feature.home.resources.settings
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
 import org.jetbrains.compose.resources.stringResource
 
-/** Home: a greeting, the song to continue, and recently played songs. [onSearch] opens the Search tab. */
+/**
+ * Home: a greeting, the song to continue, and recently played songs. [onSearch] opens the Search tab; each
+ * [scrollToTop] (its tab touched again) goes back to the top.
+ */
 @Composable
 fun HomeScreen(
     model: HomeModel,
     onSearch: () -> Unit,
     modifier: Modifier = Modifier,
     onSettings: (() -> Unit)? = null,
+    scrollToTop: Flow<Unit> = emptyFlow(),
 ) {
     val state by model.state.collectAsStateWithLifecycle()
+    val list = rememberLazyListState()
+    LaunchedEffect(scrollToTop) { scrollToTop.collect { list.animateScrollToItem(0) } }
     LazyColumn(
         modifier.fillMaxSize().statusBarsPadding(),
+        state = list,
         contentPadding = PaddingValues(bottom = Shura.spacing.xl),
         verticalArrangement = Arrangement.spacedBy(Shura.spacing.xl),
     ) {
