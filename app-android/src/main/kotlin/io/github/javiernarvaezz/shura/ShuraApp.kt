@@ -139,6 +139,9 @@ class AppGraph(
     /** Videos known to stand for an album track, and that track. */
     private val videoTracks = savedSongRepair.tracks.stateIn(scope, SharingStarted.Eagerly, emptyMap())
 
+    /** The album track [video] is known to stand for, if any. */
+    fun trackOfVideo(video: VideoId): VideoId? = videoTracks.value[video]
+
     @Suppress("SwallowedException") // A network failure only means "later"; anything else skips the album.
     private suspend fun albumTracks(albumId: String): Map<VideoId, VideoId>? =
         try {

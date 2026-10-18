@@ -3,9 +3,11 @@ package io.github.javiernarvaezz.shura.feature.home
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.javiernarvaezz.shura.core.model.Song
+import io.github.javiernarvaezz.shura.core.model.VideoId
 import io.github.javiernarvaezz.shura.core.player.AudioPlayer
 import io.github.javiernarvaezz.shura.core.player.PlayHistory
 import io.github.javiernarvaezz.shura.core.player.PlaybackState
+import io.github.javiernarvaezz.shura.core.player.SongRadio
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -41,7 +43,11 @@ class HomeModel(
     history: PlayHistory,
     hour: () -> Int,
     scope: CoroutineScope,
+    related: suspend (VideoId) -> List<Song> = { emptyList() },
+    trackOf: (VideoId) -> VideoId? = { null },
 ) {
+    private val radio = SongRadio(player, related, scope, trackOf)
+
     // Eager: the actions read state.value even when no screen is collecting it.
     val state: StateFlow<HomeUiState> =
         combine(player.queue, player.state, history.recent(RECENT_LIMIT)) { queue, playback, recent ->
@@ -56,10 +62,11 @@ class HomeModel(
             )
         }.stateIn(scope, SharingStarted.Eagerly, HomeUiState(dayPartOf(hour())))
 
-    /** Plays a recently played song, queueing the rest of the row around it. */
+    /** Plays a recently played song followed by its radio (the row's songs are unrelated to each other). */
     fun playRecent(index: Int) {
-        val recent = state.value.recent
-        if (index in recent.indices) player.playQueue(recent, index)
+        state.value.recent
+            .getOrNull(index)
+            ?.let(radio::start)
     }
 
     fun togglePlay() = if (state.value.isPlaying) player.pause() else player.resume()
@@ -73,8 +80,10 @@ class HomeViewModel(
     player: AudioPlayer,
     history: PlayHistory,
     hour: () -> Int,
+    related: suspend (VideoId) -> List<Song> = { emptyList() },
+    trackOf: (VideoId) -> VideoId? = { null },
 ) : ViewModel() {
-    val model = HomeModel(player, history, hour, viewModelScope)
+    val model = HomeModel(player, history, hour, viewModelScope, related, trackOf)
 }
 
 private val MORNING = 5..11
