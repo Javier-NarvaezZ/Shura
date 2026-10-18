@@ -59,6 +59,8 @@ class ArtistModelTest {
                     "playQueue:P0,P1,P2,P3,P4@0",
                     "shuffle:true",
                     "playQueue:P0,P1,P2,P3,P4@$start",
+                    // A tapped song plays the list in order, even right after a shuffle.
+                    "shuffle:false",
                     "playQueue:P0,P1,P2,P3,P4@3",
                 ),
                 player.calls,

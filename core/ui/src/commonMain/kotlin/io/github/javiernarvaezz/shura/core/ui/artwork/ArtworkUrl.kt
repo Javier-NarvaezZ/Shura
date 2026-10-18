@@ -17,3 +17,9 @@ fun artworkUrl(
         else -> url.substringBeforeLast('=') + "=w$sizePx-h$sizePx-l90-rj"
     }
 }
+
+/** The sizes covers are requested at, so covers shown at nearby sizes share one download and one cache entry. */
+private val artworkSteps = intArrayOf(120, 226, 544, 720, 1080, 1440)
+
+/** The smallest step that covers [shownPx] pixels, or the largest one. */
+fun artworkStep(shownPx: Int): Int = artworkSteps.firstOrNull { it >= shownPx } ?: artworkSteps.last()

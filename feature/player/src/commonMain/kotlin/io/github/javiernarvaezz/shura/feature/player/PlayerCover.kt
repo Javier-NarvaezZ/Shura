@@ -69,6 +69,7 @@ import io.github.javiernarvaezz.shura.core.ui.theme.OnTintTheme
 import io.github.javiernarvaezz.shura.core.ui.theme.Shura
 import io.github.javiernarvaezz.shura.feature.player.resources.Res
 import io.github.javiernarvaezz.shura.feature.player.resources.close_player
+import io.github.javiernarvaezz.shura.feature.player.resources.cover_enlarge
 import io.github.javiernarvaezz.shura.feature.player.resources.end_of_queue
 import io.github.javiernarvaezz.shura.feature.player.resources.hide_lyrics
 import io.github.javiernarvaezz.shura.feature.player.resources.hide_queue
@@ -115,13 +116,17 @@ internal fun CoverAndTitle(
 ) {
     val artistId = song.artists.firstNotNullOfOrNull { it.id }
     val album = song.album
+    var showCover by remember { mutableStateOf(false) }
+    if (showCover) CoverViewer(song.thumbnailUrl) { showCover = false }
     Column(modifier, verticalArrangement = Arrangement.Center) {
-        // The cover slot: the flying cover lands here.
+        // The cover slot: the flying cover lands here (it takes no touches, so a tap reaches the slot).
+        val enlarge = stringResource(Res.string.cover_enlarge)
         Spacer(
             Modifier
                 .fillMaxWidth()
                 .aspectRatio(1f)
-                .onGloballyPositioned { sheet.playerCover = it.boundsInRoot() },
+                .onGloballyPositioned { sheet.playerCover = it.boundsInRoot() }
+                .clickable(onClickLabel = enlarge) { showCover = true },
         )
         Spacer(Modifier.height(Shura.spacing.xl))
         Row(verticalAlignment = Alignment.CenterVertically) {

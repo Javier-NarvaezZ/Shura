@@ -8,6 +8,8 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -37,7 +39,7 @@ class AlbumParserTest {
     fun tracksTakeArtistAlbumAndCoverFromTheHeader() {
         assertEquals(12, page.tracks.size)
         val first = page.tracks.first()
-        assertEquals(VideoId("Bpd-yqMBp_A"), first.videoId)
+        assertEquals(VideoId("VAFGFL7PhRs"), first.videoId)
         assertEquals("Ámame", first.title)
         assertEquals(listOf(juanes), first.artists)
         assertEquals(AlbumRef("Mi Sangre", id), first.album)
@@ -61,6 +63,37 @@ class AlbumParserTest {
     }
 
     @Test
+    fun tracksPlayAsTheAlbumsSongsInAlbumOrder() {
+        // The rows link the artist's video uploads; their song-credits entry names the album's own track.
+        val songs =
+            listOf(
+                "VAFGFL7PhRs",
+                "GLfn_Y3wI20",
+                "pQ0fhVkEiqQ",
+                "7fwUH0oRmkQ",
+                "CM2nA0zZQ54",
+                "kgt0jyB5KXs",
+                "_xuHhwq8V44",
+                "SuD58uVvAqM",
+                "69nXLxJe56I",
+                "ZtWPh78WzJI",
+                "NhFXgemJofg",
+                "1aWKz9rH4uk",
+            ).map(::VideoId)
+
+        assertEquals(songs, page.tracks.map { it.videoId })
+    }
+
+    @Test
+    fun aTrackWithoutSongCreditsKeepsTheRowsVideo() {
+        val withoutCredits = Json.parseToJsonElement(Fixtures.read("album/album_juanes.json")).withoutSongCredits()
+
+        val tracks = AlbumParser.parse(withoutCredits, id).tracks
+        assertEquals(VideoId("Bpd-yqMBp_A"), tracks.first().videoId)
+        assertEquals(12, tracks.size)
+    }
+
+    @Test
     fun aRepeatedTrackAppearsOnce() {
         val doubled = Json.parseToJsonElement(Fixtures.read("album/album_juanes.json")).repeatFirstShelfRow()
 
@@ -73,6 +106,25 @@ class AlbumParserTest {
     fun aResponseWithoutAHeaderIsAParseFailure() {
         assertFailsWith<InnerTubeException.Parse> { AlbumParser.parse(JsonObject(emptyMap()), id) }
     }
+
+    /** The same response with every song-credits link (`MPTC…`) removed. */
+    private fun JsonElement.withoutSongCredits(): JsonElement =
+        when (this) {
+            is JsonObject -> {
+                JsonObject(
+                    filterValues { (it as? JsonPrimitive)?.contentOrNull?.startsWith("MPTC") != true }
+                        .mapValues { (_, value) -> value.withoutSongCredits() },
+                )
+            }
+
+            is JsonArray -> {
+                JsonArray(map { it.withoutSongCredits() })
+            }
+
+            else -> {
+                this
+            }
+        }
 
     /** The same response with the first row of its track shelf added again at the end. */
     private fun JsonElement.repeatFirstShelfRow(): JsonElement =

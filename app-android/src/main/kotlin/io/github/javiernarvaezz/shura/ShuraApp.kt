@@ -23,6 +23,7 @@ import io.github.javiernarvaezz.shura.core.innertube.InnerTubeAccountClient
 import io.github.javiernarvaezz.shura.core.innertube.InnerTubeClient
 import io.github.javiernarvaezz.shura.core.innertube.InnerTubeConfig
 import io.github.javiernarvaezz.shura.core.lyrics.LrcLibClient
+import io.github.javiernarvaezz.shura.core.lyrics.LyricsOffsets
 import io.github.javiernarvaezz.shura.core.lyrics.LyricsRepository
 import io.github.javiernarvaezz.shura.core.model.Song
 import io.github.javiernarvaezz.shura.core.network.ShuraNetwork
@@ -236,6 +237,9 @@ class AppGraph(
                 )::lyrics,
             store = storage.lyrics,
         )
+
+    /** The user's timing fix for each song's lyrics, in the app database. */
+    val lyricsOffsets: LyricsOffsets = storage.lyricsOffsets
 
     /** Used by `PlaybackService`, where the player lives; media and artwork go through the single client. */
     val playbackDependencies =

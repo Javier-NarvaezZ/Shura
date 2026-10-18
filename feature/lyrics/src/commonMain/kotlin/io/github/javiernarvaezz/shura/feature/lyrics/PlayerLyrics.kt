@@ -53,7 +53,8 @@ import org.jetbrains.compose.resources.stringResource
 
 /**
  * The lyrics as a mode of the player. Synced lyrics follow the music: the current line is bright and kept a third
- * of the way down; tap a line to jump there. A manual scroll pauses the following for a few seconds.
+ * of the way down; tap a line to jump there. A manual scroll pauses the following for a few seconds. The bar at the
+ * bottom fixes the timing of a song whose lyrics come early or late ([LyricsSyncBar]).
  */
 @Composable
 fun PlayerLyrics(
@@ -149,6 +150,7 @@ private fun SyncedLyrics(
             }
             item { Attribution(Modifier.padding(horizontal = Shura.spacing.xl)) }
         }
+        LyricsSyncBar(model, Modifier.align(Alignment.BottomCenter).padding(bottom = Shura.spacing.l))
     }
 }
 

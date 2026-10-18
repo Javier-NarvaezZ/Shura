@@ -10,6 +10,12 @@ CREATE TABLE lyrics_cache (
 
 CREATE INDEX lyrics_cache_fetched_at ON lyrics_cache(fetched_at);
 
+-- The user's timing fix for a song's synced lyrics, in milliseconds (positive: lines shown sooner). No row: none.
+CREATE TABLE lyrics_offset (
+    video_id TEXT NOT NULL PRIMARY KEY,
+    offset_ms INTEGER NOT NULL
+);
+
 entry:
 SELECT kind, body, fetched_at FROM lyrics_cache WHERE video_id = ?;
 
@@ -21,3 +27,12 @@ DELETE FROM lyrics_cache WHERE video_id NOT IN (SELECT video_id FROM lyrics_cach
 
 count:
 SELECT count(*) FROM lyrics_cache;
+
+offset:
+SELECT offset_ms FROM lyrics_offset WHERE video_id = ?;
+
+putOffset:
+INSERT OR REPLACE INTO lyrics_offset(video_id, offset_ms) VALUES (?, ?);
+
+removeOffset:
+DELETE FROM lyrics_offset WHERE video_id = ?;
