@@ -69,6 +69,7 @@ import io.github.javiernarvaezz.shura.feature.browse.resources.play_next
 import io.github.javiernarvaezz.shura.feature.browse.resources.remove_from_library
 import io.github.javiernarvaezz.shura.feature.browse.resources.retry
 import io.github.javiernarvaezz.shura.feature.browse.resources.save_to_library
+import io.github.javiernarvaezz.shura.feature.browse.resources.see_all_releases
 import io.github.javiernarvaezz.shura.feature.browse.resources.unfollow
 import io.github.javiernarvaezz.shura.feature.browse.resources.unlike
 import kotlinx.coroutines.flow.StateFlow
@@ -182,7 +183,7 @@ internal fun PrefetchShelfCovers(shelves: List<CatalogShelf>) {
 }
 
 @Composable
-private fun FailedPage(onRetry: () -> Unit) {
+internal fun FailedPage(onRetry: () -> Unit) {
     Column(
         Modifier
             .fillMaxWidth()
@@ -274,7 +275,15 @@ private fun ShelfRail(
 ) {
     when (shelf) {
         is AlbumShelf -> {
-            MediaRail(shelf.title, shelf.albums, key = { it.id }, modifier = modifier) {
+            val more = shelf.more
+            MediaRail(
+                shelf.title,
+                shelf.albums,
+                key = { it.id },
+                modifier = modifier,
+                action = more?.let { stringResource(Res.string.see_all_releases) },
+                onAction = { more?.let { navigation.onDiscography(it, shelf.title) } },
+            ) {
                 MediaTile(it.title, it.caption(), it.thumbnailUrl, onClick = { navigation.onAlbum(it.id) })
             }
         }

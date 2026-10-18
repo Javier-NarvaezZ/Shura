@@ -71,6 +71,8 @@ import io.github.javiernarvaezz.shura.feature.browse.AlbumViewModel
 import io.github.javiernarvaezz.shura.feature.browse.ArtistScreen
 import io.github.javiernarvaezz.shura.feature.browse.ArtistViewModel
 import io.github.javiernarvaezz.shura.feature.browse.BrowseNavigation
+import io.github.javiernarvaezz.shura.feature.browse.DiscographyScreen
+import io.github.javiernarvaezz.shura.feature.browse.DiscographyViewModel
 import io.github.javiernarvaezz.shura.feature.browse.PlaylistScreen
 import io.github.javiernarvaezz.shura.feature.browse.PlaylistViewModel
 import io.github.javiernarvaezz.shura.feature.home.HomeScreen
@@ -153,6 +155,12 @@ internal sealed interface Route {
 
     data class Playlist(
         val link: BrowseLink,
+        val entry: Long,
+    ) : Route
+
+    data class Discography(
+        val link: BrowseLink,
+        val title: String,
         val entry: Long,
     ) : Route
 }
@@ -350,6 +358,7 @@ private fun browseNavigation(shell: ShellViewModel) =
         onAlbum = { shell.push(Route.Album(it, shell.nextEntry())) },
         onArtist = { shell.push(Route.Artist(it, shell.nextEntry())) },
         onPlaylist = { shell.push(Route.Playlist(it, shell.nextEntry())) },
+        onDiscography = { link, title -> shell.push(Route.Discography(link, title, shell.nextEntry())) },
     )
 
 /** The catalog pages, each with its own ViewModel (cleared when the page is popped). */
@@ -368,6 +377,9 @@ private fun EntryProviderScope<Route>.pages(
             viewModel { PlaylistViewModel(deps.catalog, deps.player, route.link, deps.library) }.model,
             navigation,
         )
+    }
+    entry<Route.Discography> { route ->
+        DiscographyScreen(viewModel { DiscographyViewModel(deps.catalog, route.link) }.model, route.title, navigation)
     }
 }
 
