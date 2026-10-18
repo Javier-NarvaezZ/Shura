@@ -101,6 +101,9 @@ import io.github.javiernarvaezz.shura.feature.search.SearchViewModel
 import io.github.javiernarvaezz.shura.feature.settings.AccountModel
 import io.github.javiernarvaezz.shura.feature.settings.SettingsScreen
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.map
 import org.jetbrains.compose.resources.stringResource
 
 /** What the shell needs from the app (manual wiring, no DI framework). */
@@ -129,66 +132,34 @@ class ShellDependencies(
     val accountLibrary: AccountLibraryModel? = null,
 )
 
-enum class Tab { Home, Search, Library }
-
-internal sealed interface Route {
-    data object Home : Route
-
-    data object Search : Route
-
-    data object Library : Route
-
-    data object LikedSongs : Route
-
-    data object Settings : Route
-
-    /** [entry] tells apart two visits to the same page in one back stack (album → artist → same album). */
-    data class Album(
-        val id: String,
-        val entry: Long,
-    ) : Route
-
-    data class Artist(
-        val id: String,
-        val entry: Long,
-    ) : Route
-
-    data class Playlist(
-        val link: BrowseLink,
-        val entry: Long,
-    ) : Route
-
-    data class Discography(
-        val link: BrowseLink,
-        val title: String,
-        val entry: Long,
-    ) : Route
-}
-
-/** Navigation state, kept across rotation. Each tab has its own back stack of pages. */
+/** Navigation state ([TabNavigator]), kept across rotation, and the signals a tab's main screen reacts to. */
 internal class ShellViewModel : ViewModel() {
-    var tab by mutableStateOf(Tab.Home)
+    val nav = TabNavigator()
 
-    val stacks =
-        mapOf(
-            Tab.Home to mutableStateListOf<Route>(Route.Home),
-            Tab.Search to mutableStateListOf<Route>(Route.Search),
-            Tab.Library to mutableStateListOf<Route>(Route.Library),
-        )
+    val tab: Tab get() = nav.tab
 
-    private var entries = 0L
+    private val reselected = MutableSharedFlow<Pair<Tab, TabSelection>>(extraBufferCapacity = 1)
 
-    /** A number for the next page pushed, unique for the life of this ViewModel. */
-    fun nextEntry(): Long = ++entries
+    /** Home's or Library's tab touched while on its main screen: back to the top of the list. */
+    val homeToTop: Flow<Unit> = reselected.filter { it == (Tab.Home to TabSelection.ScrollToTop) }.map {}
+    val libraryToTop: Flow<Unit> = reselected.filter { it == (Tab.Library to TabSelection.ScrollToTop) }.map {}
 
-    fun push(route: Route) {
-        stacks.getValue(tab).add(route)
+    /** Search's tab touched while on its main screen: its field takes the focus. */
+    val searchFocus: Flow<Unit> = reselected.filter { it.second == TabSelection.FocusSearch }.map {}
+
+    fun select(tab: Tab) {
+        val result = nav.select(tab)
+        if (result == TabSelection.ScrollToTop || result == TabSelection.FocusSearch) reselected.tryEmit(tab to result)
     }
 
-    fun pop() {
-        val stack = stacks.getValue(tab)
-        if (stack.size > 1) stack.removeAt(stack.lastIndex)
-    }
+    fun nextEntry(): Long = nav.nextEntry()
+
+    fun push(
+        route: Route,
+        fromPlayer: Boolean = false,
+    ) = nav.push(route, fromPlayer)
+
+    fun back(): BackResult = nav.back()
 }
 
 /**
@@ -212,10 +183,9 @@ fun ShuraAppShell(
         }
     val sheet = rememberPlayerSheetState()
     val tabs = rememberSaveableStateHolder()
-    val navigation = remember(shell) { browseNavigation(shell) }
-    val searchLinks =
-        remember(navigation) { SearchLinks(navigation.onAlbum, navigation.onArtist, navigation.onPlaylist) }
+    val links = rememberShellLinks(shell, sheet)
     PlayerModes(sheet, lyrics?.model)
+    TabRootBack(shell, sheet)
     CompositionLocalProvider(LocalNetworkRegained provides deps.networkRegained) {
         Box(
             modifier
@@ -228,10 +198,10 @@ fun ShuraAppShell(
             Column(Modifier.fillMaxSize().graphicsLayer { alpha = if (sheet.isOpen) 0f else 1f }) {
                 Box(Modifier.weight(1f)) {
                     tabs.SaveableStateProvider(shell.tab) {
-                        val stack = shell.stacks.getValue(shell.tab)
+                        val stack = shell.nav.stacks.getValue(shell.tab)
                         NavDisplay(
                             backStack = stack,
-                            onBack = shell::pop,
+                            onBack = links.navigation.onBack,
                             // Each entry (e.g. an album page) gets its own ViewModels, cleared when it is popped.
                             entryDecorators =
                                 listOf(
@@ -240,26 +210,75 @@ fun ShuraAppShell(
                                 ),
                             entryProvider =
                                 entryProvider {
-                                    homePages(home, shell, deps)
-                                    entry<Route.Search> { SearchScreen(search.controller, searchLinks) }
-                                    pages(deps, navigation)
-                                    deps.library?.let { libraryPages(it, deps, shell, navigation) }
+                                    homePages(home, shell, deps, links.navigation.onBack)
+                                    entry<Route.Search> {
+                                        SearchScreen(search.controller, links.search, focusField = shell.searchFocus)
+                                    }
+                                    pages(deps, links.navigation)
+                                    deps.library?.let { libraryPages(it, deps, shell, links.navigation) }
                                 },
                         )
                     }
                 }
                 MiniPlayer(player.model, sheet, Modifier.padding(bottom = Shura.spacing.s))
-                BottomChrome(shell.tab, hasLibrary = deps.library != null, onSelect = { shell.tab = it })
+                BottomChrome(shell.tab, hasLibrary = deps.library != null, onSelect = shell::select)
             }
             PlayerOverlay(
                 player.model,
                 sheet,
-                links = PlayerLinks(navigation.onArtist, navigation.onAlbum),
+                links = links.player,
                 lyrics = lyrics?.let { { modifier -> PlayerLyrics(it.model, modifier) } },
             )
             PreloadUpcomingArtwork(player.model)
         }
     }
+}
+
+/** Where the pages' links and Back lead, and the player's links (which bring the player back on Back). */
+private class ShellLinks(
+    val navigation: BrowseNavigation,
+    val player: PlayerLinks,
+) {
+    val search = SearchLinks(navigation.onAlbum, navigation.onArtist, navigation.onPlaylist)
+}
+
+@Composable
+private fun rememberShellLinks(
+    shell: ShellViewModel,
+    sheet: PlayerSheetState,
+): ShellLinks {
+    val scope = rememberCoroutineScope()
+    return remember(shell, sheet) {
+        // A page opened from the player brings the player back when Back leaves it.
+        val goBack: () -> Unit = {
+            if ((shell.back() as? BackResult.Popped)?.reopenPlayer == true) sheet.open(scope)
+        }
+        ShellLinks(
+            navigation = browseNavigation(shell, goBack),
+            player =
+                PlayerLinks(
+                    onArtist = { shell.push(Route.Artist(it, shell.nextEntry()), fromPlayer = true) },
+                    onAlbum = { shell.push(Route.Album(it, shell.nextEntry()), fromPlayer = true) },
+                ),
+        )
+    }
+}
+
+/** Back on the main screen of Search or Library goes to Home; on Home's, it leaves the app (the system's). */
+@Composable
+private fun TabRootBack(
+    shell: ShellViewModel,
+    sheet: PlayerSheetState,
+) {
+    val onMainScreen =
+        shell.nav.stacks
+            .getValue(shell.tab)
+            .size == 1
+    NavigationBackHandler(
+        state = rememberNavigationEventState(NavigationEventInfo.None),
+        isBackEnabled = !sheet.isShown && shell.tab != Tab.Home && onMainScreen,
+        onBackCompleted = { shell.back() },
+    )
 }
 
 /**
@@ -352,14 +371,16 @@ private val INDICATOR_WIDTH = 56.dp
 private val INDICATOR_HEIGHT = 30.dp
 
 /** Links between pages push onto the current tab; back pops it. */
-private fun browseNavigation(shell: ShellViewModel) =
-    BrowseNavigation(
-        onBack = shell::pop,
-        onAlbum = { shell.push(Route.Album(it, shell.nextEntry())) },
-        onArtist = { shell.push(Route.Artist(it, shell.nextEntry())) },
-        onPlaylist = { shell.push(Route.Playlist(it, shell.nextEntry())) },
-        onDiscography = { link, title -> shell.push(Route.Discography(link, title, shell.nextEntry())) },
-    )
+private fun browseNavigation(
+    shell: ShellViewModel,
+    onBack: () -> Unit,
+) = BrowseNavigation(
+    onBack = onBack,
+    onAlbum = { shell.push(Route.Album(it, shell.nextEntry())) },
+    onArtist = { shell.push(Route.Artist(it, shell.nextEntry())) },
+    onPlaylist = { shell.push(Route.Playlist(it, shell.nextEntry())) },
+    onDiscography = { link, title -> shell.push(Route.Discography(link, title, shell.nextEntry())) },
+)
 
 /** The catalog pages, each with its own ViewModel (cleared when the page is popped). */
 private fun EntryProviderScope<Route>.pages(
@@ -400,11 +421,11 @@ private fun EntryProviderScope<Route>.libraryPages(
         )
     entry<Route.Library> {
         val model = viewModel { LibraryViewModel(library, account?.likedSongs) }.model
-        LibraryScreen(model, links, account = account, onSignIn = deps.onSignIn)
+        LibraryScreen(model, links, account = account, onSignIn = deps.onSignIn, scrollToTop = shell.libraryToTop)
     }
     entry<Route.LikedSongs> {
         val model = viewModel { LikedSongsViewModel(library, deps.player, account?.likedSongs) }.model
-        LikedSongsScreen(model, links, onBack = shell::pop)
+        LikedSongsScreen(model, links, onBack = navigation.onBack)
     }
 }
 
@@ -413,11 +434,17 @@ private fun EntryProviderScope<Route>.homePages(
     home: HomeViewModel,
     shell: ShellViewModel,
     deps: ShellDependencies,
+    onBack: () -> Unit,
 ) {
     entry<Route.Home> {
-        HomeScreen(home.model, onSearch = { shell.tab = Tab.Search }, onSettings = { shell.push(Route.Settings) })
+        HomeScreen(
+            home.model,
+            onSearch = { shell.select(Tab.Search) },
+            onSettings = { shell.push(Route.Settings) },
+            scrollToTop = shell.homeToTop,
+        )
     }
-    entry<Route.Settings> { Settings(deps, shell::pop) }
+    entry<Route.Settings> { Settings(deps, onBack) }
 }
 
 /** Settings: the account (where there is one) and playback. */

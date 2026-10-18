@@ -28,6 +28,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -39,7 +40,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.javiernarvaezz.shura.core.model.Song
@@ -64,16 +68,22 @@ import io.github.javiernarvaezz.shura.feature.search.resources.queued_end
 import io.github.javiernarvaezz.shura.feature.search.resources.queued_next
 import io.github.javiernarvaezz.shura.feature.search.resources.retry
 import io.github.javiernarvaezz.shura.feature.search.resources.title
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.stringResource
 
-/** Search: a field fixed at the top and song results with play-next and add-to-queue actions. */
+/**
+ * Search: a field fixed at the top and song results with play-next and add-to-queue actions. Each [focusField]
+ * (its tab touched again) puts the cursor in the field, with the keyboard and what was typed selected.
+ */
 @Composable
 fun SearchScreen(
     controller: SearchController,
     links: SearchLinks,
     modifier: Modifier = Modifier,
+    focusField: Flow<Unit> = emptyFlow(),
 ) {
     val state by controller.state.collectAsStateWithLifecycle()
     val queue by controller.queue.collectAsStateWithLifecycle()
@@ -95,6 +105,7 @@ fun SearchScreen(
             Title()
             SearchField(
                 query = state.query,
+                focusField = focusField,
                 onQueryChange = controller::onQueryChange,
                 onSubmit = {
                     focusSink.requestFocus()
@@ -196,13 +207,29 @@ private fun SearchBody(
 @Composable
 private fun SearchField(
     query: String,
+    focusField: Flow<Unit>,
     onQueryChange: (String) -> Unit,
     onSubmit: () -> Unit,
 ) {
+    // The field keeps its own selection; the text itself is the controller's.
+    var field by remember { mutableStateOf(TextFieldValue(query, TextRange(query.length))) }
+    if (field.text != query) field = TextFieldValue(query, TextRange(query.length))
+    val focus = remember { FocusRequester() }
+    val keyboard = LocalSoftwareKeyboardController.current
+    LaunchedEffect(focusField) {
+        focusField.collect {
+            field = field.copy(selection = TextRange(0, field.text.length))
+            focus.requestFocus()
+            keyboard?.show()
+        }
+    }
     OutlinedTextField(
-        value = query,
-        onValueChange = onQueryChange,
-        modifier = Modifier.fillMaxWidth().padding(horizontal = Shura.spacing.gutter),
+        value = field,
+        onValueChange = {
+            field = it
+            if (it.text != query) onQueryChange(it.text)
+        },
+        modifier = Modifier.fillMaxWidth().padding(horizontal = Shura.spacing.gutter).focusRequester(focus),
         placeholder = { Text(stringResource(Res.string.field_hint)) },
         leadingIcon = { Icon(ShuraIcons.Search, contentDescription = null) },
         trailingIcon = {
