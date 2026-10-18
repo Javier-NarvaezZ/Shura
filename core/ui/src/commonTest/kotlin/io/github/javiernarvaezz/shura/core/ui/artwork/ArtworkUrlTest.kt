@@ -19,10 +19,31 @@ class ArtworkUrlTest {
 
     @Test
     fun otherUrlsAreLeftAlone() {
-        val ytimg = "https://i.ytimg.com/vi/w2T_wDvJNu4/hqdefault.jpg?sqp=abc&rs=def"
-        assertEquals(ytimg, artworkUrl(ytimg, 544))
+        val other = "https://example.com/cover.jpg?size=60"
+        assertEquals(other, artworkUrl(other, 544))
+        assertEquals(listOf(other), artworkUrls(other, 544))
         // No size suffix: nothing to replace.
         assertEquals(base, artworkUrl(base, 544))
+    }
+
+    @Test
+    fun aVideoFrameIsAskedLargestFirstWithSmallerOnesToFallBackOn() {
+        val ytimg = "https://i.ytimg.com/vi/w2T_wDvJNu4/hq720.jpg?sqp=abc&rs=def"
+        val frames = "https://i.ytimg.com/vi/w2T_wDvJNu4"
+
+        assertEquals(
+            listOf("maxresdefault", "hq720", "sddefault", "hqdefault").map { "$frames/$it.jpg" },
+            artworkUrls(ytimg, 1080),
+        )
+        assertEquals("$frames/maxresdefault.jpg", artworkUrl(ytimg, 544))
+        // Small: the 16:9 frame without black bars, as small as it comes.
+        assertEquals(listOf("$frames/mqdefault.jpg", "$frames/hqdefault.jpg"), artworkUrls(ytimg, 120))
+        assertEquals(listOf("$frames/mqdefault.jpg", "$frames/hqdefault.jpg"), artworkUrls("$frames/default.jpg", 64))
+    }
+
+    @Test
+    fun aGoogleCoverHasOneCandidate() {
+        assertEquals(listOf("$base=w544-h544-l90-rj"), artworkUrls("$base=w60-h60-l90-rj", 544))
     }
 
     @Test

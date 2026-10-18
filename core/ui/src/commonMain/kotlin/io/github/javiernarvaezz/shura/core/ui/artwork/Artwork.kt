@@ -35,9 +35,9 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
 
 /**
- * A cover at about [sizePx] pixels (see [artworkUrl]), on a neutral placeholder that also stands in when there is
- * no cover or it fails to load. A failed load is retried while the cover is shown (see [ArtworkRetry]). Loaded by
- * the app's single image loader (ADR 0001 R7).
+ * A cover at about [sizePx] pixels (see [artworkUrls]), on a neutral placeholder that also stands in when there is
+ * no cover or it fails to load. When a size does not exist (a video's frame), the next one is tried; a failed load
+ * is retried while the cover is shown (see [ArtworkRetry]). Loaded by the app's single image loader (ADR 0001 R7).
  */
 @Composable
 fun Artwork(
@@ -52,6 +52,8 @@ fun Artwork(
     var failures by remember(url) { mutableIntStateOf(0) }
     var waiting by remember(url) { mutableStateOf(false) }
     var loaded by remember(url) { mutableStateOf(false) }
+    val candidates = remember(url, sizePx) { url?.let { artworkUrls(it, sizePx) }.orEmpty() }
+    var candidate by remember(url, sizePx) { mutableIntStateOf(0) }
     if (waiting) {
         val networkRegained = LocalNetworkRegained.current
         LaunchedEffect(url, failures) {
@@ -70,20 +72,25 @@ fun Artwork(
         }
         if (url != null && !waiting) {
             // A new key per attempt: the same request would otherwise not be loaded again.
-            key(failures) {
+            key(failures, candidate) {
                 AsyncImage(
                     model =
                         ImageRequest
                             .Builder(LocalPlatformContext.current)
-                            .data(artworkUrl(url, sizePx))
+                            .data(candidates[candidate])
                             .crossfade(ShuraMotion.QUICK_MS)
                             .build(),
                     contentDescription = contentDescription,
                     contentScale = ContentScale.Crop,
                     onSuccess = { loaded = true },
                     onError = {
-                        failures++
-                        waiting = true
+                        if (candidate < candidates.lastIndex) {
+                            candidate++
+                        } else {
+                            candidate = 0
+                            failures++
+                            waiting = true
+                        }
                     },
                     modifier = Modifier.fillMaxSize(),
                 )
