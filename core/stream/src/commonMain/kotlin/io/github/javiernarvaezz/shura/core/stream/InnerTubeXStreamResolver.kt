@@ -259,4 +259,5 @@ private fun ExtractedStream.toResolvedStream(videoId: VideoId) =
         clientProfile = profileId,
         requiresBoundedRange = requireBoundedRange,
         rangeChunkSizeBytes = rangeChunkSizeBytes,
+        itag = itag,
     )

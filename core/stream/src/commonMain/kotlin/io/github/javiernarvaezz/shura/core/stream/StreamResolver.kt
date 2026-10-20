@@ -33,10 +33,13 @@ class ResolvedStream(
     val clientProfile: String,
     val requiresBoundedRange: Boolean,
     val rangeChunkSizeBytes: Long,
+    /** The audio format's YouTube id (e.g. 251, Opus); part of the offline cache's key. */
+    val itag: Int? = null,
 ) {
     override fun toString(): String =
         "ResolvedStream(url=redacted, headers=${requestHeaders.size}, mimeType=$mimeType, codecs=$codecs, " +
-            "bitrate=$bitrate, contentLength=$contentLength, expiresAt=$expiresAt, clientProfile=$clientProfile)"
+            "bitrate=$bitrate, contentLength=$contentLength, expiresAt=$expiresAt, clientProfile=$clientProfile, " +
+            "itag=$itag)"
 }
 
 /** Why a stream could not be resolved. The player maps every case to a visible "retry" state (ADR 0001 R4). */
