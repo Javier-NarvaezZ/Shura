@@ -1,0 +1,15 @@
+-- Version 9 → 10: songs kept to listen without a connection (Phase 3, E6).
+CREATE TABLE offline_song (
+    video_id TEXT NOT NULL PRIMARY KEY,
+    title TEXT NOT NULL,
+    artist_names TEXT NOT NULL,
+    artist_ids TEXT NOT NULL,
+    album_title TEXT,
+    album_id TEXT,
+    duration_ms INTEGER,
+    thumbnail_url TEXT,
+    explicit INTEGER NOT NULL,
+    itag INTEGER NOT NULL,
+    bytes INTEGER NOT NULL,
+    saved_at INTEGER NOT NULL
+);

@@ -2,6 +2,7 @@ package io.github.javiernarvaezz.shura.core.player
 
 import io.github.javiernarvaezz.shura.core.model.Song
 import io.github.javiernarvaezz.shura.core.model.VideoId
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 
 /** Where a song stands in "escuchar sin conexión" (listening without a connection). */
@@ -85,4 +86,26 @@ object OfflineRules {
         wifiOnly: Boolean,
         dataSaver: Boolean,
     ): OfflineNetwork = if (wifiOnly || dataSaver) OfflineNetwork.Unmetered else OfflineNetwork.Any
+}
+
+/** A song kept to listen without a connection: what to show without a network, and its file's key and size. */
+data class OfflineSong(
+    val song: Song,
+    val itag: Int,
+    val bytes: Long,
+    val savedAtMillis: Long,
+) {
+    val cacheKey: String get() = OfflineRules.cacheKey(song.videoId, itag)
+}
+
+/** The kept songs' records (the app database on Android); the files themselves are the cache's. */
+interface OfflineSongStore {
+    /** Newest first. */
+    val songs: Flow<List<OfflineSong>>
+
+    suspend fun put(song: OfflineSong)
+
+    suspend fun remove(videoId: VideoId)
+
+    suspend fun clear()
 }
