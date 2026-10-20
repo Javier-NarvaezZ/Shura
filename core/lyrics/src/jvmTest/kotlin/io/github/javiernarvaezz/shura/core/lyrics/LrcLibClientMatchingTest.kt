@@ -130,11 +130,12 @@ class LrcLibClientMatchingTest {
         }
 
     @Test
-    fun aTitleWithNothingToCleanIsSearchedOnce() =
+    fun aTitleWithNothingToCleanIsSearchedAsItIsThenByTitleAlone() =
         runTest {
             assertFailsWith<LyricsException.NotFound> {
                 client(emptyMap()).lyrics(LyricsQuery("Buscando Tu Besos", "Rubby Perez", null, 232.seconds))
             }
-            assertEquals(1, requests.count { it.url.encodedPath == "/api/search" })
+            val searches = requests.filter { it.url.encodedPath == "/api/search" }
+            assertEquals(listOf("Rubby Perez", null), searches.map { it.url.parameters["artist_name"] })
         }
 }

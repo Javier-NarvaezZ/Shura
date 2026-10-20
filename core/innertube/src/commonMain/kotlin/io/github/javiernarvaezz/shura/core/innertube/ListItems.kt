@@ -33,8 +33,9 @@ internal object ListItems {
     /**
      * The row as a song, or null when it has no valid video id or title (e.g. an unavailable track).
      *
-     * With [defaults] (a page of tracks), any video counts and rows without linked artists keep their plain
-     * names; without them (search), only album-audio tracks with linked artists are taken.
+     * With [defaults] (a page of tracks), any video counts; without them (search), only album-audio tracks. Rows
+     * without linked artists keep their plain names (an uploader's, which links to no artist page), and on a page
+     * the page's artists stand in when there are none.
      */
     fun song(
         item: JsonObject,
@@ -51,7 +52,8 @@ internal object ListItems {
             title = title,
             artists =
                 when {
-                    linked.isNotEmpty() || defaults == null -> linked
+                    linked.isNotEmpty() -> linked
+                    defaults == null -> plainArtists(item)
                     else -> plainArtists(item).ifEmpty { defaults.artists }
                 },
             album =

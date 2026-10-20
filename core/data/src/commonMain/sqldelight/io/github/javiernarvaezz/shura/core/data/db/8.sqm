@@ -1,0 +1,3 @@
+-- Version 8 → 9: lyrics are now also searched as a fan upload's "Artist - Title" and by the title alone (Phase 3,
+-- E5f), so songs remembered as having none are looked up again.
+DELETE FROM lyrics_cache WHERE kind = 'none';
