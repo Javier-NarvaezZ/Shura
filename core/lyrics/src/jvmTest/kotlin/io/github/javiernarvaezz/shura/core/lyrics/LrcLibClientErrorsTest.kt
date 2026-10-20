@@ -82,7 +82,8 @@ class LrcLibClientErrorsTest {
             assertFailsWith<LyricsException.NotFound> {
                 client.lyrics(LyricsQuery("Secret Title", "Secret Artist", null, 200.seconds))
             }
-            assertEquals(listOf("/api/search"), requests.map { it.url.encodedPath })
+            // As named, then by the title alone.
+            assertEquals(listOf("/api/search", "/api/search"), requests.map { it.url.encodedPath })
         }
 
     @Test

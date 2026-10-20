@@ -12,6 +12,8 @@ import kotlin.time.Duration.Companion.seconds
 /** The fields Shura uses from an LRCLIB lyrics record. */
 internal class LrcLibRecord(
     val duration: Duration,
+    val trackName: String? = null,
+    val artistName: String? = null,
     private val instrumental: Boolean,
     private val plainLyrics: String?,
     private val syncedLyrics: String?,
@@ -61,6 +63,8 @@ internal class LrcLibRecord(
             val seconds = json.primitive("duration")?.doubleOrNull?.takeIf { it.isFinite() && it > 0 } ?: return null
             return LrcLibRecord(
                 duration = seconds.seconds,
+                trackName = json.string("trackName"),
+                artistName = json.string("artistName"),
                 instrumental = json.primitive("instrumental")?.booleanOrNull ?: false,
                 plainLyrics = json.string("plainLyrics"),
                 syncedLyrics = json.string("syncedLyrics"),

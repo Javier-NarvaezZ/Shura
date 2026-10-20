@@ -33,6 +33,57 @@ object LyricsTitle {
         }
     }
 
+    private val ARTIST_DASH_TITLE = Regex("""^(.+?)\s+[-–—]\s+(.+)$""")
+    private val NOT_A_WORD = Regex("""[^\p{L}\p{N}]+""")
+    private val ACCENTS =
+        mapOf(
+            'á' to 'a',
+            'à' to 'a',
+            'â' to 'a',
+            'ä' to 'a',
+            'ã' to 'a',
+            'å' to 'a',
+            'é' to 'e',
+            'è' to 'e',
+            'ê' to 'e',
+            'ë' to 'e',
+            'í' to 'i',
+            'ì' to 'i',
+            'î' to 'i',
+            'ï' to 'i',
+            'ó' to 'o',
+            'ò' to 'o',
+            'ô' to 'o',
+            'ö' to 'o',
+            'õ' to 'o',
+            'ú' to 'u',
+            'ù' to 'u',
+            'û' to 'u',
+            'ü' to 'u',
+            'ñ' to 'n',
+            'ç' to 'c',
+        )
+
+    /**
+     * A fan upload's "Artist - Title" (its channel is not the artist): the artist and the cleaned title, or null
+     * when the title has no such dash.
+     */
+    fun artistAndTitle(title: String): Pair<String, String>? {
+        val match = ARTIST_DASH_TITLE.matchEntire(clean(title)) ?: return null
+        val artist = match.groupValues[1].trim()
+        val song = clean(match.groupValues[2])
+        return if (artist.isEmpty() || song.isEmpty()) null else artist to song
+    }
+
+    /** [text] for comparing names: cleaned, lower case, without accents or punctuation. */
+    fun normalized(text: String): String =
+        clean(text)
+            .lowercase()
+            .map { ACCENTS[it] ?: it }
+            .joinToString("")
+            .replace(NOT_A_WORD, " ")
+            .trim()
+
     /** [artist] without a channel suffix (" - Topic", "VEVO"). */
     fun cleanArtist(artist: String): String = artist.replace(ARTIST_CHANNEL, "").trim().ifEmpty { artist.trim() }
 }

@@ -78,13 +78,48 @@ class LrcLibClient(
             emptyList()
         }
 
-    /** Search as the song is named; if nothing matches, once more without upload tags, when that changes anything. */
+    /**
+     * Search as the song is named; if nothing matches, once more without upload tags (when that changes anything),
+     * then as a fan upload's "Artist - Title", then by the title alone ([searchByTitleAlone]).
+     */
     private suspend fun searchWithCleanedTitle(query: LyricsQuery): List<Candidate> {
-        searchMatches(query.title, query.artist, query.duration).ifEmpty { null }?.let { return it }
         val title = LyricsTitle.clean(query.title)
         val artist = LyricsTitle.cleanArtist(query.artist)
-        val changed = title != query.title || artist != query.artist
-        return if (changed) searchMatches(title, artist, query.duration) else emptyList()
+        val split = LyricsTitle.artistAndTitle(query.title)
+        val attempts =
+            listOfNotNull(
+                query.title to query.artist,
+                (title to artist).takeIf { it != query.title to query.artist },
+                split?.let { (splitArtist, splitTitle) -> splitTitle to splitArtist },
+            ).distinct()
+        for ((searchTitle, searchArtist) in attempts) {
+            searchMatches(searchTitle, searchArtist, query.duration).ifEmpty { null }?.let { return it }
+        }
+        return searchByTitleAlone(title, query.duration)
+    }
+
+    /**
+     * For a track published under someone else's name (an upload credited to its uploader): records with the same
+     * title (normalized), within the duration tolerances, from one artist. The artist most of them share wins; two
+     * artists as likely as each other give nothing, as another song with that title could be the match.
+     */
+    private suspend fun searchByTitleAlone(
+        title: String,
+        duration: Duration,
+    ): List<Candidate> {
+        val wanted = LyricsTitle.normalized(title)
+        val response = get("search") { parameter("track_name", title) }
+        val byArtist =
+            LrcLibRecord
+                .listFrom(body(response))
+                .filter { it.trackName?.let(LyricsTitle::normalized) == wanted }
+                .mapNotNull { record -> Candidate.of(record, duration)?.let { record.artistName.orEmpty() to it } }
+                .groupBy({ LyricsTitle.normalized(it.first) }, { it.second })
+        val most = byArtist.values.maxOfOrNull { it.size } ?: return emptyList()
+        return byArtist.values
+            .filter { it.size == most }
+            .singleOrNull()
+            .orEmpty()
     }
 
     private suspend fun searchMatches(
