@@ -43,3 +43,36 @@ object KeystoreSessionStore {
         runCatching { keyStore().deleteEntry(ALIAS) }
     }
 }
+
+/** The offline songs' key: random, wrapped by its own Android Keystore key, in `noBackupFilesDir/offline.key`. */
+object KeystoreOfflineKey {
+    private const val KEYSTORE = "AndroidKeyStore"
+    private const val ALIAS = "sunloop_offline"
+    private const val KEY_BITS = 256
+
+    fun load(context: Context): WrappedKeyFile.Loaded =
+        WrappedKeyFile(
+            File(context.noBackupFilesDir, "offline.key"),
+            AesGcmSessionCipher(key = ::key, deleteKey = ::deleteKey),
+        ).load()
+
+    private fun keyStore(): KeyStore = KeyStore.getInstance(KEYSTORE).apply { load(null) }
+
+    private fun key(): SecretKey =
+        (keyStore().getKey(ALIAS, null) as? SecretKey) ?: KeyGenerator
+            .getInstance(KeyProperties.KEY_ALGORITHM_AES, KEYSTORE)
+            .apply {
+                init(
+                    KeyGenParameterSpec
+                        .Builder(ALIAS, KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT)
+                        .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
+                        .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
+                        .setKeySize(KEY_BITS)
+                        .build(),
+                )
+            }.generateKey()
+
+    private fun deleteKey() {
+        runCatching { keyStore().deleteEntry(ALIAS) }
+    }
+}
