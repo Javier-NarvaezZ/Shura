@@ -56,6 +56,7 @@ import io.github.javiernarvaezz.shura.core.lyrics.LyricsRepository
 import io.github.javiernarvaezz.shura.core.model.BrowseLink
 import io.github.javiernarvaezz.shura.core.model.MusicCatalog
 import io.github.javiernarvaezz.shura.core.model.Song
+import io.github.javiernarvaezz.shura.core.model.VideoId
 import io.github.javiernarvaezz.shura.core.player.AudioPlayer
 import io.github.javiernarvaezz.shura.core.player.Library
 import io.github.javiernarvaezz.shura.core.player.PlayHistory
@@ -130,6 +131,8 @@ class ShellDependencies(
     val onSignIn: () -> Unit = {},
     /** The signed-in account's library for the Library tab; null where there is no account (desktop). */
     val accountLibrary: AccountLibraryModel? = null,
+    /** The album track a video upload is known to stand for, so a radio starts from songs, not videos. */
+    val trackOfVideo: (VideoId) -> VideoId? = { null },
 )
 
 /** Navigation state ([TabNavigator]), kept across rotation, and the signals a tab's main screen reacts to. */
@@ -172,7 +175,7 @@ fun ShuraAppShell(
     modifier: Modifier = Modifier,
 ) {
     val shell = viewModel { ShellViewModel() }
-    val home = viewModel { HomeViewModel(deps.player, deps.history, deps.currentHour) }
+    val home = homeViewModel(deps)
     val search =
         viewModel { SearchViewModel(SearchSources.of(deps.catalog), deps.player, deps.onPlaybackIntent, deps.library) }
     val player = viewModel { PlayerViewModel(deps.player, deps.settings, deps.library) }
@@ -234,52 +237,12 @@ fun ShuraAppShell(
     }
 }
 
-/** Where the pages' links and Back lead, and the player's links (which bring the player back on Back). */
-private class ShellLinks(
-    val navigation: BrowseNavigation,
-    val player: PlayerLinks,
-) {
-    val search = SearchLinks(navigation.onAlbum, navigation.onArtist, navigation.onPlaylist)
-}
-
+/** Home, whose recently played songs start their radio. */
 @Composable
-private fun rememberShellLinks(
-    shell: ShellViewModel,
-    sheet: PlayerSheetState,
-): ShellLinks {
-    val scope = rememberCoroutineScope()
-    return remember(shell, sheet) {
-        // A page opened from the player brings the player back when Back leaves it.
-        val goBack: () -> Unit = {
-            if ((shell.back() as? BackResult.Popped)?.reopenPlayer == true) sheet.open(scope)
-        }
-        ShellLinks(
-            navigation = browseNavigation(shell, goBack),
-            player =
-                PlayerLinks(
-                    onArtist = { shell.push(Route.Artist(it, shell.nextEntry()), fromPlayer = true) },
-                    onAlbum = { shell.push(Route.Album(it, shell.nextEntry()), fromPlayer = true) },
-                ),
-        )
+private fun homeViewModel(deps: ShellDependencies) =
+    viewModel {
+        HomeViewModel(deps.player, deps.history, deps.currentHour, deps.catalog::relatedSongs, deps.trackOfVideo)
     }
-}
-
-/** Back on the main screen of Search or Library goes to Home; on Home's, it leaves the app (the system's). */
-@Composable
-private fun TabRootBack(
-    shell: ShellViewModel,
-    sheet: PlayerSheetState,
-) {
-    val onMainScreen =
-        shell.nav.stacks
-            .getValue(shell.tab)
-            .size == 1
-    NavigationBackHandler(
-        state = rememberNavigationEventState(NavigationEventInfo.None),
-        isBackEnabled = !sheet.isShown && shell.tab != Tab.Home && onMainScreen,
-        onBackCompleted = { shell.back() },
-    )
-}
 
 /**
  * Back leaves the queue or the lyrics, then closes the player, before it navigates. Lyrics are looked up only
@@ -369,18 +332,6 @@ private const val PLAYER_TRAVEL = 0.75f
 private val ITEM_WIDTH = 96.dp
 private val INDICATOR_WIDTH = 56.dp
 private val INDICATOR_HEIGHT = 30.dp
-
-/** Links between pages push onto the current tab; back pops it. */
-private fun browseNavigation(
-    shell: ShellViewModel,
-    onBack: () -> Unit,
-) = BrowseNavigation(
-    onBack = onBack,
-    onAlbum = { shell.push(Route.Album(it, shell.nextEntry())) },
-    onArtist = { shell.push(Route.Artist(it, shell.nextEntry())) },
-    onPlaylist = { shell.push(Route.Playlist(it, shell.nextEntry())) },
-    onDiscography = { link, title -> shell.push(Route.Discography(link, title, shell.nextEntry())) },
-)
 
 /** The catalog pages, each with its own ViewModel (cleared when the page is popped). */
 private fun EntryProviderScope<Route>.pages(

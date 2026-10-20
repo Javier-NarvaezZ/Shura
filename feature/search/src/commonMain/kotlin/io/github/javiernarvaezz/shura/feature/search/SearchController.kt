@@ -5,10 +5,12 @@ import io.github.javiernarvaezz.shura.core.model.ArtistSummary
 import io.github.javiernarvaezz.shura.core.model.MusicCatalog
 import io.github.javiernarvaezz.shura.core.model.PlaylistSummary
 import io.github.javiernarvaezz.shura.core.model.Song
+import io.github.javiernarvaezz.shura.core.model.VideoId
 import io.github.javiernarvaezz.shura.core.player.AudioPlayer
 import io.github.javiernarvaezz.shura.core.player.Library
 import io.github.javiernarvaezz.shura.core.player.QueueState
 import io.github.javiernarvaezz.shura.core.player.SongLikes
+import io.github.javiernarvaezz.shura.core.player.SongRadio
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -23,16 +25,23 @@ enum class SearchStatus { Idle, Loading, Done, Empty, Failed }
 /** What a search looks for: one of YouTube Music's search filters. */
 enum class SearchKind { Songs, Albums, Artists, Playlists }
 
-/** Where each kind of result comes from. */
+/** Where each kind of result comes from, and a song's radio ([related]) for a tapped result. */
 class SearchSources(
     val songs: suspend (String) -> List<Song>,
     val albums: suspend (String) -> List<AlbumSummary> = { emptyList() },
     val artists: suspend (String) -> List<ArtistSummary> = { emptyList() },
     val playlists: suspend (String) -> List<PlaylistSummary> = { emptyList() },
+    val related: suspend (VideoId) -> List<Song> = { emptyList() },
 ) {
     companion object {
         fun of(catalog: MusicCatalog) =
-            SearchSources(catalog::searchSongs, catalog::searchAlbums, catalog::searchArtists, catalog::searchPlaylists)
+            SearchSources(
+                catalog::searchSongs,
+                catalog::searchAlbums,
+                catalog::searchArtists,
+                catalog::searchPlaylists,
+                catalog::relatedSongs,
+            )
     }
 }
 
@@ -70,6 +79,8 @@ class SearchController(
 ) {
     /** "Me gusta" for the results; without a library the menus offer none. */
     val likes = SongLikes(library, scope)
+
+    private val radio = SongRadio(player, sources.related, scope)
 
     private val mutableState = MutableStateFlow(SearchUiState())
     private val jobs = mutableMapOf<SearchKind, Job>()
@@ -172,12 +183,8 @@ class SearchController(
     /** The queue, to mark the song that is playing in the results. */
     val queue: StateFlow<QueueState> = player.queue
 
-    /** Plays [song] with the current results as the queue (as YouTube Music does), or alone if not in them. */
-    fun play(song: Song) {
-        val results = mutableState.value.results
-        val index = results.indexOf(song)
-        if (index >= 0) player.playQueue(results, index) else player.play(song)
-    }
+    /** Plays [song] followed by its radio, not by the other results (which are unrelated to each other). */
+    fun play(song: Song) = radio.start(song)
 
     /** Plays [song] right after the current one (or starts it if nothing is queued). */
     fun playNext(song: Song) = player.playNext(listOf(song))

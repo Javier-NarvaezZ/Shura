@@ -21,7 +21,20 @@ class HomeModelTest {
     private val b = testSong(2, "B")
     private val c = testSong(3, "C")
 
-    private fun TestScope.model(hour: Int = 10) = HomeModel(player, history, { hour }, backgroundScope)
+    private val radio = listOf(testSong(7, "R1"))
+    private val radioAsked = mutableListOf<String>()
+
+    private fun TestScope.model(hour: Int = 10) =
+        HomeModel(
+            player,
+            history,
+            { hour },
+            backgroundScope,
+            related = {
+                radioAsked += it.value
+                radio
+            },
+        )
 
     @Test
     fun thePartOfTheDayFollowsTheHour() {
@@ -73,15 +86,19 @@ class HomeModelTest {
         }
 
     @Test
-    fun aRecentSongPlaysWithTheRestOfTheRowQueued() =
+    fun aRecentSongPlaysFollowedByItsRadio() =
         runTest {
             val home = model()
             history.songs.value = listOf(a, b, c)
             runCurrent()
 
             home.playRecent(1)
+            player.queue.value = QueueState(items = listOf(b), currentIndex = 0)
+            runCurrent()
 
-            assertEquals(listOf("playQueue:A,B,C@1"), player.calls)
+            // Its radio, not the rest of the row (songs unrelated to each other).
+            assertEquals(listOf("shuffle:false", "play:B", "enqueue:R1"), player.calls)
+            assertEquals(listOf(b.videoId.value), radioAsked)
         }
 
     @Test

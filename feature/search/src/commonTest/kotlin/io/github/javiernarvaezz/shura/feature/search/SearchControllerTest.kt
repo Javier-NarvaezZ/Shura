@@ -4,6 +4,7 @@ import io.github.javiernarvaezz.shura.core.model.AlbumSummary
 import io.github.javiernarvaezz.shura.core.model.ArtistSummary
 import io.github.javiernarvaezz.shura.core.model.PlaylistSummary
 import io.github.javiernarvaezz.shura.core.model.Song
+import io.github.javiernarvaezz.shura.core.player.QueueState
 import io.github.javiernarvaezz.shura.core.testing.FakeAudioPlayer
 import io.github.javiernarvaezz.shura.core.testing.FakeMusicCatalog
 import io.github.javiernarvaezz.shura.core.testing.testSong
@@ -18,8 +19,21 @@ class SearchControllerTest {
     private val song = testSong(1, "La Camisa Negra")
     private val player = FakeAudioPlayer()
 
+    private val radio = listOf(testSong(7, "Radio 1"), testSong(8, "Radio 2"))
+    private val radioAsked = mutableListOf<String>()
+
     private fun TestScope.controller(search: suspend (String) -> List<Song>) =
-        SearchController(SearchSources(songs = search), player, backgroundScope)
+        SearchController(
+            SearchSources(
+                songs = search,
+                related = {
+                    radioAsked += it.value
+                    radio
+                },
+            ),
+            player,
+            backgroundScope,
+        )
 
     @Test
     fun typingOrSubmittingAQuerySignalsPlaybackIntent() =
@@ -136,7 +150,7 @@ class SearchControllerTest {
         }
 
     @Test
-    fun tappingAResultPlaysTheResultsAsAQueueFromThatSong() =
+    fun tappingAResultPlaysItFollowedByItsRadioNotTheOtherResults() =
         runTest {
             val controller = controller { listOf(testSong(2, "Other"), song, testSong(3, "Third")) }
             controller.onQueryChange("juanes")
@@ -144,18 +158,11 @@ class SearchControllerTest {
             runCurrent()
 
             controller.play(song)
+            player.queue.value = QueueState(items = listOf(song), currentIndex = 0)
+            runCurrent()
 
-            assertEquals(listOf("playQueue:Other,La Camisa Negra,Third@1"), player.calls)
-        }
-
-    @Test
-    fun aSongOutsideTheResultsPlaysAlone() =
-        runTest {
-            val controller = controller { emptyList() }
-
-            controller.play(song)
-
-            assertEquals(listOf("play:La Camisa Negra"), player.calls)
+            assertEquals(listOf("shuffle:false", "play:La Camisa Negra", "enqueue:Radio 1,Radio 2"), player.calls)
+            assertEquals(listOf(song.videoId.value), radioAsked)
         }
 
     @Test

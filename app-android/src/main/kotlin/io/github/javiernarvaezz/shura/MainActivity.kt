@@ -55,6 +55,7 @@ class MainActivity : ComponentActivity() {
                             library = graph.library,
                             account = graph.account,
                             accountLibrary = graph.accountLibrary,
+                            trackOfVideo = graph::trackOfVideo,
                             onSignIn = { signIn.launch(Intent(this, LoginActivity::class.java)) },
                         )
                     },
