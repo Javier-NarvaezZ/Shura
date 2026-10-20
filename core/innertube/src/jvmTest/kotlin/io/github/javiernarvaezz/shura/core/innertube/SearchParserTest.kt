@@ -112,4 +112,14 @@ class SearchParserTest {
         assertNull(SearchParser.parseDuration("Amorfoda"))
         assertNull(SearchParser.parseDuration("2:3"))
     }
+
+    @Test
+    fun anArtistNotLinkedToAPageKeepsItsName() {
+        // "wiseman" is published under its uploader, whose name links to no artist page.
+        val song = parse("search/search_songs_wiseman.json").first { it.videoId == VideoId("qtK6GKyRRLM") }
+
+        assertEquals("wiseman", song.title)
+        assertEquals(listOf(Artist("SkyScale96")), song.artists)
+        assertEquals("wiseman", song.album?.title)
+    }
 }
