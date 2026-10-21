@@ -57,6 +57,23 @@ class SqlOfflineSongsTest {
         }
 
     @Test
+    fun aDownloadUnderWayIsMarkedCompleteWithItsSize() =
+        runTest {
+            val store = store()
+            store.put(kept(1, at = 1).copy(bytes = 0, complete = false))
+            assertEquals(
+                false,
+                store.songs
+                    .first()
+                    .single()
+                    .complete,
+            )
+
+            store.complete(kept(1, at = 1).song.videoId, bytes = 3_600_000)
+            assertEquals(kept(1, at = 1).copy(bytes = 3_600_000), store.songs.first().single())
+        }
+
+    @Test
     fun aSongCanBeRemovedOrAllCleared() =
         runTest {
             val store = store()

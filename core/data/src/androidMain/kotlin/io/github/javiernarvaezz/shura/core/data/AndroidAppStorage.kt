@@ -27,6 +27,8 @@ class AndroidAppStorage(
 
     val lyricsOffsets = SqlLyricsOffsets(database, ioContext)
 
+    val offlineSongs = SqlOfflineSongs(database, ioContext)
+
     /** Moves songs saved as the artist's video to their album track ([SavedSongRepair]). */
     fun savedSongRepair(albumTracks: suspend (albumId: String) -> Map<VideoId, VideoId>?) =
         SavedSongRepair(database, ioContext, albumTracks)

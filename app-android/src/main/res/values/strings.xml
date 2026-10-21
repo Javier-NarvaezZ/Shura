@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Sunloop</string>
+    <string name="offline_channel_name">Escuchar sin conexión</string>
+    <string name="offline_channel_description">Progreso de las canciones que se guardan para escuchar sin conexión</string>
+    <string name="offline_downloading">Guardando para escuchar sin conexión</string>
     <!-- Sign-in screen (runs in its own process, where Compose resources are not available). -->
     <string name="sign_in_title">Iniciar sesión</string>
     <string name="sign_in_back">Atrás</string>

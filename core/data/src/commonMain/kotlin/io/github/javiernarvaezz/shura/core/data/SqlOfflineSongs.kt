@@ -46,9 +46,17 @@ class SqlOfflineSongs(
                     itag = song.itag.toLong(),
                     bytes = song.bytes,
                     saved_at = song.savedAtMillis,
+                    complete = song.complete.toLong(),
                 ),
             )
         }
+    }
+
+    override suspend fun complete(
+        videoId: VideoId,
+        bytes: Long,
+    ) {
+        withContext(ioContext) { queries.completeOfflineSong(bytes = bytes, videoId = videoId.value) }
     }
 
     override suspend fun remove(videoId: VideoId) {
@@ -72,6 +80,6 @@ class SqlOfflineSongs(
                 thumbnailUrl = thumbnail_url,
                 explicit = explicit != 0L,
             ).toSong() ?: return null
-        return OfflineSong(song, itag.toInt(), bytes, saved_at)
+        return OfflineSong(song, itag.toInt(), bytes, saved_at, complete != 0L)
     }
 }

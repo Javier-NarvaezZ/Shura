@@ -13,6 +13,7 @@ kotlin {
             implementation(libs.media3.exoplayer)
             implementation(libs.media3.datasource.okhttp)
             implementation(libs.media3.session)
+            implementation(libs.media3.database)
         }
         commonTest.dependencies {
             implementation(libs.kotlinx.coroutines.test)

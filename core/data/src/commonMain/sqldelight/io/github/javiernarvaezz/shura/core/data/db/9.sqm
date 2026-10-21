@@ -11,5 +11,7 @@ CREATE TABLE offline_song (
     explicit INTEGER NOT NULL,
     itag INTEGER NOT NULL,
     bytes INTEGER NOT NULL,
-    saved_at INTEGER NOT NULL
+    saved_at INTEGER NOT NULL,
+    -- 0 while the download is under way (it survives the process), 1 once the whole file is kept.
+    complete INTEGER NOT NULL
 );

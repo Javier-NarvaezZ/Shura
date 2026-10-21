@@ -6,6 +6,7 @@ import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.datasource.DataSource
 import androidx.media3.datasource.HttpDataSource
 import androidx.media3.datasource.ResolvingDataSource
 import androidx.media3.datasource.okhttp.OkHttpDataSource
@@ -42,18 +43,26 @@ internal fun buildShuraExoPlayer(
     )
     return ExoPlayer
         .Builder(context)
-        .setMediaSourceFactory(
-            ProgressiveMediaSource.Factory(
-                ResolvingDataSource.Factory(
-                    BoundedRangeDataSource.Factory(OkHttpDataSource.Factory(dependencies.callFactory), trace),
-                    specResolver,
-                ),
-            ),
-        ).setAudioAttributes(audioAttributes, true)
+        .setMediaSourceFactory(ProgressiveMediaSource.Factory(mediaSources(dependencies, specResolver)))
+        .setAudioAttributes(audioAttributes, true)
         .setHandleAudioBecomingNoisy(true)
         .setWakeMode(C.WAKE_MODE_NETWORK)
         .build()
         .apply { if (trace !== Trace.NONE) addAnalyticsListener(TraceAnalytics(trace)) }
+}
+
+/** Streams through the resolver and the single client; songs kept offline are read from their encrypted cache. */
+@OptIn(UnstableApi::class)
+private fun mediaSources(
+    dependencies: PlaybackDependencies,
+    specResolver: StreamSpecResolver,
+): DataSource.Factory {
+    val streaming =
+        ResolvingDataSource.Factory(
+            BoundedRangeDataSource.Factory(OkHttpDataSource.Factory(dependencies.callFactory), dependencies.trace),
+            specResolver,
+        )
+    return dependencies.offline?.reading(streaming, dependencies.offlineKeyOf) ?: streaming
 }
 
 /** Classifies platform exceptions for [PlaybackError.from]: HTTP status, network or decoding. */

@@ -12,7 +12,9 @@ CREATE TABLE offline_song (
     explicit INTEGER NOT NULL,
     itag INTEGER NOT NULL,
     bytes INTEGER NOT NULL,
-    saved_at INTEGER NOT NULL
+    saved_at INTEGER NOT NULL,
+    -- 0 while the download is under way (it survives the process), 1 once the whole file is kept.
+    complete INTEGER NOT NULL
 );
 
 offlineSongs:
@@ -20,6 +22,9 @@ SELECT * FROM offline_song ORDER BY saved_at DESC, rowid DESC;
 
 putOfflineSong:
 INSERT OR REPLACE INTO offline_song VALUES ?;
+
+completeOfflineSong:
+UPDATE offline_song SET complete = 1, bytes = :bytes WHERE video_id = :videoId;
 
 removeOfflineSong:
 DELETE FROM offline_song WHERE video_id = ?;

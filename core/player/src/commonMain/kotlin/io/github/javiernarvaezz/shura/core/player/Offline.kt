@@ -88,12 +88,16 @@ object OfflineRules {
     ): OfflineNetwork = if (wifiOnly || dataSaver) OfflineNetwork.Unmetered else OfflineNetwork.Any
 }
 
-/** A song kept to listen without a connection: what to show without a network, and its file's key and size. */
+/**
+ * A song kept to listen without a connection: what to show without a network, and its file's key and size.
+ * [complete] once the whole file is kept; until then the download is under way.
+ */
 data class OfflineSong(
     val song: Song,
     val itag: Int,
     val bytes: Long,
     val savedAtMillis: Long,
+    val complete: Boolean = true,
 ) {
     val cacheKey: String get() = OfflineRules.cacheKey(song.videoId, itag)
 }
@@ -104,6 +108,12 @@ interface OfflineSongStore {
     val songs: Flow<List<OfflineSong>>
 
     suspend fun put(song: OfflineSong)
+
+    /** The download of [videoId] finished with [bytes]. */
+    suspend fun complete(
+        videoId: VideoId,
+        bytes: Long,
+    )
 
     suspend fun remove(videoId: VideoId)
 
