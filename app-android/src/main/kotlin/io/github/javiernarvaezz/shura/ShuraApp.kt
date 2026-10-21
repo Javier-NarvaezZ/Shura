@@ -13,6 +13,7 @@ import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import coil3.serviceLoaderEnabled
 import io.github.javiernarvaezz.shura.core.auth.AccountFingerprint
 import io.github.javiernarvaezz.shura.core.auth.CookieJarText
+import io.github.javiernarvaezz.shura.core.auth.KeystoreOfflineKey
 import io.github.javiernarvaezz.shura.core.auth.KeystoreSessionStore
 import io.github.javiernarvaezz.shura.core.auth.SapisidHash
 import io.github.javiernarvaezz.shura.core.auth.Session
@@ -30,7 +31,11 @@ import io.github.javiernarvaezz.shura.core.model.Song
 import io.github.javiernarvaezz.shura.core.model.VideoId
 import io.github.javiernarvaezz.shura.core.network.ShuraNetwork
 import io.github.javiernarvaezz.shura.core.player.AndroidAudioPlayer
+import io.github.javiernarvaezz.shura.core.player.AndroidOfflineLibrary
 import io.github.javiernarvaezz.shura.core.player.AudioPlayer
+import io.github.javiernarvaezz.shura.core.player.OfflineNotificationTexts
+import io.github.javiernarvaezz.shura.core.player.OfflineStorage
+import io.github.javiernarvaezz.shura.core.player.OfflineStorageProvider
 import io.github.javiernarvaezz.shura.core.player.PlaybackDependencies
 import io.github.javiernarvaezz.shura.core.player.PlaybackDependenciesProvider
 import io.github.javiernarvaezz.shura.core.player.PlaybackWarmup
@@ -62,6 +67,7 @@ import java.util.Locale
 class ShuraApp :
     Application(),
     PlaybackDependenciesProvider,
+    OfflineStorageProvider,
     SingletonImageLoader.Factory {
     /** Created on first use from the main thread (the media controller binds to the creating thread's looper). */
     val graph: AppGraph by lazy { AppGraph(this) }
@@ -87,6 +93,16 @@ class ShuraApp :
     }
 
     override val playbackDependencies: PlaybackDependencies get() = graph.playbackDependencies
+
+    override val offlineStorage: OfflineStorage get() = graph.offlineStorage
+
+    override val offlineNotificationTexts: OfflineNotificationTexts
+        get() =
+            OfflineNotificationTexts(
+                getString(R.string.offline_channel_name),
+                getString(R.string.offline_channel_description),
+                getString(R.string.offline_downloading),
+            )
 
     // Every Compose image request uses this loader, so artwork never reaches Coil's default HTTP stack.
     override fun newImageLoader(context: Context): ImageLoader = graph.imageLoader(context)
@@ -275,6 +291,32 @@ class AppGraph(
     /** The user's timing fix for each song's lyrics, in the app database. */
     val lyricsOffsets: LyricsOffsets = storage.lyricsOffsets
 
+    /**
+     * Songs kept to listen without a connection, encrypted in the app's private storage with a key wrapped by the
+     * Keystore. A key that could not be unwrapped was replaced: what was kept is unreadable and its records go.
+     */
+    private val offlineKey = KeystoreOfflineKey.load(context)
+
+    val offlineStorage =
+        OfflineStorage(
+            context,
+            offlineKey.bytes,
+            network.okHttp,
+            debugStreamResolver(streamResolver),
+            trace = trace,
+            keyReplaced = offlineKey.replaced,
+        )
+
+    val offline =
+        AndroidOfflineLibrary(
+            context,
+            offlineStorage,
+            debugStreamResolver(streamResolver),
+            storage.offlineSongs,
+            scope,
+            trackOf = ::trackOfVideo,
+        )
+
     /** Used by `PlaybackService`, where the player lives; media and artwork go through the single client. */
     val playbackDependencies =
         PlaybackDependencies(
@@ -285,6 +327,8 @@ class AppGraph(
             prefetchNext = ::nextItemPrefetchEnabled,
             relatedSongs = catalog::relatedSongs,
             autoplay = settings.autoplay,
+            offline = offlineStorage,
+            offlineKeyOf = { offline.cacheKeys.value[it] },
         )
 
     val player: AudioPlayer = AndroidAudioPlayer(context, trace)
@@ -323,6 +367,7 @@ class AppGraph(
         )
 
     init {
+        if (offlineKey.replaced) scope.launch { storage.offlineSongs.clear() }
         debugMaybePrewarm(streamResolver, trace)
         // Likes queued while offline go to the account as soon as there is a network again.
         scope.launch { networkRegained.collect { accountLikes.flush() } }

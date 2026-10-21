@@ -23,6 +23,10 @@ class PlaybackDependencies(
     val relatedSongs: (suspend (VideoId) -> List<Song>)? = null,
     /** Whether autoplay is on (the user's setting); turning it on while the last song plays acts at once. */
     val autoplay: StateFlow<Boolean> = MutableStateFlow(false),
+    /** The songs kept to listen without a connection; null streams everything. */
+    val offline: OfflineStorage? = null,
+    /** The cache key of a song kept whole ("<video id>:<itag>"), so it plays from there. */
+    val offlineKeyOf: (VideoId) -> String? = { null },
 )
 
 /** Implemented by the `Application`, so the service gets its dependencies without a DI framework. */

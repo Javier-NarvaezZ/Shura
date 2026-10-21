@@ -53,6 +53,12 @@ internal class StreamSpecResolver(
                 throw StreamResolutionIOException(e)
             }
         trace.event("player: resolve done", mapOf("profile" to stream.clientProfile))
+        // A kept song's bytes are of one format: a new resolution with another must not be mixed in.
+        val keptFormat = dataSpec.key?.let(::keptItag)
+        if (keptFormat != null && keptFormat != stream.itag) {
+            runBlocking { cache.invalidate(videoId) }
+            throw IOException("Stream format changed")
+        }
         return dataSpec
             .buildUpon()
             .setUri(stream.url)
@@ -96,5 +102,8 @@ internal class StreamSpecResolver(
         scope.cancel()
     }
 }
+
+/** The itag of a kept song's cache key ("<video id>:<itag>"), or null for any other key. */
+internal fun keptItag(cacheKey: String): Int? = cacheKey.substringAfterLast(':', "").toIntOrNull()
 
 private const val TAG = "ShuraStream"

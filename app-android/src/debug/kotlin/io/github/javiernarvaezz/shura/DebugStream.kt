@@ -49,6 +49,7 @@ internal fun applyDebugLaunchOptions(intent: Intent) {
     if (intent.getBooleanExtra(EXTRA_PREWARM, false)) prewarmRequested = true
     warmupEnabled = intent.getBooleanExtra(EXTRA_WARMUP, false)
     prefetchEnabled = !intent.getBooleanExtra(EXTRA_NO_PREFETCH, false)
+    if (intent.getBooleanExtra("shura.debug.rejectMidDownload", false)) rejectMidDownload = true
 }
 
 /** Debug: off unless launched with `--ez shura.debug.warmup true`, so cold-start measurements stay comparable. */

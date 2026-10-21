@@ -75,6 +75,8 @@ class InnerTubeXStreamResolverTest {
             assertEquals("VISIONOS_0_1__nopo", stream.clientProfile)
             assertTrue(stream.requiresBoundedRange)
             assertEquals(1_048_576, stream.rangeChunkSizeBytes)
+            // The format, for the offline cache's key (video id + itag).
+            assertEquals(251, stream.itag)
         }
 
     @Test
